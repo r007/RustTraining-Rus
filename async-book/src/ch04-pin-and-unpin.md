@@ -1,37 +1,37 @@
-# 4. Pin and Unpin 🔴
+# 4. Pin и Unpin 🔴
 
-> **What you'll learn:**
-> - Why self-referential structs break when moved in memory
-> - What `Pin<P>` guarantees and how it prevents moves
-> - The three practical pinning patterns: `Box::pin()`, `tokio::pin!()`, `Pin::new()`
-> - When `Unpin` gives you an escape hatch
+> **Что вы узнаете:**
+> - Почему самоссылающиеся структуры ломаются при перемещении в памяти
+> - Что гарантирует `Pin<P>` и как он предотвращает перемещение
+> - Три практических паттерна закрепления: `Box::pin()`, `tokio::pin!()`, `Pin::new()`
+> - Когда `Unpin` даёт вам лазейку
 
-## Why Pin Exists
+## Зачем нужен Pin
 
-This is the most confusing concept in async Rust. Let's build the intuition step by step.
+Это самое запутанное понятие в асинхронном Rust. Построим интуицию шаг за шагом.
 
-### The Problem: Self-Referential Structs
+### Проблема: самоссылающиеся структуры
 
-When the compiler transforms an `async fn` into a state machine, that state machine may contain references to its own fields. This creates a *self-referential struct* — and moving it in memory would invalidate those internal references.
+Когда компилятор превращает `async fn` в конечный автомат, этот автомат может содержать ссылки на собственные поля. Так возникает *самоссылающаяся структура* — и её перемещение в памяти сделает внутренние ссылки недействительными.
 
 ```rust
-// What the compiler generates (simplified) for:
+// Что компилятор генерирует (упрощённо) для:
 // async fn example() {
 //     let data = vec![1, 2, 3];
-//     let reference = &data;       // Points to data above
+//     let reference = &data;       // Указывает на data выше
 //     use_ref(reference).await;
 // }
 
-// Becomes something like:
+// Превращается во что-то вроде:
 enum ExampleStateMachine {
     State0 {
         data: Vec<i32>,
-        // reference: &Vec<i32>,  // PROBLEM: points to `data` above
-        //                        // If this struct moves, the pointer is dangling!
+        // reference: &Vec<i32>,  // ПРОБЛЕМА: указывает на `data` выше
+        //                        // Если структура переместится, указатель повиснет!
     },
     State1 {
         data: Vec<i32>,
-        reference: *const Vec<i32>, // Internal pointer to data field
+        reference: *const Vec<i32>, // Внутренний указатель на поле data
     },
     Complete,
 }
@@ -39,16 +39,16 @@ enum ExampleStateMachine {
 
 ```mermaid
 graph LR
-    subgraph "Before Move (Valid)"
-        A["data: [1,2,3]<br/>at addr 0x1000"]
-        B["reference: 0x1000<br/>(points to data)"]
-        B -->|"valid"| A
+    subgraph "До перемещения (корректно)"
+        A["data: [1,2,3]<br/>по адресу 0x1000"]
+        B["reference: 0x1000<br/>(указывает на data)"]
+        B -->|"корректно"| A
     end
 
-    subgraph "After Move (INVALID)"
-        C["data: [1,2,3]<br/>at addr 0x2000"]
-        D["reference: 0x1000<br/>(still points to OLD location!)"]
-        D -->|"dangling!"| E["💥 0x1000<br/>(freed/garbage)"]
+    subgraph "После перемещения (НЕКОРРЕКТНО)"
+        C["data: [1,2,3]<br/>по адресу 0x2000"]
+        D["reference: 0x1000<br/>(всё ещё указывает на СТАРОЕ место!)"]
+        D -->|"висячий указатель!"| E["💥 0x1000<br/>(освобождено / мусор)"]
     end
 
     style E fill:#ffcdd2,color:#000
@@ -56,141 +56,139 @@ graph LR
     style B fill:#c8e6c9,color:#000
 ```
 
-### Self-Referential Structs
+### Самоссылающиеся структуры
 
-This isn't an academic concern. Every `async fn` that holds a reference across an `.await` point creates a self-referential state machine:
+Это не академическая проблема. Любая `async fn`, которая удерживает ссылку через точку `.await`, создаёт самоссылающийся конечный автомат:
 
 ```rust
 async fn problematic() {
     let data = String::from("hello");
-    let slice = &data[..]; // slice borrows data
-    
-    some_io().await; // <-- .await point: state machine stores both data AND slice
-    
-    println!("{slice}"); // uses the reference after await
+    let slice = &data[..]; // slice заимствует data
+
+    some_io().await; // <-- точка .await: автомат хранит и data, и slice
+
+    println!("{slice}"); // использует ссылку после await
 }
-// The generated state machine has `data: String` and `slice: &str`
-// where slice points INTO data. Moving the state machine = dangling pointer.
+// Сгенерированный автомат содержит `data: String` и `slice: &str`,
+// где slice указывает ВНУТРЬ data. Перемещение автомата = висячий указатель.
 ```
 
-### Pin in Practice
+### Pin на практике
 
-`Pin<P>` is a wrapper that prevents moving the value behind the pointer:
+`Pin<P>` — это обёртка, которая запрещает перемещать значение, на которое указывает указатель:
 
 ```rust
 use std::pin::Pin;
 
 let mut data = String::from("hello");
 
-// Pin it — now it can't be moved
+// Закрепляем — теперь его нельзя переместить
 let pinned: Pin<&mut String> = Pin::new(&mut data);
 
-// Can still use it:
+// Всё ещё можно использовать:
 println!("{}", pinned.as_ref().get_ref()); // "hello"
 
-// But we can't get &mut String back (which would allow mem::swap):
-// let mutable: &mut String = Pin::into_inner(pinned); // Only if String: Unpin
-// String IS Unpin, so this actually works for String.
-// But for self-referential state machines (which are !Unpin), it's blocked.
+// Но получить обратно &mut String нельзя (это позволило бы mem::swap):
+// let mutable: &mut String = Pin::into_inner(pinned); // Только если String: Unpin
+// String — это Unpin, поэтому здесь это на самом деле работает.
+// Но для самоссылающихся конечных автоматов (они !Unpin) это заблокировано.
 ```
 
-In real code, you mostly encounter Pin in three places:
+В реальном коде Pin встречается в основном в трёх местах:
 
 ```rust
-// 1. poll() signature — all futures are polled through Pin
+// 1. Сигнатура poll() — все future опрашиваются через Pin
 fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Output>;
 
-// 2. Box::pin() — heap-allocate and pin a future
+// 2. Box::pin() — разместить future в куче и закрепить его
 let future: Pin<Box<dyn Future<Output = i32>>> = Box::pin(async { 42 });
 
-// 3. tokio::pin!() — pin a future on the stack
+// 3. tokio::pin!() — закрепить future на стеке
 tokio::pin!(my_future);
-// Now my_future: Pin<&mut impl Future>
+// Теперь my_future: Pin<&mut impl Future>
 ```
 
-### The Unpin Escape Hatch
+### Лазейка Unpin
 
-Most types in Rust are `Unpin` — they don't contain self-references, so pinning is a no-op. Only compiler-generated state machines (from `async fn`) are `!Unpin`.
+Большинство типов в Rust — `Unpin`: они не содержат самоссылок, поэтому закрепление для них ничего не меняет. `!Unpin` — только автоматы, сгенерированные компилятором из `async fn`.
 
 ```rust
-// These are all Unpin — pinning them does nothing special:
+// Все эти типы — Unpin, закрепление для них ничего особого не делает:
 // i32, String, Vec<T>, HashMap<K,V>, Box<T>, &T, &mut T
 
-// These are !Unpin — they MUST be pinned before polling:
-// The state machines generated by `async fn` and `async {}`
+// Эти типы — !Unpin, их ОБЯЗАТЕЛЬНО нужно закрепить перед опросом:
+// Конечные автоматы, сгенерированные из `async fn` и `async {}`
 
-// Practical implication:
-// If you write a Future by hand and it has NO self-references,
-// implement Unpin to make it easier to work with:
-impl Unpin for MySimpleFuture {} // "I'm safe to move, trust me"
+// Практический вывод:
+// Если вы пишете Future вручную и в нём НЕТ самоссылок,
+// реализуйте Unpin, чтобы с ним было проще работать:
+impl Unpin for MySimpleFuture {} // «Его безопасно перемещать, поверьте мне»
 ```
 
-### Quick Reference
+### Краткая справка
 
-| What | When | How |
-|------|------|-----|
-| Pin a future on the heap | Storing in a collection, returning from function | `Box::pin(future)` |
-| Pin a future on the stack | Local use in `select!` or manual polling | `std::pin::pin!(future)` or `tokio::pin!(future)` |
-| Pin in function signature | Accepting pinned futures | `future: Pin<&mut F>` |
-| Require Unpin | When you need to move a future after creation | `F: Future + Unpin` |
+| Что | Когда | Как |
+|-----|-------|-----|
+| Закрепить future в куче | Хранение в коллекции, возврат из функции | `Box::pin(future)` |
+| Закрепить future на стеке | Локальное использование в `select!` или при ручном опросе | `std::pin::pin!(future)` или `tokio::pin!(future)` |
+| Pin в сигнатуре функции | Приём уже закреплённых future | `future: Pin<&mut F>` |
+| Требовать Unpin | Когда нужно переместить future после создания | `F: Future + Unpin` |
 
 <details>
-<summary><strong>🏋️ Exercise: Pin and Move</strong> (click to expand)</summary>
+<summary><strong>🏋️ Упражнение: Pin и перемещение</strong> (нажмите, чтобы раскрыть)</summary>
 
-**Challenge**: Which of these code snippets compile? For each one that doesn't, explain why and fix it.
+**Задача**: какие из этих фрагментов кода компилируются? Для каждого, который не компилируется, объясните почему и исправьте.
 
 ```rust
-// Snippet A
+// Фрагмент A
 let fut = async { 42 };
 let pinned = Box::pin(fut);
-let moved = pinned; // Move the Box
+let moved = pinned; // Перемещаем Box
 let result = moved.await;
 
-// Snippet B
+// Фрагмент B
 let fut = async { 42 };
 tokio::pin!(fut);
-let moved = fut; // Move the pinned future
+let moved = fut; // Перемещаем закреплённый future
 let result = moved.await;
 
-// Snippet C
+// Фрагмент C
 use std::pin::Pin;
 let mut fut = async { 42 };
 let pinned = Pin::new(&mut fut);
 ```
 
 <details>
-<summary>🔑 Solution</summary>
+<summary>🔑 Решение</summary>
 
-**Snippet A**: ✅ **Compiles.** `Box::pin()` puts the future on the heap. Moving the `Box` moves the *pointer*, not the future itself. The future stays pinned in its heap location.
+**Фрагмент A**: ✅ **Компилируется.** `Box::pin()` размещает future в куче. Перемещение `Box` перемещает *указатель*, а не сам future. Future остаётся закреплённым в своём месте в куче.
 
-**Snippet B**: ✅ **Compiles.** `tokio::pin!` pins the future to the stack and rebinds `fut` as `Pin<&mut ...>`. `let moved = fut` moves the **`Pin` wrapper** (a pointer), not the underlying future — the future stays pinned on the stack. This is just like `Box::pin`: moving the `Box` doesn't move the heap allocation. However, `fut` is consumed by the move, so you can't use `fut` afterwards — only `moved`:
+**Фрагмент B**: ✅ **Компилируется.** `tokio::pin!` закрепляет future на стеке и переобъявляет `fut` как `Pin<&mut ...>`. `let moved = fut` перемещает **обёртку `Pin`** (по сути, указатель), а не лежащий в ней future — future остаётся закреплённым на стеке. Это похоже на `Box::pin`: перемещение `Box` не перемещает выделение в куче. Однако `fut` потребляется перемещением, поэтому после него нельзя использовать `fut` — только `moved`:
 ```rust
 let fut = async { 42 };
 tokio::pin!(fut);
-let moved = fut;        // Moves the Pin<&mut> wrapper — OK
-// fut.await;           // ❌ Error: fut was moved
-let result = moved.await; // ✅ Use moved instead
+let moved = fut;        // Перемещаем обёртку Pin<&mut> — OK
+// fut.await;           // ❌ Ошибка: fut уже перемещён
+let result = moved.await; // ✅ Используем moved
 ```
 
-**Snippet C**: ❌ **Does not compile.** `Pin::new()` requires `T: Unpin`. Async blocks generate `!Unpin` types. **Fix**: Use `Box::pin()` or `unsafe Pin::new_unchecked()`:
+**Фрагмент C**: ❌ **Не компилируется.** `Pin::new()` требует `T: Unpin`. Async-блоки порождают типы `!Unpin`. **Исправление**: используйте `Box::pin()` или `unsafe Pin::new_unchecked()`:
 ```rust
 let fut = async { 42 };
-let pinned = Box::pin(fut); // Heap-pin — works with !Unpin
+let pinned = Box::pin(fut); // Закрепление в куче — работает с !Unpin
 ```
 
-**Key takeaway**: `Box::pin()` is the safe, easy way to pin `!Unpin` futures. `tokio::pin!()` pins on the stack — you can move the `Pin<&mut>` wrapper (it's just a pointer), but the underlying future stays put. `Pin::new()` only works with `Unpin` types.
+**Ключевой вывод**: `Box::pin()` — безопасный и простой способ закрепить `!Unpin` future. `tokio::pin!()` закрепляет на стеке — можно перемещать обёртку `Pin<&mut>` (это всего лишь указатель), но сам future остаётся на месте. `Pin::new()` работает только с типами `Unpin`.
 
 </details>
 </details>
 
-> **Key Takeaways — Pin and Unpin**
-> - `Pin<P>` is a wrapper that **prevents the pointee from being moved** — essential for self-referential state machines
-> - `Box::pin()` is the safe, easy default for pinning futures on the heap
-> - `tokio::pin!()` pins on the stack — you can move the `Pin<&mut>` wrapper, but the underlying future stays put
-> - `Unpin` is an auto-trait opt-out: types that implement `Unpin` can be moved even when pinned (most types are `Unpin`; async blocks are not)
+> **Ключевые выводы — Pin и Unpin**
+> - `Pin<P>` — это обёртка, которая **запрещает перемещать то, на что указывает**; без неё невозможны самоссылающиеся конечные автоматы
+> - `Box::pin()` — безопасный и простой вариант по умолчанию для закрепления future в куче
+> - `tokio::pin!()` закрепляет на стеке — обёртку `Pin<&mut>` можно перемещать, но сам future остаётся на месте
+> - `Unpin` — это автотрейт-исключение: типы, реализующие `Unpin`, можно перемещать даже будучи закреплёнными (большинство типов — `Unpin`; async-блоки — нет)
 
-> **See also:** [Ch 2 — The Future Trait](ch02-the-future-trait.md) for `Pin<&mut Self>` in poll, [Ch 5 — The State Machine Reveal](ch05-the-state-machine-reveal.md) for why async state machines are self-referential
+> **См. также:** [Гл. 2 — Трейт Future](ch02-the-future-trait.md) — `Pin<&mut Self>` в poll, [Гл. 5 — Раскрываем конечный автомат](ch05-the-state-machine-reveal.md) — почему async-автоматы самоссылающиеся
 
 ***
-
-

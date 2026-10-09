@@ -1,32 +1,32 @@
-# 8. Tokio Deep Dive 🟡
+# 8. Глубокое погружение в Tokio 🟡
 
-> **What you'll learn:**
-> - Runtime flavors: multi-thread vs current-thread and when to use each
-> - `tokio::spawn`, the `'static` requirement, and `JoinHandle`
-> - Task cancellation semantics (cancel-on-drop)
-> - Sync primitives: Mutex, RwLock, Semaphore, and all four channel types
+> **Что вы узнаете:**
+> - Варианты рантайма: multi-thread и current-thread и когда какой использовать
+> - `tokio::spawn`, требование `'static` и `JoinHandle`
+> - Семантика отмены задач (отмена при уничтожении)
+> - Примитивы синхронизации: Mutex, RwLock, Semaphore и все четыре типа каналов
 
-## Runtime Flavors: Multi-Thread vs Current-Thread
+## Варианты рантайма: multi-thread и current-thread
 
-Tokio offers two runtime configurations:
+Tokio предлагает две конфигурации рантайма:
 
 ```rust
-// Multi-threaded (default with #[tokio::main])
-// Uses a work-stealing thread pool — tasks can move between threads
+// Многопоточный (по умолчанию с #[tokio::main])
+// Использует пул потоков с work-stealing — задачи могут переходить между потоками
 #[tokio::main]
 async fn main() {
-    // N worker threads (default = number of CPU cores)
-    // Tasks are Send + 'static
+    // N рабочих потоков (по умолчанию — количество ядер CPU)
+    // Задачи должны быть Send + 'static
 }
 
-// Current-thread — everything runs on one thread
+// Current-thread — всё выполняется в одном потоке
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
-    // Single-threaded — tasks don't need to be Send
-    // Lighter weight, good for simple tools or WASM
+    // Однопоточный — задачам не нужен Send
+    // Легче по весу, подходит для простых утилит или WASM
 }
 
-// Manual runtime construction:
+// Ручное создание рантайма:
 let rt = tokio::runtime::Builder::new_multi_thread()
     .worker_threads(4)
     .enable_all()
@@ -34,24 +34,24 @@ let rt = tokio::runtime::Builder::new_multi_thread()
     .unwrap();
 
 rt.block_on(async {
-    println!("Running on custom runtime");
+    println!("Работаем на своём рантайме");
 });
 ```
 
 ```mermaid
 graph TB
-    subgraph "Multi-Thread (default)"
-        MT_Q1["Thread 1<br/>Task A, Task D"]
-        MT_Q2["Thread 2<br/>Task B"]
-        MT_Q3["Thread 3<br/>Task C, Task E"]
-        STEAL["Work Stealing:<br/>idle threads steal from busy ones"]
+    subgraph "Multi-Thread (по умолчанию)"
+        MT_Q1["Поток 1<br/>Задача A, Задача D"]
+        MT_Q2["Поток 2<br/>Задача B"]
+        MT_Q3["Поток 3<br/>Задача C, Задача E"]
+        STEAL["Кража работы:<br/>простаивающие потоки забирают задачи у занятых"]
         MT_Q1 <--> STEAL
         MT_Q2 <--> STEAL
         MT_Q3 <--> STEAL
     end
 
     subgraph "Current-Thread"
-        ST_Q["Single Thread<br/>Task A → Task B → Task C → Task D"]
+        ST_Q["Один поток<br/>Задача A → Задача B → Задача C → Задача D"]
     end
 
     style MT_Q1 fill:#c8e6c9,color:#000
@@ -60,9 +60,9 @@ graph TB
     style ST_Q fill:#bbdefb,color:#000
 ```
 
-### tokio::spawn and the 'static Requirement
+### tokio::spawn и требование 'static
 
-`tokio::spawn` puts a future onto the runtime's task queue. Because it might run on *any* worker thread at *any* time, the future must be `Send + 'static`:
+`tokio::spawn` помещает future в очередь задач рантайма. Поскольку он может выполняться на *любом* рабочем потоке в *любой* момент, future должен быть `Send + 'static`:
 
 ```rust
 use tokio::task;
@@ -70,49 +70,49 @@ use tokio::task;
 async fn example() {
     let data = String::from("hello");
 
-    // ✅ Works: move ownership into the task
+    // ✅ Работает: передаём владение в задачу
     let handle = task::spawn(async move {
         println!("{data}");
         data.len()
     });
 
     let len = handle.await.unwrap();
-    println!("Length: {len}");
+    println!("Длина: {len}");
 }
 
 async fn problem() {
     let data = String::from("hello");
 
-    // ❌ FAILS: data is borrowed, not 'static
+    // ❌ НЕ РАБОТАЕТ: data заимствован, а не 'static
     // task::spawn(async {
-    //     println!("{data}"); // borrows `data` — not 'static
+    //     println!("{data}"); // заимствует `data` — не 'static
     // });
 
-    // ❌ FAILS: Rc is not Send
+    // ❌ НЕ РАБОТАЕТ: Rc не является Send
     // let rc = std::rc::Rc::new(42);
     // task::spawn(async move {
-    //     println!("{rc}"); // Rc is !Send — can't cross thread boundary
+    //     println!("{rc}"); // Rc — !Send, нельзя пересечь границу потока
     // });
 }
 ```
 
-**Why `'static`?** The spawned task runs independently — it might outlive the scope that created it. The compiler can't prove the references will remain valid, so it requires owned data.
+**Почему `'static`?** Порождённая задача выполняется независимо — она может пережить область видимости, в которой была создана. Компилятор не может доказать, что ссылки останутся действительными, поэтому требуются данные, которыми задача владеет.
 
-**Why `Send`?** The task might be resumed on a different thread than where it was suspended. All data held across `.await` points must be safe to send between threads.
+**Почему `Send`?** Задачу могут возобновить на другом потоке, а не на том, где её приостановили. Все данные, которые хранятся через точки `.await`, должны безопасно передаваться между потоками.
 
 ```rust
-// Common pattern: clone shared data into the task
+// Типичный паттерн: клонируем общие данные в задачу
 let shared = Arc::new(config);
 
 for i in 0..10 {
-    let shared = Arc::clone(&shared); // Clone the Arc, not the data
+    let shared = Arc::clone(&shared); // Клонируем Arc, а не данные
     tokio::spawn(async move {
         process_item(i, &shared).await;
     });
 }
 ```
 
-### JoinHandle and Task Cancellation
+### JoinHandle и отмена задач
 
 ```rust
 use tokio::task::JoinHandle;
@@ -124,44 +124,44 @@ async fn cancellation_example() {
         "completed".to_string()
     });
 
-    // Cancel the task by dropping the handle? NO — task keeps running!
-    // drop(handle); // Task continues in the background
+    // Отменить задачу, уничтожив handle? НЕТ — задача продолжит работать!
+    // drop(handle); // Задача продолжает выполняться в фоне
 
-    // To actually cancel, call abort():
+    // Чтобы действительно отменить, вызовите abort():
     handle.abort();
 
-    // Awaiting an aborted task returns JoinError
+    // Ожидание отменённой задачи возвращает JoinError
     match handle.await {
-        Ok(val) => println!("Got: {val}"),
-        Err(e) if e.is_cancelled() => println!("Task was cancelled"),
-        Err(e) => println!("Task panicked: {e}"),
+        Ok(val) => println!("Получено: {val}"),
+        Err(e) if e.is_cancelled() => println!("Задача отменена"),
+        Err(e) => println!("Задача завершилась паникой: {e}"),
     }
 }
 ```
 
-> **Important**: Dropping a `JoinHandle` does NOT cancel the task in tokio.
-> The task becomes *detached* and keeps running. You must explicitly call
-> `.abort()` to cancel it. This is different from dropping a `Future` directly,
-> which does cancel/drop the underlying computation.
+> **Важно**: уничтожение `JoinHandle` НЕ отменяет задачу в tokio.
+> Задача становится *отсоединённой* и продолжает работать. Чтобы её отменить, нужно явно вызвать
+> `.abort()`. Это отличается от уничтожения `Future` напрямую,
+> которое действительно отменяет (уничтожает) базовое вычисление.
 
-### Tokio Sync Primitives
+### Примитивы синхронизации Tokio
 
-Tokio provides async-aware synchronization primitives. The key principle: **don't use `std::sync::Mutex` across `.await` points**.
+Tokio предоставляет примитивы синхронизации, которые понимают async. Ключевой принцип: **не используйте `std::sync::Mutex` через точки `.await`**.
 
 ```rust
 use tokio::sync::{Mutex, RwLock, Semaphore, mpsc, oneshot, broadcast, watch};
 
 // --- Mutex ---
-// Async mutex: the lock() method is async and won't block the thread
+// Асинхронный мьютекс: метод lock() асинхронный и не блокирует поток
 let data = Arc::new(Mutex::new(vec![1, 2, 3]));
 {
-    let mut guard = data.lock().await; // Non-blocking lock
+    let mut guard = data.lock().await; // Неблокирующая блокировка
     guard.push(4);
-} // Guard dropped here — lock released
+} // Guard уничтожен здесь — блокировка снята
 
-// --- Channels ---
-// mpsc: Multiple producer, single consumer
-let (tx, mut rx) = mpsc::channel::<String>(100); // Bounded buffer
+// --- Каналы ---
+// mpsc: несколько отправителей, один получатель
+let (tx, mut rx) = mpsc::channel::<String>(100); // Буфер ограниченного размера
 
 tokio::spawn(async move {
     tx.send("hello".into()).await.unwrap();
@@ -169,76 +169,76 @@ tokio::spawn(async move {
 
 let msg = rx.recv().await.unwrap();
 
-// oneshot: Single value, single consumer
+// oneshot: одно значение, один получатель
 let (tx, rx) = oneshot::channel::<i32>();
-tx.send(42).unwrap(); // No await needed — either sends or fails
+tx.send(42).unwrap(); // await не нужен — либо отправляет, либо ошибка
 let val = rx.await.unwrap();
 
-// broadcast: Multiple producers, multiple consumers (all get every message)
+// broadcast: несколько отправителей, несколько получателей (каждый получает все сообщения)
 let (tx, _) = broadcast::channel::<String>(100);
 let mut rx1 = tx.subscribe();
 let mut rx2 = tx.subscribe();
 
-// watch: Single value, multiple consumers (only latest value)
+// watch: одно значение, несколько получателей (только последнее значение)
 let (tx, rx) = watch::channel(0u64);
 tx.send(42).unwrap();
-println!("Latest: {}", *rx.borrow());
+println!("Последнее значение: {}", *rx.borrow());
 ```
 
-> **Note:** `.unwrap()` is used for brevity throughout these channel examples.
-> In production, handle send/receive errors gracefully — a failed `.send()` means
-> the receiver was dropped, and a failed `.recv()` means the channel is closed.
+> **Примечание:** `.unwrap()` в примерах с каналами используется для краткости.
+> В продакшене обрабатывайте ошибки отправки и получения аккуратно: неудачный `.send()` означает,
+> что получатель уже уничтожен, а неудачный `.recv()` — что канал закрыт.
 
 ```mermaid
 graph LR
-    subgraph "Channel Types"
+    subgraph "Типы каналов"
         direction TB
-        MPSC["mpsc<br/>N→1<br/>Buffered queue"]
-        ONESHOT["oneshot<br/>1→1<br/>Single value"]
-        BROADCAST["broadcast<br/>N→N<br/>All receivers get all"]
-        WATCH["watch<br/>1→N<br/>Latest value only"]
+        MPSC["mpsc<br/>N→1<br/>Буферизованная очередь"]
+        ONESHOT["oneshot<br/>1→1<br/>Одно значение"]
+        BROADCAST["broadcast<br/>N→N<br/>Все получатели получают всё"]
+        WATCH["watch<br/>1→N<br/>Только последнее значение"]
     end
 
-    P1["Producer 1"] --> MPSC
-    P2["Producer 2"] --> MPSC
-    MPSC --> C1["Consumer"]
+    P1["Отправитель 1"] --> MPSC
+    P2["Отправитель 2"] --> MPSC
+    MPSC --> C1["Получатель"]
 
-    P3["Producer"] --> ONESHOT
-    ONESHOT --> C2["Consumer"]
+    P3["Отправитель"] --> ONESHOT
+    ONESHOT --> C2["Получатель"]
 
-    P4["Producer"] --> BROADCAST
-    BROADCAST --> C3["Consumer 1"]
-    BROADCAST --> C4["Consumer 2"]
+    P4["Отправитель"] --> BROADCAST
+    BROADCAST --> C3["Получатель 1"]
+    BROADCAST --> C4["Получатель 2"]
 
-    P5["Producer"] --> WATCH
-    WATCH --> C5["Consumer 1"]
-    WATCH --> C6["Consumer 2"]
+    P5["Отправитель"] --> WATCH
+    WATCH --> C5["Получатель 1"]
+    WATCH --> C6["Получатель 2"]
 ```
 
-## Case Study: Choosing the Right Channel for a Notification Service
+## Разбор кейса: выбор канала для сервиса уведомлений
 
-You're building a notification service where:
-- Multiple API handlers produce events
-- A single background task batches and sends them
-- A config watcher updates rate limits at runtime
-- A shutdown signal must reach all components
+Вы создаёте сервис уведомлений, где:
+- Несколько обработчиков API порождают события
+- Одна фоновая задача группирует их в пакеты и отправляет
+- Наблюдатель за конфигурацией обновляет лимиты скорости во время работы
+- Сигнал остановки должен дойти до всех компонентов
 
-**Which channels for each?**
+**Какой канал для каждого случая?**
 
-| Requirement | Channel | Why |
-|-------------|---------|-----|
-| API handlers → Batcher | `mpsc` (bounded) | N producers, 1 consumer. Bounded for backpressure — if the batcher falls behind, API handlers slow down instead of OOM |
-| Config watcher → Rate limiter | `watch` | Only the latest config matters. Multiple readers (each worker) see the current value |
-| Shutdown signal → All components | `broadcast` | Every component must receive the shutdown notification independently |
-| Single health-check response | `oneshot` | Request/response pattern — one value, then done |
+| Требование | Канал | Почему |
+|------------|-------|--------|
+| Обработчики API → Batcher | `mpsc` (ограниченный) | N отправителей, 1 получатель. Ограничение нужно для backpressure — если batcher отстаёт, обработчики API замедляются вместо переполнения памяти (OOM) |
+| Наблюдатель конфигурации → Ограничитель скорости | `watch` | Важна только последняя конфигурация. Несколько читателей (каждый воркер) видят текущее значение |
+| Сигнал остановки → Все компоненты | `broadcast` | Каждый компонент должен независимо получить уведомление об остановке |
+| Ответ на единичную проверку здоровья | `oneshot` | Шаблон запрос/ответ — одно значение, и всё |
 
 ```mermaid
 graph LR
-    subgraph "Notification Service"
+    subgraph "Сервис уведомлений"
         direction TB
-        API1["API Handler 1"] -->|mpsc| BATCH["Batcher"]
-        API2["API Handler 2"] -->|mpsc| BATCH
-        CONFIG["Config Watcher"] -->|watch| RATE["Rate Limiter"]
+        API1["Обработчик API 1"] -->|mpsc| BATCH["Batcher"]
+        API2["Обработчик API 2"] -->|mpsc| BATCH
+        CONFIG["Наблюдатель конфигурации"] -->|watch| RATE["Ограничитель скорости"]
         CTRL["Ctrl+C"] -->|broadcast| API1
         CTRL -->|broadcast| BATCH
         CTRL -->|broadcast| RATE
@@ -253,12 +253,12 @@ graph LR
 ```
 
 <details>
-<summary><strong>🏋️ Exercise: Build a Task Pool</strong> (click to expand)</summary>
+<summary><strong>🏋️ Упражнение: пул задач</strong> (нажмите, чтобы раскрыть)</summary>
 
-**Challenge**: Build a function `run_with_limit` that accepts a list of async closures and a concurrency limit, executing at most N tasks simultaneously. Use `tokio::sync::Semaphore`.
+**Задача**: реализуйте функцию `run_with_limit`, которая принимает список асинхронных замыканий и лимит конкурентности и выполняет не более N задач одновременно. Используйте `tokio::sync::Semaphore`.
 
 <details>
-<summary>🔑 Solution</summary>
+<summary>🔑 Решение</summary>
 
 ```rust
 use std::future::Future;
@@ -278,7 +278,7 @@ where
         let permit = Arc::clone(&semaphore);
         let handle = tokio::spawn(async move {
             let _permit = permit.acquire().await.unwrap();
-            // Permit is held while task runs, then dropped
+            // Разрешение удерживается, пока выполняется задача, затем освобождается
             task().await
         });
         handles.push(handle);
@@ -291,26 +291,24 @@ where
     results
 }
 
-// Usage:
+// Использование:
 // let tasks: Vec<_> = urls.into_iter().map(|url| {
 //     move || async move { fetch(url).await }
 // }).collect();
-// let results = run_with_limit(tasks, 10).await; // Max 10 concurrent
+// let results = run_with_limit(tasks, 10).await; // Не более 10 одновременно
 ```
 
-**Key takeaway**: `Semaphore` is the standard way to limit concurrency in tokio. Each task acquires a permit before starting work. When the semaphore is full, new tasks wait asynchronously (non-blocking) until a slot opens.
+**Ключевой вывод**: `Semaphore` — стандартный способ ограничить конкурентность в tokio. Каждая задача получает разрешение перед началом работы. Когда семафор заполнен, новые задачи асинхронно (без блокировки потока) ждут, пока не освободится слот.
 
 </details>
 </details>
 
-> **Key Takeaways — Tokio Deep Dive**
-> - Use `multi_thread` for servers (default); `current_thread` for CLI tools, tests, or `!Send` types
-> - `tokio::spawn` requires `'static` futures — use `Arc` or channels to share data
-> - Dropping a `JoinHandle` does **not** cancel the task — call `.abort()` explicitly
-> - Choose sync primitives by need: `Mutex` for shared state, `Semaphore` for concurrency limits, `mpsc`/`oneshot`/`broadcast`/`watch` for communication
+> **Ключевые выводы — глубокое погружение в Tokio**
+> - Используйте `multi_thread` для серверов (по умолчанию); `current_thread` — для CLI-утилит, тестов или типов `!Send`
+> - `tokio::spawn` требует future типа `'static` — для совместного использования данных применяйте `Arc` или каналы
+> - Уничтожение `JoinHandle` **не** отменяет задачу — вызывайте `.abort()` явно
+> - Выбирайте примитивы синхронизации по потребности: `Mutex` для общего состояния, `Semaphore` для лимитов конкурентности, `mpsc`/`oneshot`/`broadcast`/`watch` для обмена сообщениями
 
-> **See also:** [Ch 9 — When Tokio Isn't the Right Fit](ch09-when-tokio-isnt-the-right-fit.md) for alternatives to spawn, [Ch 12 — Common Pitfalls](ch12-common-pitfalls.md) for MutexGuard-across-await bugs
+> **См. также:** [Гл. 9 — Когда Tokio не подходит](ch09-when-tokio-isnt-the-right-fit.md) — альтернативы spawn, [Гл. 12 — Типичные ловушки](ch12-common-pitfalls.md) — ошибки с MutexGuard через await
 
 ***
-
-

@@ -1,22 +1,22 @@
-# 9. When Tokio Isn't the Right Fit 🟡
+# 9. Когда Tokio не подходит 🟡
 
-> **What you'll learn:**
-> - The `'static` problem: when `tokio::spawn` forces you into `Arc` everywhere
-> - `LocalSet` for `!Send` futures
-> - `FuturesUnordered` for borrow-friendly concurrency (no spawn needed)
-> - `JoinSet` for managed task groups
-> - Writing runtime-agnostic libraries
+> **Что вы узнаете:**
+> - Проблему `'static`: когда `tokio::spawn` заставляет использовать `Arc` повсюду
+> - `LocalSet` для фьючей типа `!Send`
+> - `FuturesUnordered` для конкурентности, дружественной к заимствованиям (без spawn)
+> - `JoinSet` для управляемых групп задач
+> - Написание библиотек, не привязанных к рантайму
 
 ```mermaid
 graph TD
-    START["Need concurrent futures?"] --> STATIC{"Can futures be 'static?"}
-    STATIC -->|Yes| SEND{"Are futures Send?"}
-    STATIC -->|No| FU["FuturesUnordered<br/>Runs on current task"]
-    SEND -->|Yes| SPAWN["tokio::spawn<br/>Multi-threaded"]
-    SEND -->|No| LOCAL["LocalSet<br/>Single-threaded"]
-    SPAWN --> MANAGE{"Need to track/abort tasks?"}
-    MANAGE -->|Yes| JOINSET["JoinSet / TaskTracker"]
-    MANAGE -->|No| HANDLE["JoinHandle"]
+    START["Нужны конкурентные фьючи?"] --> STATIC{"Фьючи могут быть 'static?"}
+    STATIC -->|Да| SEND{"Фьючи являются Send?"}
+    STATIC -->|Нет| FU["FuturesUnordered<br/>Выполняется в текущей задаче"]
+    SEND -->|Да| SPAWN["tokio::spawn<br/>Многопоточный"]
+    SEND -->|Нет| LOCAL["LocalSet<br/>Однопоточный"]
+    SPAWN --> MANAGE{"Нужно отслеживать/прерывать задачи?"}
+    MANAGE -->|Да| JOINSET["JoinSet / TaskTracker"]
+    MANAGE -->|Нет| HANDLE["JoinHandle"]
 
     style START fill:#f5f5f5,stroke:#333,color:#000
     style FU fill:#d4efdf,stroke:#27ae60,color:#000
@@ -26,20 +26,20 @@ graph TD
     style HANDLE fill:#e8f4f8,stroke:#2980b9,color:#000
 ```
 
-## The 'static Future Problem
+## Проблема 'static у фьючей
 
-Tokio's `spawn` requires `'static` futures. This means you can't borrow local data in spawned tasks:
+`spawn` в Tokio требует future типа `'static`. Это значит, что в порождённых задачах нельзя заимствовать локальные данные:
 
 ```rust
 async fn process_items(items: &[String]) {
-    // ❌ Can't do this — items is borrowed, not 'static
+    // ❌ Так нельзя — items заимствован, а не 'static
     // for item in items {
     //     tokio::spawn(async {
     //         process(item).await;
     //     });
     // }
 
-    // 😐 Workaround 1: Clone everything
+    // 😐 Обходной путь 1: клонировать всё
     for item in items {
         let item = item.clone();
         tokio::spawn(async move {
@@ -47,7 +47,7 @@ async fn process_items(items: &[String]) {
         });
     }
 
-    // 😐 Workaround 2: Use Arc
+    // 😐 Обходной путь 2: использовать Arc
     let items = Arc::new(items.to_vec());
     for i in 0..items.len() {
         let items = Arc::clone(&items);
@@ -58,57 +58,57 @@ async fn process_items(items: &[String]) {
 }
 ```
 
-This is annoying! In Go, you can just `go func() { use(item) }` with a closure. In Rust, the ownership system forces you to think about who owns what and how long it lives.
+Это раздражает! В Go можно просто написать `go func() { use(item) }` с замыканием. В Rust система владения заставляет думать о том, кому что принадлежит и как долго это живёт.
 
-### Alternatives to `tokio::spawn`
+### Альтернативы `tokio::spawn`
 
-Not every problem requires `spawn`. Here are three tools that each solve a
-*different* constraint:
+Не каждая задача требует `spawn`. Вот три инструмента, каждый из которых решает
+*другое* ограничение:
 
 ```rust
-// 1. FuturesUnordered — avoids 'static entirely (no spawn!)
+// 1. FuturesUnordered — полностью обходит 'static (без spawn!)
 use futures::stream::{FuturesUnordered, StreamExt};
 
 async fn process_items(items: &[String]) {
     let futures: FuturesUnordered<_> = items
         .iter()
         .map(|item| async move {
-            // ✅ Can borrow item — no spawn, no 'static needed!
+            // ✅ Может заимствовать item — ни spawn, ни 'static не нужны!
             process(item).await
         })
         .collect();
 
-    // Drive all futures to completion
+    // Доводим все фьючи до завершения
     futures.for_each(|result| async move {
-        println!("Result: {result:?}");
+        println!("Результат: {result:?}");
     }).await;
 }
 
-// 2. tokio::task::LocalSet — run !Send futures on current thread
-//    ⚠️  Still requires 'static — solves Send, not 'static
+// 2. tokio::task::LocalSet — запускает фьючи !Send в текущем потоке
+//    ⚠️  Всё ещё требует 'static — решает Send, а не 'static
 use tokio::task::LocalSet;
 
 let local_set = LocalSet::new();
 local_set.run_until(async {
     tokio::task::spawn_local(async {
-        // Can use Rc, Cell, and other !Send types here
+        // Здесь можно использовать Rc, Cell и другие типы !Send
         let rc = std::rc::Rc::new(42);
         println!("{rc}");
     }).await.unwrap();
 }).await;
 
-// 3. tokio JoinSet (tokio 1.21+) — managed set of spawned tasks
-//    ⚠️  Still requires 'static + Send — solves task *management*,
-//    not the 'static problem. Useful for tracking, aborting, and
-//    joining a dynamic group of tasks.
+// 3. JoinSet в tokio (tokio 1.21+) — управляемый набор порождённых задач
+//    ⚠️  Всё ещё требует 'static + Send — решает управление задачами,
+//    а не проблему 'static. Полезен для отслеживания, прерывания и
+//    ожидания динамической группы задач.
 use tokio::task::JoinSet;
 
 async fn with_joinset() {
     let mut set = JoinSet::new();
 
     for i in 0..10 {
-        // i is Copy and moved into the closure — already 'static.
-        // You'd still need Arc or clone for borrowed data.
+        // i — Copy и перемещается в замыкание, поэтому он уже 'static.
+        // Для заимствованных данных всё равно понадобятся Arc или clone.
         set.spawn(async move {
             tokio::time::sleep(Duration::from_millis(100)).await;
             i * 2
@@ -116,37 +116,37 @@ async fn with_joinset() {
     }
 
     while let Some(result) = set.join_next().await {
-        println!("Task completed: {:?}", result.unwrap());
+        println!("Задача завершена: {:?}", result.unwrap());
     }
 }
 ```
 
-> **Which tool solves which problem?**
+> **Какой инструмент решает какую проблему?**
 >
-> | Constraint you hit | Tool | Avoids `'static`? | Avoids `Send`? |
+> | Ограничение, с которым вы столкнулись | Инструмент | Обходит `'static`? | Обходит `Send`? |
 > |---|---|---|---|
-> | Can't make futures `'static` | `FuturesUnordered` | ✅ Yes | ✅ Yes |
-> | Futures are `'static` but `!Send` | `LocalSet` | ❌ No | ✅ Yes |
-> | Need to track / abort spawned tasks | `JoinSet` | ❌ No | ❌ No |
+> | Нельзя сделать фьючи `'static` | `FuturesUnordered` | ✅ Да | ✅ Да |
+> | Фьючи `'static`, но `!Send` | `LocalSet` | ❌ Нет | ✅ Да |
+> | Нужно отслеживать / прерывать порождённые задачи | `JoinSet` | ❌ Нет | ❌ Нет |
 
-### Lightweight Runtimes for Libraries
+### Лёгкие рантаймы для библиотек
 
-If you're writing a library — don't force users into tokio:
+Если вы пишете библиотеку — не заставляйте пользователей использовать tokio:
 
 ```rust
-// ❌ BAD: Library forces tokio on users
+// ❌ ПЛОХО: библиотека навязывает tokio пользователям
 pub async fn my_lib_function() {
     tokio::time::sleep(Duration::from_secs(1)).await;
-    // Now your users MUST use tokio
+    // Теперь твои пользователи ОБЯЗАНЫ использовать tokio
 }
 
-// ✅ GOOD: Library is runtime-agnostic
+// ✅ ХОРОШО: библиотека не привязана к рантайму
 pub async fn my_lib_function() {
-    // Use only types from std::future and futures crate
+    // Используем только типы из std::future и крейта futures
     do_computation().await;
 }
 
-// ✅ GOOD: Accept a generic future for I/O operations
+// ✅ ХОРОШО: принимаем обобщённую фьючу для операций ввода-вывода
 pub async fn fetch_with_retry<F, Fut, T, E>(
     operation: F,
     max_retries: usize,
@@ -166,29 +166,29 @@ where
 }
 ```
 
-> **Rule of thumb**: Libraries should depend on `futures` crate, not `tokio`.
-> Applications should depend on `tokio` (or their chosen runtime).
-> This keeps the ecosystem composable.
+> **Эмпирическое правило**: библиотеки должны зависеть от крейта `futures`, а не от `tokio`.
+> Приложения должны зависеть от `tokio` (или от выбранного рантайма).
+> Так экосистема остаётся компонуемой.
 
 <details>
-<summary><strong>🏋️ Exercise: FuturesUnordered vs Spawn</strong> (click to expand)</summary>
+<summary><strong>🏋️ Упражнение: FuturesUnordered против spawn</strong> (нажмите, чтобы раскрыть)</summary>
 
-**Challenge**: Write the same function two ways — once using `tokio::spawn` (requires `'static`) and once using `FuturesUnordered` (borrows data). The function receives `&[String]` and returns the length of each string after a simulated async lookup.
+**Задача**: напишите одну и ту же функцию двумя способами — один раз с `tokio::spawn` (требует `'static`) и один раз с `FuturesUnordered` (заимствует данные). Функция получает `&[String]` и возвращает длину каждой строки после имитации асинхронного поиска.
 
-Compare: Which approach requires `.clone()`? Which can borrow the input slice?
+Сравните: какой подход требует `.clone()`? Какой может заимствовать входной срез?
 
 <details>
-<summary>🔑 Solution</summary>
+<summary>🔑 Решение</summary>
 
 ```rust
 use futures::stream::{FuturesUnordered, StreamExt};
 use tokio::time::{sleep, Duration};
 
-// Version 1: tokio::spawn — requires 'static, must clone
+// Версия 1: tokio::spawn — требует 'static, нужно клонирование
 async fn lengths_with_spawn(items: &[String]) -> Vec<usize> {
     let mut handles = Vec::new();
     for item in items {
-        let owned = item.clone(); // Must clone — spawn requires 'static
+        let owned = item.clone(); // Обязательно клонируем — spawn требует 'static
         handles.push(tokio::spawn(async move {
             sleep(Duration::from_millis(10)).await;
             owned.len()
@@ -202,13 +202,13 @@ async fn lengths_with_spawn(items: &[String]) -> Vec<usize> {
     results
 }
 
-// Version 2: FuturesUnordered — borrows data, no clone needed
+// Версия 2: FuturesUnordered — заимствует данные, клонирование не нужно
 async fn lengths_without_spawn(items: &[String]) -> Vec<usize> {
     let futures: FuturesUnordered<_> = items
         .iter()
         .map(|item| async move {
             sleep(Duration::from_millis(10)).await;
-            item.len() // ✅ Borrows item — no clone!
+            item.len() // ✅ Заимствует item — без клонирования!
         })
         .collect();
 
@@ -220,29 +220,27 @@ async fn test_both_versions() {
     let items = vec!["hello".into(), "world".into(), "rust".into()];
 
     let v1 = lengths_with_spawn(&items).await;
-    // Note: v1 preserves insertion order (sequential join)
+    // Примечание: v1 сохраняет порядок вставки (последовательное ожидание)
 
     let mut v2 = lengths_without_spawn(&items).await;
-    v2.sort(); // FuturesUnordered returns in completion order
+    v2.sort(); // FuturesUnordered возвращает результаты в порядке завершения
 
     assert_eq!(v1, vec![5, 5, 4]);
     assert_eq!(v2, vec![4, 5, 5]);
 }
 ```
 
-**Key takeaway**: `FuturesUnordered` avoids the `'static` requirement by running all futures on the current task (no thread migration). The trade-off: all futures share one task — if one blocks, the others stall. Use `spawn` for CPU-heavy work that should run on separate threads.
+**Ключевой вывод**: `FuturesUnordered` обходит требование `'static`, выполняя все фьючи в текущей задаче (без миграции между потоками). Цена: все фьючи делят одну задачу — если один блокируется, остальные стоят. Для тяжёлых по CPU вычислений, которые должны идти в отдельных потоках, используйте `spawn`.
 
 </details>
 </details>
 
-> **Key Takeaways — When Tokio Isn't the Right Fit**
-> - `FuturesUnordered` runs futures concurrently on the current task — no `'static` requirement
-> - `LocalSet` enables `!Send` futures on a single-threaded executor
-> - `JoinSet` (tokio 1.21+) provides managed task groups with automatic cleanup
-> - For libraries: depend only on `std::future::Future` + `futures` crate, not tokio directly
+> **Ключевые выводы — когда Tokio не подходит**
+> - `FuturesUnordered` выполняет фьючи конкурентно в текущей задаче — требования `'static` нет
+> - `LocalSet` позволяет запускать фьючи `!Send` в однопоточном исполнителе
+> - `JoinSet` (tokio 1.21+) предоставляет управляемые группы задач с автоматической очисткой
+> - Для библиотек: зависьте только от `std::future::Future` и крейта `futures`, а не напрямую от tokio
 
-> **See also:** [Ch 8 — Tokio Deep Dive](ch08-tokio-deep-dive.md) for when spawn is the right tool, [Ch 11 — Streams](ch11-streams-and-asynciterator.md) for `buffer_unordered()` as another concurrency limiter
+> **См. также:** [Гл. 8 — Глубокое погружение в Tokio](ch08-tokio-deep-dive.md) — когда spawn — правильный инструмент, [Гл. 11 — Потоки](ch11-streams-and-asynciterator.md) — `buffer_unordered()` как ещё один ограничитель конкурентности
 
 ***
-
-

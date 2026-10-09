@@ -1,96 +1,95 @@
-# Async Rust: From Futures to Production
+# Async Rust: от Future до продакшена
 
-## Speaker Intro
+## Об авторе
 
-- Principal Firmware Architect in Microsoft SCHIE (Silicon and Cloud Hardware Infrastructure Engineering) team
-- Industry veteran with expertise in security, systems programming (firmware, operating systems, hypervisors), CPU and platform architecture, and C++ systems
-- Started programming in Rust in 2017 (@AWS EC2), and have been in love with the language ever since
+- Главный архитектор прошивок в команде SCHIE (Silicon and Cloud Hardware Infrastructure Engineering) компании Microsoft
+- Опытный специалист в области безопасности, системного программирования (прошивки, операционные системы, гипервизоры), архитектуры CPU и платформ, а также систем на C++
+- Начал программировать на Rust в 2017 году (@AWS EC2) и с тех пор влюблён в этот язык
 
 ---
 
-A deep-dive guide to asynchronous programming in Rust. Unlike most async tutorials that start with `tokio::main` and hand-wave the internals, this guide builds understanding from first principles — the `Future` trait, polling, state machines — then progresses to real-world patterns, runtime selection, and production pitfalls.
+Подробное руководство по асинхронному программированию в Rust. В отличие от большинства туториалов по async, которые начинаются с `tokio::main` и обходят внутреннее устройство стороной, эта книга строит понимание с первых принципов: трейт `Future`, опрос (polling), конечные автоматы — и только потом переходит к практическим паттернам, выбору рантайма и продакшен-ловушкам.
 
-## Who This Is For
-- Rust developers who can write synchronous Rust but find async confusing
-- Developers from C#, Go, Python, or JavaScript who know `async/await` but not Rust's model
-- Anyone who's been bitten by `Future is not Send`, `Pin<Box<dyn Future>>`, or "why does my program hang?"
+## Для кого эта книга
 
-## Prerequisites
+- Разработчики на Rust, которые уверенно пишут синхронный код, но путаются в async
+- Разработчики из C#, Go, Python или JavaScript, которые знают `async/await`, но не знают модели Rust
+- Все, кто натыкался на `Future is not Send`, `Pin<Box<dyn Future>>` или вопрос «почему программа зависла?»
 
-You should be comfortable with:
-- Ownership, borrowing, and lifetimes
-- Traits and generics (including `impl Trait`)
-- Using `Result<T, E>` and the `?` operator
-- Basic multi-threading (`std::thread::spawn`, `Arc`, `Mutex`)
+## Предварительные требования
 
-No prior async Rust experience is needed.
+Вы должны уверенно владеть:
+- Владением, заимствованием и временами жизни (lifetimes)
+- Трейтами и обобщёнными типами (включая `impl Trait`)
+- Типом `Result<T, E>` и оператором `?`
+- Базовой многопоточностью (`std::thread::spawn`, `Arc`, `Mutex`)
 
-## How to Use This Book
+Предыдущий опыт асинхронного Rust не нужен.
 
-**Read linearly the first time.** Parts I–III build on each other. Each chapter has:
+## Как пользоваться этой книгой
 
-| Symbol | Meaning |
-|--------|---------|
-| 🟢 | Beginner — foundational concept |
-| 🟡 | Intermediate — requires earlier chapters |
-| 🔴 | Advanced — deep internals or production patterns |
+**При первом чтении идите по порядку.** Части I–III опираются друг на друга. Каждая глава содержит:
 
-Each chapter includes:
-- A **"What you'll learn"** block at the top
-- **Mermaid diagrams** for visual learners
-- An **inline exercise** with a hidden solution
-- **Key Takeaways** summarizing the core ideas
-- **Cross-references** to related chapters
+| Символ | Значение |
+|--------|----------|
+| 🟢 | Начальный уровень — базовое понятие |
+| 🟡 | Средний уровень — требует знания предыдущих глав |
+| 🔴 | Продвинутый уровень — глубокие внутренние механизмы или продакшен-паттерны |
 
-## Pacing Guide
+В каждой главе есть:
+- Блок **«Что вы узнаете»** в начале
+- **Диаграммы Mermaid** для тех, кто лучше воспринимает визуально
+- **Встроенное упражнение** со скрытым решением
+- **Ключевые выводы**, которые суммируют основные идеи
+- **Перекрёстные ссылки** на связанные главы
 
-| Chapters | Topic | Suggested Time | Checkpoint |
-|----------|-------|----------------|------------|
-| 1–5 | How Async Works | 6–8 hours | You can explain `Future`, `Poll`, `Pin`, and why Rust has no built-in runtime |
-| 6–10 | The Ecosystem | 6–8 hours | You can build futures by hand, choose a runtime, and use tokio's API |
-| 11–13 | Production Async | 6–8 hours | You can write production-grade async code with streams, proper error handling, and graceful shutdown |
-| Capstone | Chat Server | 4–6 hours | You've built a real async application integrating all concepts |
+## План изучения
 
-**Total estimated time: 22–30 hours**
+| Главы | Тема | Примерное время | Контрольная точка |
+|-------|------|-----------------|-------------------|
+| 1–5 | Как работает async | 6–8 ч | Вы можете объяснить `Future`, `Poll`, `Pin` и то, почему в Rust нет встроенного рантайма |
+| 6–10 | Экосистема | 6–8 ч | Вы можете написать фьючи вручную, выбрать рантайм и использовать API tokio |
+| 11–13 | Async в продакшене | 6–8 ч | Вы можете писать продакшен-код с потоками, корректной обработкой ошибок и graceful shutdown |
+| Итог | Чат-сервер | 4–6 ч | Вы создали реальное асинхронное приложение, объединяющее все концепции |
 
-## Working Through Exercises
+**Общее расчётное время: 22–30 часов**
 
-Every content chapter has an inline exercise. The capstone (Ch 16) integrates everything into a single project. For maximum learning:
+## Работа с упражнениями
 
-1. **Try the exercise before expanding the solution** — struggling is where learning happens
-2. **Type the code, don't copy-paste** — muscle memory matters for Rust's syntax
-3. **Run every example** — `cargo new async-exercises` and test as you go
+Каждая содержательная глава содержит встроенное упражнение. Итоговый проект (гл. 16) объединяет всё в одном приложении. Для максимальной пользы:
 
-## Table of Contents
+1. **Сначала решите упражнение, и только потом раскрывайте решение** — именно в процессе борьбы с задачей и происходит обучение
+2. **Набирайте код, а не копируйте его** — для синтаксиса Rust важна мышечная память
+3. **Запускайте каждый пример** — `cargo new async-exercises` и проверяйте по ходу чтения
 
-### Part I: How Async Works
+## Содержание
 
-- [1. Why Async is Different in Rust](ch01-why-async-is-different-in-rust.md) 🟢 — The fundamental difference: Rust has no built-in runtime
-- [2. The Future Trait](ch02-the-future-trait.md) 🟡 — `poll()`, `Waker`, and the contract that makes it all work
-- [3. How Poll Works](ch03-how-poll-works.md) 🟡 — The polling state machine and a minimal executor
-- [4. Pin and Unpin](ch04-pin-and-unpin.md) 🔴 — Why self-referential structs need pinning
-- [5. The State Machine Reveal](ch05-the-state-machine-reveal.md) 🟢 — What the compiler actually generates from `async fn`
+### Часть I: Как работает async
 
-### Part II: The Ecosystem
+- [1. Почему async в Rust устроен иначе](ch01-why-async-is-different-in-rust.md) 🟢 — Фундаментальное отличие: в Rust нет встроенного рантайма
+- [2. Трейт Future](ch02-the-future-trait.md) 🟡 — `poll()`, `Waker` и контракт, на котором всё держится
+- [3. Как работает poll](ch03-how-poll-works.md) 🟡 — Конечный автомат опроса и минимальный исполнитель
+- [4. Pin и Unpin](ch04-pin-and-unpin.md) 🔴 — Зачем самоссылающимся структурам нужен pinning
+- [5. Раскрываем конечный автомат](ch05-the-state-machine-reveal.md) 🟢 — Что компилятор на самом деле генерирует из `async fn`
 
-- [6. Building Futures by Hand](ch06-building-futures-by-hand.md) 🟡 — TimerFuture, Join, Select from scratch
-- [7. Executors and Runtimes](ch07-executors-and-runtimes.md) 🟡 — tokio, smol, async-std, embassy — how to choose
-- [8. Tokio Deep Dive](ch08-tokio-deep-dive.md) 🟡 — Runtime flavors, spawn, channels, sync primitives
-- [9. When Tokio Isn't the Right Fit](ch09-when-tokio-isnt-the-right-fit.md) 🟡 — LocalSet, FuturesUnordered, runtime-agnostic design
-- [10. Async Traits](ch10-async-traits.md) 🟡 — RPITIT, dyn dispatch, trait_variant, async closures
+### Часть II: Экосистема
 
-### Part III: Production Async
+- [6. Создаём фьючи вручную](ch06-building-futures-by-hand.md) 🟡 — TimerFuture, Join, Select с нуля
+- [7. Исполнители и рантаймы](ch07-executors-and-runtimes.md) 🟡 — tokio, smol, async-std, embassy — как выбрать
+- [8. Глубокое погружение в Tokio](ch08-tokio-deep-dive.md) 🟡 — Варианты рантайма, spawn, каналы, примитивы синхронизации
+- [9. Когда Tokio не подходит](ch09-when-tokio-isnt-the-right-fit.md) 🟡 — LocalSet, FuturesUnordered, дизайн, не привязанный к рантайму
+- [10. Async-трейты](ch10-async-traits.md) 🟡 — RPITIT, динамическая диспетчеризация, trait_variant, async-замыкания
 
-- [11. Streams and AsyncIterator](ch11-streams-and-asynciterator.md) 🟡 — Async iteration, AsyncRead/Write, stream combinators
-- [12. Common Pitfalls](ch12-common-pitfalls.md) 🔴 — 9 production bugs and how to avoid them
-- [13. Production Patterns](ch13-production-patterns.md) 🔴 — Graceful shutdown, backpressure, Tower middleware
-- [14. Async Is an Optimization, Not an Architecture](ch14-async-is-an-optimization-not-an-architecture.md) 🔴 — Sync core / async shell, the function coloring tax
+### Часть III: Async в продакшене
 
-### Appendices
+- [11. Потоки и AsyncIterator](ch11-streams-and-asynciterator.md) 🟡 — Асинхронная итерация, AsyncRead/Write, комбинаторы потоков
+- [12. Типичные ловушки](ch12-common-pitfalls.md) 🔴 — 9 продакшен-багов и как их избежать
+- [13. Продакшен-паттерны](ch13-production-patterns.md) 🔴 — Graceful shutdown, обратное давление, middleware Tower
+- [14. Async — это оптимизация, а не архитектура](ch14-async-is-an-optimization-not-an-architecture.md) 🔴 — Синхронное ядро / асинхронная оболочка, налог на раскраску функций
 
-- [Summary and Reference Card](ch16-summary-and-reference-card.md) — Quick-lookup tables and decision trees
-- [Capstone Project: Async Chat Server](ch17-capstone-project.md) — Build a complete async application
+### Приложения
+
+- [Итоги и справочная карточка](ch16-summary-and-reference-card.md) — Таблицы для быстрого поиска и деревья решений
+- [Итоговый проект: асинхронный чат-сервер](ch17-capstone-project.md) — Создайте полноценное асинхронное приложение
 
 ***
-
-

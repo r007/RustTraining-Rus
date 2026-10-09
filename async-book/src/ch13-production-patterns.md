@@ -1,79 +1,79 @@
-# 13. Production Patterns 🔴
+# 13. Продакшен-паттерны 🔴
 
-> **What you'll learn:**
-> - Graceful shutdown with `watch` channels and `select!`
-> - Backpressure: bounded channels prevent OOM
-> - Structured concurrency: `JoinSet` and `TaskTracker`
-> - Timeouts, retries, and exponential backoff
-> - Error handling: `thiserror` vs `anyhow`, the double-`?` pattern
-> - Tower: the middleware pattern used by axum, tonic, and hyper
+> **Что вы узнаете:**
+> - Graceful shutdown с помощью каналов `watch` и `select!`
+> - Обратное давление: ограниченные каналы защищают от OOM
+> - Структурированная конкурентность: `JoinSet` и `TaskTracker`
+> - Таймауты, повторы и экспоненциальная задержка (backoff)
+> - Обработка ошибок: `thiserror` против `anyhow`, паттерн двойного `?`
+> - Tower: паттерн middleware, который используют axum, tonic и hyper
 
 ## Graceful Shutdown
 
-Production servers must shut down cleanly — finish in-flight requests, flush buffers, close connections:
+Продакшен-серверы должны корректно завершаться: доводить до конца текущие запросы, сбрасывать буферы, закрывать соединения:
 
 ```rust
 use tokio::signal;
 use tokio::sync::watch;
 
 async fn main_server() {
-    // Create a shutdown signal channel
+    // Создаём канал для сигнала остановки
     let (shutdown_tx, shutdown_rx) = watch::channel(false);
 
-    // Spawn the server
+    // Запускаем сервер
     let server_handle = tokio::spawn(run_server(shutdown_rx.clone()));
 
-    // Wait for Ctrl+C
-    signal::ctrl_c().await.expect("Failed to listen for Ctrl+C");
-    println!("Shutdown signal received, finishing in-flight requests...");
+    // Ждём Ctrl+C
+    signal::ctrl_c().await.expect("Не удалось подписаться на Ctrl+C");
+    println!("Получен сигнал остановки, доводим текущие запросы...");
 
-    // Notify all tasks to shut down
-    // NOTE: .unwrap() is used for brevity. Production code should handle
-    // the case where all receivers have been dropped.
+    // Уведомляем все задачи о завершении
+    // ПРИМЕЧАНИЕ: .unwrap() используется для краткости. В продакшен-коде нужно обрабатывать
+    // случай, когда все получатели уже уничтожены.
     shutdown_tx.send(true).unwrap();
 
-    // Wait for server to finish (with timeout)
+    // Ждём завершения сервера (с таймаутом)
     match tokio::time::timeout(
         std::time::Duration::from_secs(30),
         server_handle,
     ).await {
-        Ok(Ok(())) => println!("Server shut down gracefully"),
-        Ok(Err(e)) => eprintln!("Server error: {e}"),
-        Err(_) => eprintln!("Server shutdown timed out — forcing exit"),
+        Ok(Ok(())) => println!("Сервер корректно остановлен"),
+        Ok(Err(e)) => eprintln!("Ошибка сервера: {e}"),
+        Err(_) => eprintln!("Таймаут остановки сервера — принудительный выход"),
     }
 }
 
 async fn run_server(mut shutdown: watch::Receiver<bool>) {
     loop {
         tokio::select! {
-            // Accept new connections
+            // Принимаем новые соединения
             conn = accept_connection() => {
                 let shutdown = shutdown.clone();
                 tokio::spawn(handle_connection(conn, shutdown));
             }
-            // Shutdown signal
+            // Сигнал остановки
             _ = shutdown.changed() => {
                 if *shutdown.borrow() {
-                    println!("Stopping accepting new connections");
+                    println!("Прекращаем приём новых соединений");
                     break;
                 }
             }
         }
     }
-    // In-flight connections will finish on their own
-    // because they have their own shutdown_rx clone
+    // Активные соединения завершатся сами,
+    // потому что у них есть собственный клон shutdown_rx
 }
 
 async fn handle_connection(conn: Connection, mut shutdown: watch::Receiver<bool>) {
     loop {
         tokio::select! {
             request = conn.next_request() => {
-                // Process the request fully — don't abandon mid-request
+                // Обрабатываем запрос полностью — не бросаем его на полпути
                 process_request(request).await;
             }
             _ = shutdown.changed() => {
                 if *shutdown.borrow() {
-                    // Finish current request, then exit
+                    // Завершаем текущий запрос и выходим
                     break;
                 }
             }
@@ -84,63 +84,63 @@ async fn handle_connection(conn: Connection, mut shutdown: watch::Receiver<bool>
 
 ```mermaid
 sequenceDiagram
-    participant OS as OS Signal
-    participant Main as Main Task
-    participant WCH as watch Channel
-    participant W1 as Worker 1
-    participant W2 as Worker 2
+    participant OS as Сигнал ОС
+    participant Main as Главная задача
+    participant WCH as Канал watch
+    participant W1 as Воркер 1
+    participant W2 as Воркер 2
 
     OS->>Main: SIGINT (Ctrl+C)
     Main->>WCH: send(true)
     WCH-->>W1: changed()
     WCH-->>W2: changed()
 
-    Note over W1: Finish current request
-    Note over W2: Finish current request
+    Note over W1: Доводим текущий запрос
+    Note over W2: Доводим текущий запрос
 
-    W1-->>Main: Task complete
-    W2-->>Main: Task complete
-    Main->>Main: All workers done → exit
+    W1-->>Main: Задача завершена
+    W2-->>Main: Задача завершена
+    Main->>Main: Все воркеры закончили → выход
 ```
 
-### Backpressure with Bounded Channels
+### Обратное давление через ограниченные каналы
 
-Unbounded channels can lead to OOM if the producer is faster than the consumer. Always use bounded channels in production:
+Неограниченные каналы могут привести к OOM, если производитель быстрее потребителя. В продакшене всегда используйте ограниченные каналы:
 
 ```rust
 use tokio::sync::mpsc;
 
 async fn backpressure_example() {
-    // Bounded channel: max 100 items buffered
+    // Ограниченный канал: не более 100 элементов в буфере
     let (tx, mut rx) = mpsc::channel::<WorkItem>(100);
 
-    // Producer: slows down naturally when buffer is full
+    // Производитель: естественно замедляется, когда буфер заполнен
     let producer = tokio::spawn(async move {
         for i in 0..1_000_000 {
-            // send() is async — waits if buffer is full
-            // This creates natural backpressure!
+            // send() асинхронный — ждёт, если буфер полон
+            // Это создаёт естественное обратное давление!
             tx.send(WorkItem { id: i }).await.unwrap();
         }
     });
 
-    // Consumer: processes items at its own pace
+    // Потребитель: обрабатывает элементы в своём темпе
     let consumer = tokio::spawn(async move {
         while let Some(item) = rx.recv().await {
-            process(item).await; // Slow processing is OK — producer waits
+            process(item).await; // Медленная обработка — нормально, производитель будет ждать
         }
     });
 
     let _ = tokio::join!(producer, consumer);
 }
 
-// Compare with unbounded — DANGEROUS:
-// let (tx, rx) = mpsc::unbounded_channel(); // No backpressure!
-// Producer can fill memory indefinitely
+// Сравните с неограниченным — ОПАСНО:
+// let (tx, rx) = mpsc::unbounded_channel(); // Никакого обратного давления!
+// Производитель может бесконечно заполнять память
 ```
 
-### Structured Concurrency: JoinSet and TaskTracker
+### Структурированная конкурентность: JoinSet и TaskTracker
 
-`JoinSet` groups related tasks and ensures they all complete:
+`JoinSet` объединяет связанные задачи и гарантирует, что все они завершатся:
 
 ```rust
 use tokio::task::JoinSet;
@@ -149,28 +149,28 @@ use tokio::time::{sleep, Duration};
 async fn structured_concurrency() {
     let mut set = JoinSet::new();
 
-    // Spawn a batch of tasks
+    // Порождаем пачку задач
     for url in get_urls() {
         set.spawn(async move {
             fetch_and_process(url).await
         });
     }
 
-    // Collect all results (order not guaranteed)
+    // Собираем все результаты (порядок не гарантирован)
     let mut results = Vec::new();
     while let Some(result) = set.join_next().await {
         match result {
             Ok(Ok(data)) => results.push(data),
-            Ok(Err(e)) => eprintln!("Task error: {e}"),
-            Err(e) => eprintln!("Task panicked: {e}"),
+            Ok(Err(e)) => eprintln!("Ошибка задачи: {e}"),
+            Err(e) => eprintln!("Задача завершилась паникой: {e}"),
         }
     }
 
-    // ALL tasks are done here — no dangling background work
-    println!("Processed {} items", results.len());
+    // ВСЕ задачи завершены — фоновой работы не осталось
+    println!("Обработано элементов: {}", results.len());
 }
 
-// TaskTracker (tokio-util 0.7.9+) — wait for all spawned tasks
+// TaskTracker (tokio-util 0.7.9+) — ждём все порождённые задачи
 use tokio_util::task::TaskTracker;
 
 async fn with_tracker() {
@@ -179,22 +179,22 @@ async fn with_tracker() {
     for i in 0..10 {
         tracker.spawn(async move {
             sleep(Duration::from_millis(100 * i)).await;
-            println!("Task {i} done");
+            println!("Задача {i} завершена");
         });
     }
 
-    tracker.close(); // No more tasks will be added
-    tracker.wait().await; // Wait for ALL tracked tasks
-    println!("All tasks finished");
+    tracker.close(); // Больше задач добавлять не будут
+    tracker.wait().await; // Ждём ВСЕ отслеживаемые задачи
+    println!("Все задачи завершены");
 }
 ```
 
-### Timeouts and Retries
+### Таймауты и повторы
 
 ```rust
 use tokio::time::{timeout, sleep, Duration};
 
-// Simple timeout
+// Простой таймаут
 async fn with_timeout() -> Result<Response, Error> {
     match timeout(Duration::from_secs(5), fetch_data()).await {
         Ok(Ok(response)) => Ok(response),
@@ -203,7 +203,7 @@ async fn with_timeout() -> Result<Response, Error> {
     }
 }
 
-// Exponential backoff retry
+// Повтор с экспоненциальной задержкой
 async fn retry_with_backoff<F, Fut, T, E>(
     max_attempts: u32,
     base_delay_ms: u64,
@@ -221,80 +221,80 @@ where
             Ok(result) => return Ok(result),
             Err(e) => {
                 if attempt == max_attempts {
-                    eprintln!("Final attempt {attempt} failed: {e}");
+                    eprintln!("Последняя попытка {attempt} не удалась: {e}");
                     return Err(e);
                 }
-                eprintln!("Attempt {attempt} failed: {e}, retrying in {delay:?}");
+                eprintln!("Попытка {attempt} не удалась: {e}, повтор через {delay:?}");
                 sleep(delay).await;
-                delay *= 2; // Exponential backoff
+                delay *= 2; // Экспоненциальная задержка
             }
         }
     }
     unreachable!()
 }
 
-// Usage:
+// Использование:
 // let result = retry_with_backoff(3, 100, || async {
 //     reqwest::get("https://api.example.com/data").await
 // }).await?;
 ```
 
-> **Production tip — add jitter**: The function above uses pure exponential backoff, but in
-> production many clients failing simultaneously will all retry at the same intervals (thundering
-> herd). Add random *jitter* — e.g., `sleep(delay + rand_jitter)` where `rand_jitter` is
-> `0..delay/4` — so retries spread out over time.
+> **Совет для продакшена — добавляйте jitter**: функция выше использует чистую экспоненциальную задержку, но в продакшене
+> много клиентов, падающих одновременно, будут повторять запросы в одни и те же моменты (эффект «стада»,
+> thundering herd). Добавьте случайный *jitter* — например, `sleep(delay + rand_jitter)`, где `rand_jitter` —
+> это значение из `0..delay/4`, — чтобы повторы распределялись во времени.
 
-### Error Handling in Async Code
+### Обработка ошибок в асинхронном коде
 
-Async introduces unique error propagation challenges — spawned tasks create error boundaries, timeout errors wrap inner errors, and `?` interacts differently when futures cross task boundaries.
+Асинхронность создаёт особые сложности при распространении ошибок: порождённые задачи образуют границы ошибок, ошибки таймаута оборачивают внутренние ошибки, и `?` ведёт себя иначе, когда futures пересекают границы задач.
 
-**`thiserror` vs `anyhow`** — choosing the right tool:
+**`thiserror` против `anyhow`** — выбираем подходящий инструмент:
 
 ```rust
-// thiserror: Define typed errors for libraries and public APIs
-// Every variant is explicit — callers can match on specific errors
+// thiserror: определяем типизированные ошибки для библиотек и публичных API
+// Каждый вариант явный — вызывающий код может сопоставлять конкретные ошибки
 use thiserror::Error;
 
 #[derive(Error, Debug)]
 enum DiagError {
-    #[error("IPMI command failed: {0}")]
+    #[error("Команда IPMI не выполнена: {0}")]
     Ipmi(#[from] IpmiError),
 
-    #[error("Sensor {sensor} out of range: {value}°C (max {max}°C)")]
+    #[error("Датчик {sensor} вне диапазона: {value}°C (максимум {max}°C)")]
     OverTemp { sensor: String, value: f64, max: f64 },
 
-    #[error("Operation timed out after {0:?}")]
+    #[error("Операция завершилась по таймауту через {0:?}")]
     Timeout(std::time::Duration),
 
-    #[error("Task panicked: {0}")]
+    #[error("Задача завершилась паникой: {0}")]
     TaskPanic(#[from] tokio::task::JoinError),
 }
 
-// anyhow: Quick error handling for applications and prototypes
-// Wraps any error — no need to define types for every case
+// anyhow: быстрая обработка ошибок для приложений и прототипов
+// Оборачивает любую ошибку — не нужно определять типы для каждого случая
 use anyhow::{Context, Result};
 
 async fn run_diagnostics() -> Result<()> {
     let config = load_config()
         .await
-        .context("Failed to load diagnostic config")?;  // Adds context
+        .context("Не удалось загрузить конфигурацию диагностики")?;  // Добавляет контекст
 
     let result = run_gpu_test(&config)
         .await
-        .context("GPU diagnostic failed")?;              // Chains context
+        .context("Диагностика GPU не выполнена")?;              // Строит цепочку контекста
 
     Ok(())
 }
-// anyhow prints: "GPU diagnostic failed: IPMI command failed: timeout"
+// anyhow выведет: "Диагностика GPU не выполнена: Команда IPMI не выполнена: timeout"
 ```
 
-| Crate | Use When | Error Type | Matching |
-|-------|----------|-----------|----------|
-| `thiserror` | Library code, public APIs | `enum MyError { ... }` | `match err { MyError::Timeout => ... }` |
-| `anyhow` | Applications, CLI tools, scripts | `anyhow::Error` (type-erased) | `err.downcast_ref::<MyError>()` |
-| Both together | Library exposes `thiserror`, app wraps with `anyhow` | Best of both | Library errors are typed, app doesn't care |
+| Крейт | Когда использовать | Тип ошибки | Сопоставление |
+|-------|--------------------|------------|---------------|
+| `thiserror` | Код библиотек, публичные API | `enum MyError { ... }` | `match err { MyError::Timeout => ... }` |
+| `anyhow` | Приложения, CLI-утилиты, скрипты | `anyhow::Error` (стёртый тип) | `err.downcast_ref::<MyError>()` |
+| Оба вместе | Библиотека отдаёт `thiserror`, приложение оборачивает `anyhow` | Лучшее из двух | Ошибки библиотеки типизированы, приложению это безразлично |
 
-**The double-`?` pattern** with `tokio::spawn`:
+**Паттерн двойного `?`** с `tokio::spawn`:
 
 ```rust
 use thiserror::Error;
@@ -302,10 +302,10 @@ use tokio::task::JoinError;
 
 #[derive(Error, Debug)]
 enum AppError {
-    #[error("HTTP error: {0}")]
+    #[error("Ошибка HTTP: {0}")]
     Http(#[from] reqwest::Error),
 
-    #[error("Task panicked: {0}")]
+    #[error("Задача завершилась паникой: {0}")]
     TaskPanic(#[from] JoinError),
 }
 
@@ -315,42 +315,42 @@ async fn spawn_with_errors() -> Result<String, AppError> {
         Ok::<_, reqwest::Error>(resp.text().await?)
     });
 
-    // Double ?: First ? unwraps JoinError (task panic), second ? unwraps inner Result
+    // Двойной ?: первый ? разворачивает JoinError (паника задачи), второй ? — внутренний Result
     let result = handle.await??;
     Ok(result)
 }
 ```
 
-**The error boundary problem** — `tokio::spawn` erases context:
+**Проблема границы ошибок** — `tokio::spawn` стирает контекст:
 
 ```rust
-// ❌ Error context is lost across spawn boundaries:
+// ❌ Контекст ошибки теряется на границе spawn:
 async fn bad_error_handling() -> Result<()> {
     let handle = tokio::spawn(async {
-        some_fallible_work().await  // Returns Result<T, SomeError>
+        some_fallible_work().await  // Возвращает Result<T, SomeError>
     });
 
-    // handle.await returns Result<Result<T, SomeError>, JoinError>
-    // The inner error has no context about what task failed
+    // handle.await возвращает Result<Result<T, SomeError>, JoinError>
+    // У внутренней ошибки нет контекста о том, какая задача упала
     let result = handle.await??;
     Ok(())
 }
 
-// ✅ Add context at the spawn boundary:
+// ✅ Добавляем контекст на границе spawn:
 async fn good_error_handling() -> Result<()> {
     let handle = tokio::spawn(async {
         some_fallible_work()
             .await
-            .context("worker task failed")  // Context before crossing boundary
+            .context("ошибка рабочей задачи")  // Контекст до пересечения границы
     });
 
     let result = handle.await
-        .context("worker task panicked")??;  // Context for JoinError too
+        .context("рабочая задача завершилась паникой")??;  // Контекст и для JoinError
     Ok(())
 }
 ```
 
-**Timeout errors** — wrapping vs replacing:
+**Ошибки таймаута** — оборачивание или замена:
 
 ```rust
 use tokio::time::{timeout, Duration};
@@ -359,18 +359,18 @@ async fn with_timeout_context() -> Result<String, DiagError> {
     let dur = Duration::from_secs(30);
     match timeout(dur, fetch_sensor_data()).await {
         Ok(Ok(data)) => Ok(data),
-        Ok(Err(e)) => Err(e),                      // Inner error preserved
-        Err(_) => Err(DiagError::Timeout(dur)),     // Timeout → typed error
+        Ok(Err(e)) => Err(e),                      // Внутренняя ошибка сохраняется
+        Err(_) => Err(DiagError::Timeout(dur)),     // Таймаут → типизированная ошибка
     }
 }
 ```
 
-### Tower: The Middleware Pattern
+### Tower: паттерн middleware
 
-The [Tower](https://docs.rs/tower) crate defines a composable `Service` trait — the backbone of async middleware in Rust (used by `axum`, `tonic`, `hyper`):
+Крейт [Tower](https://docs.rs/tower) определяет компонуемый трейт `Service` — основу асинхронных middleware в Rust (его используют `axum`, `tonic`, `hyper`):
 
 ```rust
-// Tower's core trait (simplified):
+// Основной трейт Tower (упрощённо):
 pub trait Service<Request> {
     type Response;
     type Error;
@@ -381,29 +381,29 @@ pub trait Service<Request> {
 }
 ```
 
-Middleware wraps a `Service` to add cross-cutting behavior — logging, timeouts, rate-limiting — without modifying inner logic:
+Middleware оборачивает `Service`, добавляя сквозное поведение — логирование, таймауты, ограничение частоты — без изменения внутренней логики:
 
 ```rust
 use tower::{ServiceBuilder, timeout::TimeoutLayer, limit::RateLimitLayer};
 use std::time::Duration;
 
 let service = ServiceBuilder::new()
-    .layer(TimeoutLayer::new(Duration::from_secs(10)))       // Outermost: timeout
-    .layer(RateLimitLayer::new(100, Duration::from_secs(1))) // Then: rate limit
-    .service(my_handler);                                     // Innermost: your code
+    .layer(TimeoutLayer::new(Duration::from_secs(10)))       // Самый внешний: таймаут
+    .layer(RateLimitLayer::new(100, Duration::from_secs(1))) // Затем: ограничение частоты
+    .service(my_handler);                                     // Самый внутренний: ваш код
 ```
 
-**Why this matters**: If you've used ASP.NET middleware or Express.js middleware, Tower is the Rust equivalent. It's how production Rust services add cross-cutting concerns without code duplication.
+**Почему это важно**: если вы использовали middleware в ASP.NET или Express.js, Tower — это его аналог в Rust. Так продакшен-сервисы на Rust добавляют сквозные задачи без дублирования кода.
 
-### Exercise: Graceful Shutdown with Worker Pool
-
-<details>
-<summary>🏋️ Exercise (click to expand)</summary>
-
-**Challenge**: Build a task processor with a channel-based work queue, N worker tasks, and graceful shutdown on Ctrl+C. Workers should finish in-flight work before exiting.
+### Упражнение: graceful shutdown с пулом воркеров
 
 <details>
-<summary>🔑 Solution</summary>
+<summary>🏋️ Упражнение (нажмите, чтобы раскрыть)</summary>
+
+**Задача**: постройте обработчик задач с очередью работы на каналах, N задачами-воркерами и graceful shutdown по Ctrl+C. Воркеры должны доделать текущую работу, прежде чем завершиться.
+
+<details>
+<summary>🔑 Решение</summary>
 
 ```rust
 use tokio::sync::{mpsc, watch};
@@ -434,7 +434,7 @@ async fn main() {
                 };
                 match item {
                     Some(work) => {
-                        println!("Worker {id}: processing {}", work.id);
+                        println!("Воркер {id}: обрабатываю {}", work.id);
                         sleep(Duration::from_millis(200)).await;
                     }
                     None => break,
@@ -443,33 +443,31 @@ async fn main() {
         }));
     }
 
-    // Submit work
+    // Отправляем работу
     for i in 0..20 {
         let _ = work_tx.send(WorkItem { id: i, payload: format!("task-{i}") }).await;
         sleep(Duration::from_millis(50)).await;
     }
 
-    // On Ctrl+C: signal shutdown, wait for workers
-    // NOTE: .unwrap() is used for brevity — handle errors in production.
+    // По Ctrl+C: сигнализируем об остановке и ждём воркеров
+    // ПРИМЕЧАНИЕ: .unwrap() используется для краткости — в продакшене обрабатывайте ошибки.
     tokio::signal::ctrl_c().await.unwrap();
     shutdown_tx.send(true).unwrap();
     for h in handles { let _ = h.await; }
-    println!("Shut down cleanly.");
+    println!("Корректно завершено.");
 }
 ```
 
 </details>
 </details>
 
-> **Key Takeaways — Production Patterns**
-> - Use a `watch` channel + `select!` for coordinated graceful shutdown
-> - Bounded channels (`mpsc::channel(N)`) provide **backpressure** — senders block when the buffer is full
-> - `JoinSet` and `TaskTracker` provide **structured concurrency**: track, abort, and await task groups
-> - Always add timeouts to network operations — `tokio::time::timeout(dur, fut)`
-> - Tower's `Service` trait is the standard middleware pattern for production Rust services
+> **Ключевые выводы — продакшен-паттерны**
+> - Используйте канал `watch` + `select!` для согласованного graceful shutdown
+> - Ограниченные каналы (`mpsc::channel(N)`) обеспечивают **обратное давление** — отправители блокируются, когда буфер полон
+> - `JoinSet` и `TaskTracker` обеспечивают **структурированную конкурентность**: отслеживание, прерывание и ожидание групп задач
+> - Для сетевых операций всегда задавайте таймауты — `tokio::time::timeout(dur, fut)`
+> - Трейт `Service` из Tower — стандартный паттерн middleware для продакшен-сервисов на Rust
 
-> **See also:** [Ch 8 — Tokio Deep Dive](ch08-tokio-deep-dive.md) for channels and sync primitives, [Ch 12 — Common Pitfalls](ch12-common-pitfalls.md) for cancellation hazards during shutdown
+> **См. также:** [Гл. 8 — Глубокое погружение в Tokio](ch08-tokio-deep-dive.md) — каналы и примитивы синхронизации, [Гл. 12 — Типичные ловушки](ch12-common-pitfalls.md) — опасности отмены при остановке
 
 ***
-
-

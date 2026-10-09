@@ -1,45 +1,45 @@
-# 3. How Poll Works 🟡
+# 3. Как работает poll 🟡
 
-> **What you'll learn:**
-> - The executor's poll loop: poll → pending → wake → poll again
-> - How to build a minimal executor from scratch
-> - Spurious wake rules and why they matter
-> - Utility functions: `poll_fn()` and `yield_now()`
+> **Что вы узнаете:**
+> - Цикл опроса исполнителя: poll → Pending → wake → снова poll
+> - Как собрать минимальный исполнитель с нуля
+> - Правила «ложных» пробуждений и почему они важны
+> - Вспомогательные функции: `poll_fn()` и `yield_now()`
 
-## The Polling State Machine
+## Конечный автомат опроса
 
-The executor runs a loop: poll a future, if it's `Pending`, park it until its waker fires, then poll again. This is fundamentally different from OS threads where the kernel handles scheduling.
+Исполнитель работает в цикле: опрашивает future, и если он возвращает `Pending`, откладывает его до срабатывания waker, а затем опрашивает снова. Это принципиально отличается от потоков ОС, где планированием занимается ядро.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Idle : Future created
-    Idle --> Polling : executor calls poll()
+    [*] --> Idle : Future создан
+    Idle --> Polling : исполнитель вызывает poll()
     Polling --> Complete : Ready(value)
     Polling --> Waiting : Pending
-    Waiting --> Polling : waker.wake() called
-    Complete --> [*] : Value returned
+    Waiting --> Polling : вызван waker.wake()
+    Complete --> [*] : Значение возвращено
 ```
 
-> **Important:** While in the *Waiting* state the future **must** have registered
-> the waker with an I/O source. No registration = hang forever.
+> **Важно:** находясь в состоянии *Waiting*, future **обязан** был зарегистрировать
+> waker у источника ввода-вывода. Без регистрации — зависание навсегда.
 
-### A Minimal Executor
+### Минимальный исполнитель
 
-To demystify executors, let's build the simplest possible one:
+Чтобы развеять магию исполнителей, построим самый простой из возможных:
 
 ```rust
 use std::future::Future;
 use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 use std::pin::Pin;
 
-/// The simplest possible executor: busy-loop poll until Ready
+/// Простейший исполнитель: крутим poll в цикле, пока не получим Ready
 fn block_on<F: Future>(mut future: F) -> F::Output {
-    // Pin the future on the stack
-    // SAFETY: `future` is never moved after this point — we only
-    // access it through the pinned reference until it completes.
+    // Закрепляем future на стеке
+    // SAFETY: `future` не перемещается после этого момента — мы обращаемся
+    // к нему только через закреплённую ссылку до самого завершения.
     let mut future = unsafe { Pin::new_unchecked(&mut future) };
 
-    // Create a no-op waker (just keeps polling — inefficient but simple)
+    // Создаём пустой waker (он просто продолжает опрос — неэффективно, зато просто)
     fn noop_raw_waker() -> RawWaker {
         fn no_op(_: *const ()) {}
         fn clone(_: *const ()) -> RawWaker { noop_raw_waker() }
@@ -47,24 +47,24 @@ fn block_on<F: Future>(mut future: F) -> F::Output {
         RawWaker::new(std::ptr::null(), vtable)
     }
 
-    // SAFETY: noop_raw_waker() returns a valid RawWaker with a correct vtable.
+    // SAFETY: noop_raw_waker() возвращает корректный RawWaker с правильной таблицей vtable.
     let waker = unsafe { Waker::from_raw(noop_raw_waker()) };
     let mut cx = Context::from_waker(&waker);
 
-    // Busy-loop until the future completes
+    // Крутим цикл, пока future не завершится
     loop {
         match future.as_mut().poll(&mut cx) {
             Poll::Ready(value) => return value,
             Poll::Pending => {
-                // A real executor would park the thread here
-                // and wait for waker.wake() — we just spin
+                // Настоящий исполнитель усыпил бы поток здесь
+                // и ждал бы waker.wake() — а мы просто крутимся
                 std::thread::yield_now();
             }
         }
     }
 }
 
-// Usage:
+// Использование:
 fn main() {
     let result = block_on(async {
         println!("Hello from our mini executor!");
@@ -74,73 +74,73 @@ fn main() {
 }
 ```
 
-> **Don't use this in production!** It busy-loops, wasting CPU. Real executors
-> (tokio, smol) use `epoll`/`kqueue`/`io_uring` to sleep until I/O is ready.
-> But this shows the core idea: an executor is just a loop that calls `poll()`.
+> **Не используйте это в продакшене!** Здесь активный цикл, он тратит CPU впустую. Настоящие исполнители
+> (tokio, smol) используют `epoll`/`kqueue`/`io_uring`, чтобы спать до готовности ввода-вывода.
+> Но этот пример показывает главную идею: исполнитель — это просто цикл, который вызывает `poll()`.
 
-### Wake-Up Notifications
+### Уведомления о пробуждении
 
-A real executor is event-driven. When all futures are `Pending`, the executor sleeps. The waker is an interrupt mechanism:
+Настоящий исполнитель управляется событиями. Когда все future находятся в `Pending`, исполнитель засыпает. Waker работает как механизм прерывания:
 
 ```rust
-// Conceptual model of a real executor's main loop:
+// Концептуальная модель главного цикла настоящего исполнителя:
 fn executor_loop(tasks: &mut TaskQueue) {
     loop {
-        // 1. Poll all tasks that have been woken
+        // 1. Опрашиваем все задачи, которые были разбужены
         while let Some(task) = tasks.get_woken_task() {
             match task.poll() {
                 Poll::Ready(result) => task.complete(result),
-                Poll::Pending => { /* task stays in queue, waiting for wake */ }
+                Poll::Pending => { /* задача остаётся в очереди, ждём пробуждения */ }
             }
         }
 
-        // 2. Sleep until something wakes us up (epoll_wait, kevent, etc.)
-        //    This is where mio/polling does the heavy lifting
-        tasks.wait_for_events(); // blocks until an I/O event or waker fires
+        // 2. Спим, пока что-нибудь нас не разбудит (epoll_wait, kevent и т. п.)
+        //    Вот где основную работу делает mio/polling
+        tasks.wait_for_events(); // блокируется до события ввода-вывода или срабатывания waker
     }
 }
 ```
 
-### Spurious Wakes
+### Ложные пробуждения
 
-A future may be polled even when its I/O isn't ready. This is called a *spurious wake*. Futures must handle this correctly:
+Future может быть опрошен, даже когда его ввод-вывод ещё не готов. Это называется *ложным пробуждением* (spurious wake). Future должен корректно с этим справляться:
 
 ```rust
 impl Future for MyFuture {
     type Output = Data;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Data> {
-        // ✅ CORRECT: Always re-check the actual condition
+        // ✅ ПРАВИЛЬНО: всегда перепроверяем реальное условие
         if let Some(data) = self.try_read_data() {
             Poll::Ready(data)
         } else {
-            // Re-register the waker (it might have changed!)
+            // Регистрируем waker заново (он мог измениться!)
             self.register_waker(cx.waker());
             Poll::Pending
         }
 
-        // ❌ WRONG: Assuming poll means data is ready
-        // let data = self.read_data(); // might block or panic
+        // ❌ НЕПРАВИЛЬНО: считать, что poll означает готовность данных
+        // let data = self.read_data(); // может заблокироваться или упасть с паникой
         // Poll::Ready(data)
     }
 }
 ```
 
-**Rules for implementing `poll()`**:
-1. **Never block** — return `Pending` immediately if not ready
-2. **Always re-register the waker** — it may have changed between polls
-3. **Handle spurious wakes** — check the actual condition, don't assume readiness
-4. **Don't poll after `Ready`** — behavior is **unspecified** (may panic, return `Pending`, or repeat `Ready`). Only `FusedFuture` guarantees safe post-completion polling
+**Правила реализации `poll()`**:
+1. **Никогда не блокируйтесь** — если данных нет, сразу возвращайте `Pending`
+2. **Всегда регистрируйте waker заново** — он мог измениться между опросами
+3. **Обрабатывайте ложные пробуждения** — проверяйте реальное условие, а не полагайтесь на готовность
+4. **Не опрашивайте после `Ready`** — поведение **не определено** (может вызвать панику, вернуть `Pending` или снова `Ready`). Гарантированно безопасный опрос после завершения даёт только `FusedFuture`
 
 <details>
-<summary><strong>🏋️ Exercise: Spurious-Wake-Safe Flag Future</strong> (click to expand)</summary>
+<summary><strong>🏋️ Упражнение: FlagFuture, устойчивый к ложным пробуждениям</strong> (нажмите, чтобы раскрыть)</summary>
 
-**Challenge**: Implement a `FlagFuture` that wraps a shared `Arc<AtomicBool>` flag. When polled, it checks whether the flag is `true`. If so, it completes with `Ready(())`. If not, it stores the waker and returns `Pending`. The twist: the future must handle **spurious wakes** correctly — it must re-check the flag on every poll, never assuming the flag is set just because it was woken.
+**Задача**: реализуйте `FlagFuture`, который оборачивает общий флаг `Arc<AtomicBool>`. При опросе он проверяет, равен ли флаг `true`. Если да — завершается с `Ready(())`. Если нет — сохраняет waker и возвращает `Pending`. Тонкость: future должен корректно обрабатывать **ложные пробуждения** — он должен перепроверять флаг при каждом опросе и никогда не считать, что флаг установлен, только потому что его разбудили.
 
-*Hint*: You'll need an `Arc<Mutex<Option<Waker>>>` (or similar) so an external thread can set the flag and wake the future. Use `poll_fn` for a concise alternative solution.
+*Подсказка*: понадобится `Arc<Mutex<Option<Waker>>>` (или что-то похожее), чтобы внешний поток мог установить флаг и разбудить future. Для краткого альтернативного решения используйте `poll_fn`.
 
 <details>
-<summary>🔑 Solution</summary>
+<summary>🔑 Решение</summary>
 
 ```rust
 use std::future::Future;
@@ -164,18 +164,18 @@ impl Future for FlagFuture {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        // Always re-check the actual condition — never trust the wake alone
+        // Всегда перепроверяем реальное условие — никогда не доверяем одному только пробуждению
         if self.flag.load(Ordering::Acquire) {
             return Poll::Ready(());
         }
 
-        // Store/update the waker so we get notified
+        // Сохраняем/обновляем waker, чтобы нас уведомили
         let mut slot = self.waker_slot.lock().unwrap();
         *slot = Some(cx.waker().clone());
 
-        // Re-check after storing the waker to avoid a race:
-        // the flag could have been set between our first check
-        // and storing the waker
+        // Перепроверяем после сохранения waker, чтобы избежать гонки:
+        // флаг мог быть установлен между нашей первой проверкой
+        // и сохранением waker
         if self.flag.load(Ordering::Acquire) {
             Poll::Ready(())
         } else {
@@ -184,7 +184,7 @@ impl Future for FlagFuture {
     }
 }
 
-// The setter side (e.g., another thread or task):
+// Сторона, которая устанавливает флаг (например, другой поток или задача):
 fn set_flag(flag: &AtomicBool, waker_slot: &Mutex<Option<Waker>>) {
     flag.store(true, Ordering::Release);
     if let Some(waker) = waker_slot.lock().unwrap().take() {
@@ -192,7 +192,7 @@ fn set_flag(flag: &AtomicBool, waker_slot: &Mutex<Option<Waker>>) {
     }
 }
 
-// Equivalent using poll_fn:
+// Эквивалент через poll_fn:
 // async fn wait_for_flag(flag: Arc<AtomicBool>, waker_slot: Arc<Mutex<Option<Waker>>>) {
 //     std::future::poll_fn(|cx| {
 //         if flag.load(Ordering::Acquire) {
@@ -204,39 +204,39 @@ fn set_flag(flag: &AtomicBool, waker_slot: &Mutex<Option<Waker>>) {
 // }
 ```
 
-**Key takeaway**: The double-check pattern (check → store waker → check again) is essential to avoid a race between the condition changing and the waker being registered. This is the real-world pattern that all I/O futures use internally, and it demonstrates why handling spurious wakes matters.
+**Ключевой вывод**: шаблон «двойной проверки» (проверить → сохранить waker → проверить снова) необходим, чтобы избежать гонки между изменением условия и регистрацией waker. Именно так внутри работают все фьючи ввода-вывода, и это показывает, почему обработка ложных пробуждений так важна.
 
 </details>
 </details>
 
-### Handy Utilities: `poll_fn` and `yield_now`
+### Полезные утилиты: `poll_fn` и `yield_now`
 
-Two utilities from the standard library and tokio that avoid writing full `Future` impls:
+Две утилиты из стандартной библиотеки и tokio, которые избавляют от написания полных реализаций `Future`:
 
 ```rust
 use std::future::poll_fn;
 use std::task::Poll;
 
-// poll_fn: create a one-off future from a closure
+// poll_fn: создаём разовый future из замыкания
 let value = poll_fn(|cx| {
-    // Do something with cx.waker(), return Ready or Pending
+    // Делаем что-нибудь с cx.waker(), возвращаем Ready или Pending
     Poll::Ready(42)
 }).await;
 
-// Real-world use: bridge a callback-based API into async
+// Пример из практики: адаптируем API на основе колбэков к async
 async fn read_when_ready(source: &MySource) -> Data {
     poll_fn(|cx| source.poll_read(cx)).await
 }
 ```
 
 ```rust
-// yield_now: voluntarily yield control to the executor
-// Useful in CPU-heavy async loops to avoid starving other tasks
+// yield_now: добровольно отдаём управление исполнителю
+// Полезно в тяжёлых по CPU асинхронных циклах, чтобы не морить голодом другие задачи
 async fn cpu_heavy_work(items: &[Item]) {
     for (i, item) in items.iter().enumerate() {
-        process(item); // CPU work
+        process(item); // работа с CPU
 
-        // Every 100 items, yield to let other tasks run
+        // Каждые 100 элементов уступаем управление, чтобы могли выполниться другие задачи
         if i % 100 == 0 {
             tokio::task::yield_now().await;
         }
@@ -244,18 +244,16 @@ async fn cpu_heavy_work(items: &[Item]) {
 }
 ```
 
-> **When to use `yield_now()`**: If your async function does CPU work in a loop
-> without any `.await` points, it monopolizes the executor thread. Insert
-> `yield_now().await` periodically to enable cooperative multitasking.
+> **Когда использовать `yield_now()`**: если асинхронная функция выполняет работу с CPU в цикле
+> без единой точки `.await`, она монополизирует поток исполнителя. Периодически вставляйте
+> `yield_now().await`, чтобы включить кооперативную многозадачность.
 
-> **Key Takeaways — How Poll Works**
-> - An executor repeatedly calls `poll()` on futures that have been woken
-> - Futures must handle **spurious wakes** — always re-check the actual condition
-> - `poll_fn()` lets you create ad-hoc futures from closures
-> - `yield_now()` is a cooperative scheduling escape hatch for CPU-heavy async code
+> **Ключевые выводы — как работает poll**
+> - Исполнитель многократно вызывает `poll()` для future, которые были разбужены
+> - Future должны обрабатывать **ложные пробуждения** — всегда перепроверяйте реальное условие
+> - `poll_fn()` позволяет создавать разовые future из замыканий
+> - `yield_now()` — это лаз для кооперативного планирования в async-коде с тяжёлыми вычислениями
 
-> **See also:** [Ch 2 — The Future Trait](ch02-the-future-trait.md) for the trait definition, [Ch 5 — The State Machine Reveal](ch05-the-state-machine-reveal.md) for what the compiler generates
+> **См. также:** [Гл. 2 — Трейт Future](ch02-the-future-trait.md) — определение трейта, [Гл. 5 — Раскрываем конечный автомат](ch05-the-state-machine-reveal.md) — что генерирует компилятор
 
 ***
-
-

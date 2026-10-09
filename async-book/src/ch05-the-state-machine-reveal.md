@@ -1,19 +1,19 @@
-# 5. The State Machine Reveal 🟢
+# 5. Раскрываем конечный автомат 🟢
 
-> **What you'll learn:**
-> - How the compiler transforms `async fn` into an enum state machine
-> - Side-by-side comparison: source code vs generated states
-> - Why large stack allocations in `async fn` blow up future sizes
-> - The drop optimization: values drop as soon as they're no longer needed
+> **Что вы узнаете:**
+> - Как компилятор превращает `async fn` в перечисление (enum) — конечный автомат
+> - Сравнение бок о бок: исходный код и сгенерированные состояния
+> - Почему большие стековые выделения в `async fn` раздувают размер future
+> - Оптимизация уничтожения: значения освобождаются, как только больше не нужны
 
-## What the Compiler Actually Generates
+## Что компилятор генерирует на самом деле
 
-When you write `async fn`, the compiler transforms your sequential-looking code into an enum-based state machine. Understanding this transformation is the key to understanding async Rust's performance characteristics and many of its quirks.
+Когда вы пишете `async fn`, компилятор превращает ваш последовательно выглядящий код в конечный автомат на основе enum. Понимание этого преобразования — ключ к пониманию производительности асинхронного Rust и многих его особенностей.
 
-### Side-by-Side: async fn vs State Machine
+### Бок о бок: async fn и конечный автомат
 
 ```rust
-// What you write:
+// Что вы пишете:
 async fn fetch_two_pages() -> String {
     let page1 = http_get("https://example.com/a").await;
     let page2 = http_get("https://example.com/b").await;
@@ -21,25 +21,25 @@ async fn fetch_two_pages() -> String {
 }
 ```
 
-The compiler generates something conceptually like this:
+Компилятор генерирует примерно такой код:
 
 ```rust
 enum FetchTwoPagesStateMachine {
-    // State 0: About to call http_get for page1
+    // Состояние 0: собираемся вызвать http_get для page1
     Start,
 
-    // State 1: Waiting for page1, holding the future
+    // Состояние 1: ждём page1, удерживая future
     WaitingPage1 {
         fut1: HttpGetFuture,
     },
 
-    // State 2: Got page1, waiting for page2
+    // Состояние 2: получили page1, ждём page2
     WaitingPage2 {
         page1: String,
         fut2: HttpGetFuture,
     },
 
-    // Terminal state
+    // Конечное состояние
     Complete,
 }
 
@@ -77,31 +77,31 @@ impl Future for FetchTwoPagesStateMachine {
 }
 ```
 
-> **Note**: This desugaring is *conceptual*. The real compiler output uses
-> `unsafe` pin projections — the `get_mut()` calls shown here require
-> `Unpin`, but async state machines are `!Unpin`. The goal is to illustrate
-> state transitions, not produce compilable code.
+> **Примечание**: это преобразование *концептуальное*. Реальный вывод компилятора использует
+> `unsafe`-проекции Pin — вызовы `get_mut()`, показанные здесь, требуют
+> `Unpin`, а async-автоматы являются `!Unpin`. Цель — проиллюстрировать
+> переходы между состояниями, а не получить код, который компилируется.
 
 ```mermaid
 stateDiagram-v2
     [*] --> Start
-    Start --> WaitingPage1: Create http_get future #1
+    Start --> WaitingPage1: Создаём future http_get #1
     WaitingPage1 --> WaitingPage1: poll() → Pending
     WaitingPage1 --> WaitingPage2: poll() → Ready(page1)
     WaitingPage2 --> WaitingPage2: poll() → Pending
     WaitingPage2 --> Complete: poll() → Ready(page2)
-    Complete --> [*]: Return format!("{page1}\\n{page2}")
+    Complete --> [*]: Возвращаем format!("{page1}\\n{page2}")
 ```
 
-> **State contents:**
-> - **WaitingPage1** — stores `fut1: HttpGetFuture` (page2 not yet allocated)
-> - **WaitingPage2** — stores `page1: String`, `fut2: HttpGetFuture` (fut1 has been dropped)
+> **Содержимое состояний:**
+> - **WaitingPage1** — хранит `fut1: HttpGetFuture` (page2 ещё не выделен)
+> - **WaitingPage2** — хранит `page1: String`, `fut2: HttpGetFuture` (fut1 уже уничтожен)
 
-### Why This Matters for Performance
+### Почему это важно для производительности
 
-**Zero-cost**: The state machine is a stack-allocated enum. No heap allocation per future, no garbage collector, no boxing — unless you explicitly use `Box::pin()`.
+**Нулевая стоимость**: конечный автомат — это enum на стеке. Никаких выделений в куче на каждый future, никакого сборщика мусора, никакого боксинга — если вы явно не используете `Box::pin()`.
 
-**Size**: The enum's size is the maximum of all its variants. Each `.await` point creates a new variant. This means:
+**Размер**: размер enum равен максимуму размеров всех его вариантов. Каждая точка `.await` создаёт новый вариант. Это означает:
 
 ```rust
 async fn small() {
@@ -110,31 +110,32 @@ async fn small() {
     let b: u8 = 0;
     yield_now().await;
 }
-// Size ≈ max(size_of(u8), size_of(u8)) + discriminant + future sizes
-//      ≈ small!
+// Размер ≈ max(size_of(u8), size_of(u8)) + дискриминант + размеры future
+//       ≈ маленький!
 
 async fn big() {
-    let buf: [u8; 1_000_000] = [0; 1_000_000]; // 1MB on the stack!
+    let buf: [u8; 1_000_000] = [0; 1_000_000]; // 1 МБ на стеке!
     some_io().await;
     process(&buf);
 }
-// Size ≈ 1MB + inner future sizes
-// ⚠️ Don't stack-allocate huge buffers in async functions!
-// Use Vec<u8> or Box<[u8]> instead.
+// Размер ≈ 1 МБ + размеры вложенных future
+// ⚠️ Не размещайте огромные буферы на стеке в async-функциях!
+// Используйте Vec<u8> или Box<[u8]>.
 ```
 
-**Drop optimization**: When a state machine transitions, it drops values no longer needed. In the example above, `fut1` is dropped when we transition from `WaitingPage1` to `WaitingPage2` — the compiler inserts the drop automatically.
+**Оптимизация уничтожения**: при переходе между состояниями автомат уничтожает значения, которые больше не нужны. В примере выше `fut1` уничтожается при переходе из `WaitingPage1` в `WaitingPage2` — компилятор вставляет уничтожение автоматически.
 
-> **Practical rule**: Large stack allocations in `async fn` blow up the future's
-> size. If you see stack overflows in async code, check for large arrays or
-> deeply nested futures. Use `Box::pin()` to heap-allocate sub-futures if needed.
+> **Практическое правило**: большие стековые выделения в `async fn` раздувают размер future.
+> Если вы видите переполнение стека в async-коде, проверьте большие массивы или
+> глубоко вложенные future. При необходимости используйте `Box::pin()`, чтобы
+> разместить вложенные future в куче.
 
-### Exercise: Predict the State Machine
+### Упражнение: предскажите конечный автомат
 
 <details>
-<summary>🏋️ Exercise (click to expand)</summary>
+<summary>🏋️ Упражнение (нажмите, чтобы раскрыть)</summary>
 
-**Challenge**: Given this async function, sketch the state machine the compiler generates. How many states (enum variants) does it have? What values are stored in each?
+**Задача**: для этой async-функции набросайте конечный автомат, который генерирует компилятор. Сколько у него состояний (вариантов enum)? Какие значения хранятся в каждом?
 
 ```rust
 async fn pipeline(url: &str) -> Result<usize, Error> {
@@ -146,29 +147,27 @@ async fn pipeline(url: &str) -> Result<usize, Error> {
 ```
 
 <details>
-<summary>🔑 Solution</summary>
+<summary>🔑 Решение</summary>
 
-Five states:
+Пять состояний:
 
-1. **Start** — stores `url`
-2. **WaitingFetch** — stores `url`, `fetch` future
-3. **WaitingText** — stores `response`, `text()` future
-4. **WaitingParse** — stores `body`, `parse` future
-5. **Done** — returned `Ok(parsed.len())`
+1. **Start** — хранит `url`
+2. **WaitingFetch** — хранит `url`, future `fetch`
+3. **WaitingText** — хранит `response`, future `text()`
+4. **WaitingParse** — хранит `body`, future `parse`
+5. **Done** — вернул `Ok(parsed.len())`
 
-Each `.await` creates a yield point = a new enum variant. The `?` adds early-exit paths but doesn't add extra states — it's just a `match` on the `Poll::Ready` value.
+Каждый `.await` создаёт точку передачи управления = новый вариант enum. Оператор `?` добавляет пути раннего выхода, но не добавляет лишних состояний — это просто `match` по значению `Poll::Ready`.
 
 </details>
 </details>
 
-> **Key Takeaways — The State Machine Reveal**
-> - `async fn` compiles to an enum with one variant per `.await` point
-> - The future's **size** = max of all variant sizes — large stack values blow it up
-> - The compiler inserts **drops** at state transitions automatically
-> - Use `Box::pin()` or heap allocation when future size becomes a problem
+> **Ключевые выводы — раскрываем конечный автомат**
+> - `async fn` компилируется в enum с одним вариантом на каждую точку `.await`
+> - **Размер** future = максимум размеров всех вариантов — большие значения на стеке его раздувают
+> - Компилятор автоматически вставляет **уничтожение** значений при переходах между состояниями
+> - Используйте `Box::pin()` или выделение в куче, когда размер future становится проблемой
 
-> **See also:** [Ch 4 — Pin and Unpin](ch04-pin-and-unpin.md) for why the generated enum needs pinning, [Ch 6 — Building Futures by Hand](ch06-building-futures-by-hand.md) to build these state machines yourself
+> **См. также:** [Гл. 4 — Pin и Unpin](ch04-pin-and-unpin.md) — почему сгенерированный enum нужно закреплять, [Гл. 6 — Создаём фьючи вручную](ch06-building-futures-by-hand.md) — построить такие автоматы самостоятельно
 
 ***
-
-

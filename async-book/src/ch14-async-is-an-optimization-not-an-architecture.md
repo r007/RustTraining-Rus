@@ -1,84 +1,84 @@
-# 14. Async Is an Optimization, Not an Architecture 🔴
+# 14. Async — это оптимизация, а не архитектура 🔴
 
-> **What you'll learn:**
-> - Why async tends to contaminate entire codebases — and why that's a design flaw, not a feature
-> - The "sync core, async shell" pattern for keeping most code testable and debuggable
-> - How to handle the hard case: logic that *also* needs I/O
-> - When `spawn_blocking` is a fix vs. a symptom
-> - When async genuinely belongs in your core logic
-> - Why sync-first libraries are more composable than async-first ones
+> **Что вы узнаете:**
+> - Почему async обычно «заражает» всю кодовую базу — и почему это недостаток дизайна, а не возможность
+> - Паттерн «синхронное ядро, асинхронная оболочка», который делает большую часть кода тестируемой и понятной
+> - Как справляться со сложным случаем: логикой, которой *тоже* нужен ввод-вывод
+> - Когда `spawn_blocking` — это решение, а когда — симптом
+> - Когда async действительно уместен в основной логике
+> - Почему библиотеки, построенные сначала на синхронном коде, компонуемее библиотек, построенных сначала на async
 
-You've now spent 13 chapters learning async Rust. Here's the most important thing the book hasn't told you: **most of your code shouldn't be async.**
+Вы уже прошли 13 глав, изучая асинхронный Rust. Вот самое важное, о чём эта книга до сих пор не говорила: **большая часть вашего кода не должна быть асинхронной.**
 
-## The Function Coloring Problem
+## Проблема раскраски функций
 
-Bob Nystrom's ["What Color is Your Function?"](https://journal.stuffwithstuff.com/2015/02/01/what-color-is-your-function/) identifies the core issue: async functions can call sync functions, but sync functions cannot call async functions. Once one function goes async, everything above it in the call chain must follow.
+В статье Боба Ныстрома [«What Color is Your Function?»](https://journal.stuffwithstuff.com/2015/02/01/what-color-is-your-function/) описана основная проблема: асинхронные функции могут вызывать синхронные, а синхронные функции не могут вызывать асинхронные. Как только одна функция становится асинхронной, всё, что выше по цепочке вызовов, тоже должно стать асинхронным.
 
-In Rust this is **worse** than in C# or JavaScript, because async doesn't just infect function signatures — it infects types:
+В Rust это **хуже**, чем в C# или JavaScript, потому что async заражает не только сигнатуры функций, но и типы:
 
-| Sync code | Async equivalent | Why it's different |
+| Синхронный код | Асинхронный аналог | Чем отличается |
 |---|---|---|
-| `fn process(&self)` | `async fn process(&self)` | Callers must be async too |
-| `&mut T` | `Arc<Mutex<T>>` | Spawned tasks need `'static + Send` |
-| `std::sync::Mutex` | `tokio::sync::Mutex` | Different type if held across `.await` |
-| `impl Trait` return | `impl Future<Output = T> + Send` | Simpler since RPITIT (Rust 1.75, ch10), but still colored |
-| `#[test]` | `#[tokio::test]` | Tests need a runtime |
-| Stack trace: 5 frames | Stack trace: 25 frames | Half are runtime internals |
+| `fn process(&self)` | `async fn process(&self)` | Вызывающие тоже должны быть асинхронными |
+| `&mut T` | `Arc<Mutex<T>>` | Порождаемым задачам нужны `'static + Send` |
+| `std::sync::Mutex` | `tokio::sync::Mutex` | Другой тип, если блокировка удерживается через `.await` |
+| Возврат `impl Trait` | `impl Future<Output = T> + Send` | Проще с RPITIT (Rust 1.75, гл. 10), но всё равно «окрашено» |
+| `#[test]` | `#[tokio::test]` | Тестам нужен рантайм |
+| Трассировка стека: 5 кадров | Трассировка стека: 25 кадров | Половина — внутренности рантайма |
 
-Every row is a decision someone must make, get right, and maintain — and none of it is about business logic. The industry is moving *away* from this: Java's Project Loom (virtual threads) and Go's goroutines both let you write synchronous-looking code that the runtime multiplexes cheaply. Rust chose explicit async for zero-cost control, but that control has a complexity cost that should be paid consciously, not by default.
+Каждая строка — это решение, которое кто-то должен принять, сделать правильно и поддерживать, и ни одно из них не относится к бизнес-логике. Индустрия движется *от* этого: виртуальные потоки Project Loom в Java и горутины в Go позволяют писать код, который выглядит синхронным, а рантайм дёшево мультиплексирует его. Rust выбрал явный async ради контроля с нулевой стоимостью, но у этого контроля есть цена в сложности, которую стоит платить осознанно, а не по умолчанию.
 
-## "But Threads Are Expensive"
+## «Но потоки дорогие»
 
-The reflexive counter: "we need async because threads are expensive." Mostly wrong at the scale where most teams operate.
+Рефлекторный аргумент: «нам нужен async, потому что потоки дорогие». В масштабах, в которых работает большинство команд, это в основном неверно.
 
-- **Stack memory:** Each OS thread reserves 8MB of virtual address space (Linux default), but the OS only commits pages as touched — a mostly-idle thread uses 20-80KB of physical memory.
-- **Context switches:** ~1-5µs on modern hardware. At 50 concurrent requests, this is noise. At 100K switches/second, it's measurable.
-- **Creation cost:** ~10-30µs per thread on Linux. A thread pool (rayon, `std::thread::scope`) amortizes this to zero.
+- **Память стека:** каждый поток ОС резервирует 8 МБ виртуального адресного пространства (по умолчанию в Linux), но ОС выделяет физическую память только под реально затронутые страницы — поток, который в основном простаивает, занимает 20–80 КБ физической памяти.
+- **Переключение контекста:** ~1–5 мкс на современном железе. При 50 одновременных запросах это шум. При 100 тысячах переключений в секунду это уже заметно.
+- **Стоимость создания:** ~10–30 мкс на поток в Linux. Пул потоков (rayon, `std::thread::scope`) амортизирует это до нуля.
 
-The honest threshold where async earns its complexity is roughly **1K-10K concurrent mostly-idle connections** — the epoll/io_uring sweet spot where per-connection stacks become a real cost. Below that, a thread pool is simpler, faster to debug, and fast enough. Above that, async wins. Most services are below that.
+Честный порог, при котором async окупает свою сложность, — примерно **1–10 тысяч одновременных, в основном простаивающих соединений**: зона epoll/io_uring, где стеки на соединение становятся реальной стоимостью. Ниже этого порога пул потоков проще, легче отлаживается и достаточно быстр. Выше — побеждает async. Большинство сервисов находятся ниже этого порога.
 
-## The Hard Example: Logic That Also Needs I/O
+## Трудный пример: логика, которой тоже нужен ввод-вывод
 
-A trivial pure function — `fn add(a: i32, b: i32) -> i32` — obviously doesn't need async. That's not an interesting lesson. The interesting case is when business logic *seems* to need I/O in the middle: validation that checks inventory, pricing that queries an exchange rate, an order pipeline that looks up a customer.
+Тривиальная чистая функция — `fn add(a: i32, b: i32) -> i32` — очевидно не нуждается в async. Это неинтересный урок. Интересный случай — когда бизнес-логике *кажется*, что ей посреди работы нужен ввод-вывод: валидация, которая проверяет остатки на складе, ценообразование, которое запрашивает курс валют, конвейер заказов, который ищет клиента.
 
-Consider an order processing service. The async-everywhere version looks natural:
+Рассмотрим сервис обработки заказов. Вариант «async везде» выглядит естественно:
 
-### Version A: Async Through the Core
+### Вариант A: async через всё ядро
 
 ```rust
-// orders.rs — async all the way down
+// orders.rs — async до самого низа
 
 pub async fn process_order(order: Order) -> Result<Receipt, OrderError> {
-    // Step 1: Validate — pure business rules, no I/O
+    // Шаг 1: валидация — чистые бизнес-правила, без ввода-вывода
     validate_items(&order)?;
     validate_quantities(&order)?;
 
-    // Step 2: Check inventory — needs a database call
+    // Шаг 2: проверка остатков — нужен вызов к базе данных
     let stock = inventory_client.check(&order.items).await?;
     if !stock.all_available() {
         return Err(OrderError::OutOfStock(stock.missing()));
     }
 
-    // Step 3: Calculate pricing — pure math, but async because we're already here
+    // Шаг 3: расчёт цены — чистая арифметика, но async, потому что мы уже здесь
     let pricing = calculate_pricing(&order, &stock);
 
-    // Step 4: Apply discount — needs an external service call
+    // Шаг 4: применение скидки — нужен вызов внешнего сервиса
     let discount = discount_service.lookup(order.customer_id).await?;
     let final_price = pricing.apply_discount(discount);
 
-    // Step 5: Format receipt — pure
+    // Шаг 5: формирование чека — чисто
     Ok(Receipt::new(order, final_price))
 }
 ```
 
-This is *reasonable* async code. No `Arc<Mutex>` abuse — just sequential awaits. Most developers would write it this way and move on. But look at what happened: `validate_items`, `validate_quantities`, `calculate_pricing`, and `Receipt::new` are all pure functions that got dragged into an async context because steps 2 and 4 need I/O. The entire function must be async, its tests need a runtime, and every caller up the chain is now colored.
+Это *разумный* асинхронный код. Никакого злоупотребления `Arc<Mutex>` — просто последовательные `await`. Большинство разработчиков написали бы именно так и пошли дальше. Но посмотрите, что произошло: `validate_items`, `validate_quantities`, `calculate_pricing` и `Receipt::new` — это чистые функции, которые затянуло в асинхронный контекст, потому что шагам 2 и 4 нужен ввод-вывод. Вся функция должна стать асинхронной, её тестам нужен рантайм, и каждый вызывающий выше по цепочке тоже оказывается «окрашенным».
 
-### Version B: Sync Core, Async Shell
+### Вариант B: синхронное ядро, асинхронная оболочка
 
-The alternative: separate *what to decide* from *how to fetch*:
+Альтернатива: отделить *что решить* от *как получить данные*:
 
 ```rust
-// core.rs — pure business logic, zero async, zero tokio dependency
+// core.rs — чистая бизнес-логика, ноль async, ноль зависимостей от tokio
 
 pub fn validate_order(order: &Order) -> Result<ValidatedOrder, OrderError> {
     validate_items(order)?;
@@ -107,42 +107,42 @@ pub fn finalize(
 ```
 
 ```rust
-// shell.rs — thin async orchestrator
+// shell.rs — тонкий асинхронный оркестратор
 //
-// Note: the `?` on network calls requires `impl From<reqwest::Error> for OrderError`
-// (or a unified error enum). See ch12 for async error handling patterns.
+// Примечание: `?` на сетевых вызовах требует `impl From<reqwest::Error> for OrderError`
+// (или единого перечисления ошибок). См. гл. 12 — паттерны обработки ошибок в async.
 
 use crate::core;
 
 pub async fn process_order(order: Order) -> Result<Receipt, OrderError> {
-    // Sync: validate
+    // Синхронно: валидация
     let validated = core::validate_order(&order)?;
 
-    // Async: fetch inventory (this is the shell's job)
+    // Асинхронно: получаем остатки (это задача оболочки)
     let stock = inventory_client.check(&validated.items).await?;
 
-    // Sync: apply business rule to fetched data
+    // Синхронно: применяем бизнес-правило к полученным данным
     let stocked = core::check_stock(&validated, &stock)?;
 
-    // Async: fetch discount
+    // Асинхронно: получаем скидку
     let discount = discount_service.lookup(order.customer_id).await?;
 
-    // Sync: finalize
+    // Синхронно: финализируем
     Ok(core::finalize(&stocked, discount))
 }
 ```
 
-The async shell is a **pipeline of fetch → decide → fetch → decide**. Each "decide" step is a sync function that takes the I/O result as input instead of reaching out for it.
+Асинхронная оболочка — это **конвейер «получить → решить → получить → решить»**. Каждый шаг «решить» — синхронная функция, которая получает результат ввода-вывода как входные данные, а не ходит за ним сама.
 
-### Testing the Difference
+### Тестирование разницы
 
-The sync core tests every business rule without a runtime or mocks:
+Синхронное ядро проверяет каждое бизнес-правило без рантайма и моков:
 
 ```rust
 #[test]
 fn out_of_stock_rejects_order() {
     let order = validated_order(vec![item("widget", 10)]);
-    let stock = stock_result(vec![("widget", 3)]); // only 3 available
+    let stock = stock_result(vec![("widget", 3)]); // доступно только 3
 
     let result = core::check_stock(&order, &stock);
     assert_eq!(result.unwrap_err(), OrderError::OutOfStock(vec!["widget"]));
@@ -150,137 +150,137 @@ fn out_of_stock_rejects_order() {
 
 #[test]
 fn discount_applied_correctly() {
-    let order = stocked_order(100_00); // price in cents
+    let order = stocked_order(100_00); // цена в копейках
     let receipt = core::finalize(&order, Discount::Percent(15));
     assert_eq!(receipt.final_price, 85_00);
 }
 ```
 
-The async shell gets a thinner *integration* test that verifies the wiring, not the logic:
+Асинхронная оболочка получает более тонкий *интеграционный* тест, который проверяет связку компонентов, а не логику:
 
 ```rust
 #[tokio::test]
 async fn process_order_integration() {
-    let mock_inventory = mock_service(/* returns stock */);
-    let mock_discounts = mock_service(/* returns 10% */);
+    let mock_inventory = mock_service(/* возвращает остатки */);
+    let mock_discounts = mock_service(/* возвращает 10% */);
     let receipt = process_order(sample_order()).await.unwrap();
     assert!(receipt.final_price > 0);
-    // Logic correctness is already proven by core tests above
+    // Корректность логики уже доказана тестами ядра выше
 }
 ```
 
-### Why This Matters
+### Почему это важно
 
-| Concern | Async through the core | Sync core + async shell |
+| Аспект | Async через всё ядро | Синхронное ядро + асинхронная оболочка |
 |---|---|---|
-| Business rules testable without runtime | No | **Yes** |
-| Number of unit tests needing `#[tokio::test]` | All of them | **Only integration tests** |
-| I/O failures entangled with logic errors | Yes — one `Result` type for both | **No** — sync returns logic errors, shell handles I/O errors |
-| `validate_order` reusable in CLI / WASM / batch | No — pulls in tokio transitively | **Yes** — pure `fn` |
-| Stack traces through business logic | Interleaved with runtime frames | **Clean** |
-| Can swap HTTP client for gRPC later | Requires changing core functions | **Shell change only** |
+| Бизнес-правила тестируются без рантайма | Нет | **Да** |
+| Число модульных тестов, которым нужен `#[tokio::test]` | Все | **Только интеграционные** |
+| Ошибки ввода-вывода перемешаны с логическими ошибками | Да — один тип `Result` для обоих | **Нет** — синхронный код возвращает логические ошибки, оболочка обрабатывает ошибки I/O |
+| `validate_order` переиспользуем в CLI / WASM / пакетной обработке | Нет — тянет tokio транзитивно | **Да** — чистая `fn` |
+| Трассировки стека через бизнес-логику | Перемешаны с кадрами рантайма | **Чистые** |
+| HTTP-клиент можно заменить на gRPC позже | Нужно менять функции ядра | **Меняется только оболочка** |
 
-The key insight: **the I/O calls in steps 2 and 4 don't *need* to be inside the business logic. They're inputs to it.** The sync core takes `StockResult` and `Discount` as arguments. Where those values came from — HTTP, gRPC, a test fixture, a cache — is the shell's concern.
+Ключевая мысль: **вызовы I/O на шагах 2 и 4 не обязаны находиться внутри бизнес-логики. Они — её входные данные.** Синхронное ядро принимает `StockResult` и `Discount` как аргументы. Откуда пришли эти значения — из HTTP, gRPC, тестовой фикстуры или кэша — это забота оболочки.
 
-## The `spawn_blocking` Smell
+## Запах `spawn_blocking`
 
-Chapter 12 introduced `spawn_blocking` as a fix for accidentally blocking the executor. That's the right fix when you have a one-off blocking call — `std::fs::read`, a compression library, a legacy FFI function.
+В главе 12 `spawn_blocking` был представлен как средство от случайной блокировки исполнителя. Это правильное решение для разовых блокирующих вызовов — `std::fs::read`, библиотеки сжатия, устаревшей FFI-функции.
 
-But if you find yourself wrapping large sections of code in `spawn_blocking`:
+Но если вы обнаруживаете, что оборачиваете в `spawn_blocking` большие участки кода:
 
 ```rust
 async fn handler(req: Request) -> Response {
-    // If this is your codebase, the boundary is in the wrong place
+    // Если это ваша кодовая база, граница проведена не там
     tokio::task::spawn_blocking(move || {
-        let validated = validate(&req);       // sync
-        let enriched = enrich(validated);      // sync
-        let result = process(enriched);        // sync
-        let output = format_response(result);  // sync
+        let validated = validate(&req);       // синхронно
+        let enriched = enrich(validated);      // синхронно
+        let result = process(enriched);        // синхронно
+        let output = format_response(result);  // синхронно
         output
     }).await.unwrap()
 }
 ```
 
-...that's the codebase telling you: **this logic was never async to begin with.** You don't need `spawn_blocking` — you need a sync module that the async handler calls directly:
+...то это кодовая база сообщает вам: **эта логика никогда не была асинхронной.** `spawn_blocking` здесь не нужен — нужен синхронный модуль, который асинхронный обработчик вызывает напрямую:
 
 ```rust
 async fn handler(req: Request) -> Response {
-    // validate → enrich → process → format are all sync.
-    // No spawn_blocking needed — they're fast and CPU-light.
+    // validate → enrich → process → format — всё синхронное.
+    // spawn_blocking не нужен: это быстро и почти не нагружает CPU.
     let response = my_core::handle(req);
     response
 }
 ```
 
-Reserve `spawn_blocking` for genuinely heavy CPU work (parsing large payloads, image processing, compression) where the time cost would actually starve the executor. For ordinary business logic that runs in microseconds, a direct sync call is simpler and correct.
+Оставляйте `spawn_blocking` для действительно тяжёлой работы с CPU (разбор больших полезных нагрузок, обработка изображений, сжатие), где затраты времени реально могут заморить исполнитель. Для обычной бизнес-логики, которая выполняется за микросекунды, прямой синхронный вызов проще и корректен.
 
-## Libraries: Sync First, Async Wrapper Optional
+## Библиотеки: сначала синхронные, асинхронная обёртка — по желанию
 
-The boundary question is even more consequential for library authors. A sync library can be used from both sync and async callers:
+Вопрос границы ещё важнее для авторов библиотек. Синхронная библиотека может использоваться как из синхронного, так и из асинхронного кода:
 
 ```rust
-// A sync library — usable everywhere
+// Синхронная библиотека — пригодна везде
 let report = my_lib::analyze(&data);
 
-// Caller A: sync CLI
+// Вызывающий A: синхронная CLI-утилита
 fn main() {
     let report = my_lib::analyze(&data);
     println!("{report}");
 }
 
-// Caller B: async handler, works fine
+// Вызывающий B: асинхронный обработчик, работает нормально
 async fn handler() -> Json<Report> {
-    let report = my_lib::analyze(&data); // sync call in async context — fine
+    let report = my_lib::analyze(&data); // синхронный вызов в async-контексте — нормально
     Json(report)
 }
 
-// Caller C: heavy analysis — caller decides to offload
+// Вызывающий C: тяжёлый анализ — вызывающий решает разгрузить его
 async fn handler_heavy() -> Json<Report> {
     let data = data.clone();
     let report = tokio::task::spawn_blocking(move || {
-        my_lib::analyze(&data) // caller controls the async boundary
+        my_lib::analyze(&data) // граница async контролирует вызывающий
     }).await.unwrap();
     Json(report)
 }
 ```
 
-An async library forces *all* callers into a runtime:
+Асинхронная библиотека загоняет *всех* вызывающих в рантайм:
 
 ```rust
-// An async library — only usable from async contexts
-let report = my_lib::analyze(&data).await; // caller MUST be async
+// Асинхронная библиотека — пригодна только из асинхронного контекста
+let report = my_lib::analyze(&data).await; // вызывающий ОБЯЗАН быть асинхронным
 
-// Sync caller? Now you need block_on — and hope there's no nested runtime
+// Синхронный вызывающий? Теперь нужен block_on — и надежда, что нет вложенного рантайма
 let report = tokio::runtime::Runtime::new().unwrap().block_on(
     my_lib::analyze(&data)
-); // fragile, panic-prone if already inside a runtime
+); // хрупко, может паниковать, если мы уже внутри рантайма
 ```
 
-**Default to sync APIs.** If your library does pure computation, data transformation, or parsing, there is no reason for it to be async. If it does I/O, consider offering a sync core with an optional async convenience layer behind a feature flag — let the caller own the boundary decision.
+**По умолчанию проектируйте синхронные API.** Если ваша библиотека выполняет чистые вычисления, преобразование данных или разбор, нет причин делать её асинхронной. Если она выполняет ввод-вывод, рассмотрите синхронное ядро с необязательным асинхронным удобным слоем за feature-флагом — пусть вызывающий сам решает, где граница.
 
-## When Async Belongs in the Core
+## Когда async принадлежит ядру
 
-Not everything can be cleanly separated. Async belongs in your core logic when:
+Не всё можно аккуратно разделить. Async уместен в основной логике, когда:
 
-- **Fan-out/fan-in is the logic.** If your business rule is "query 5 pricing services concurrently and return the cheapest," the concurrency *is* the logic, not plumbing. Forcing this through sync + threads is reinventing a worse async.
+- **Fan-out/fan-in и есть логика.** Если бизнес-правило звучит как «одновременно запросить 5 сервисов ценообразования и вернуть самый дешёвый», конкурентность — это *и есть* логика, а не сантехника. Пытаться протащить это через синхронный код и потоки — значит заново изобретать худший async.
 
-- **Streaming is the logic.** Processing a continuous event stream with backpressure — the stream management is non-trivial business logic, not just an I/O wrapper.
+- **Потоковая обработка и есть логика.** Обработка непрерывного потока событий с обратным давлением — управление потоком нетривиальная бизнес-логика, а не просто обёртка над I/O.
 
-- **Long-lived stateful connections.** WebSocket handlers, gRPC bidirectional streams, and protocol state machines have state transitions inherently tied to I/O events. The capstone project in [ch17](ch17-capstone-project.md) — an async chat server — is exactly this case: concurrent connections, room-based fan-out, and graceful shutdown are fundamentally async work.
+- **Долгоживущие состоятельные соединения.** Обработчики WebSocket, двунаправленные потоки gRPC и конечные автоматы протоколов имеют переходы состояний, неразрывно связанные с событиями ввода-вывода. Итоговый проект в [гл. 17](ch17-capstone-project.md) — асинхронный чат-сервер — как раз такой случай: одновременные соединения, рассылка по комнатам и корректное завершение по своей природе являются асинхронной работой.
 
-**The test:** if removing `async` from a function would require replacing it with threads, channels, or manual polling, then async is pulling its weight. If removing `async` would just mean deleting the keyword with no other changes, it never needed to be async.
+**Проверка:** если удаление `async` из функции потребовало бы заменить её потоками, каналами или ручным опросом, значит async оправдывает себя. Если же удаление `async` сводится к тому, чтобы просто убрать ключевое слово без других изменений, в асинхронности не было необходимости.
 
-## Decision Rule
+## Правило принятия решения
 
 ```mermaid
 graph TD
-    START["Should this function be async?"] --> IO{"Does it do I/O?"}
-    IO -->|No| SYNC["sync fn — always"]
-    IO -->|Yes| BOUNDARY{"Is it at the boundary?<br/>handler, main loop, accept()"}
-    BOUNDARY -->|Yes| ASYNC_SHELL["async fn — this is the shell"]
-    BOUNDARY -->|No| CORE_IO{"Is the I/O the core logic?<br/>fan-out, streaming, stateful conn"}
-    CORE_IO -->|Yes| ASYNC_CORE["async fn — justified"]
-    CORE_IO -->|No| EXTRACT["Extract logic into sync fn.<br/>Pass I/O results in as arguments."]
+    START["Должна ли эта функция быть async?"] --> IO{"Она выполняет I/O?"}
+    IO -->|Нет| SYNC["sync fn — всегда"]
+    IO -->|Да| BOUNDARY{"Она на границе?<br/>обработчик, главный цикл, accept()"}
+    BOUNDARY -->|Да| ASYNC_SHELL["async fn — это оболочка"]
+    BOUNDARY -->|Нет| CORE_IO{"Является ли I/O основной логикой?<br/>fan-out, потоковая обработка, состоятельное соединение"}
+    CORE_IO -->|Да| ASYNC_CORE["async fn — оправдано"]
+    CORE_IO -->|Нет| EXTRACT["Вынесите логику в sync fn.<br/>Передавайте результаты I/O как аргументы."]
 
     style SYNC fill:#d4efdf,stroke:#27ae60,color:#000
     style ASYNC_SHELL fill:#e8f4f8,stroke:#2980b9,color:#000
@@ -288,26 +288,26 @@ graph TD
     style EXTRACT fill:#d4efdf,stroke:#27ae60,color:#000
 ```
 
-> **Rule of thumb:** Start sync. Add async only at the outermost I/O boundary. Pull it inward only when you can articulate *which concurrent I/O operations* justify the complexity tax.
+> **Эмпирическое правило:** начинайте с синхронного кода. Добавляйте async только на самой внешней границе ввода-вывода. Перемещайте его внутрь, только когда можете назвать, *какие конкурентные операции ввода-вывода* оправдывают налог на сложность.
 
 ---
 
 <details>
-<summary><strong>🏋️ Exercise: Extract the Sync Core</strong> (click to expand)</summary>
+<summary><strong>🏋️ Упражнение: выделите синхронное ядро</strong> (нажмите, чтобы раскрыть)</summary>
 
-The following axum handler has async contamination — business logic mixed with I/O. Refactor it into a sync core module and a thin async shell.
+Следующий обработчик axum «заражён» async: бизнес-логика смешана с вводом-выводом. Отрефакторите его в модуль синхронного ядра и тонкую асинхронную оболочку.
 
 ```rust
 use axum::{Json, extract::Path};
 
 async fn get_device_report(Path(device_id): Path<String>) -> Result<Json<Report>, AppError> {
-    // Fetch raw telemetry from the device over HTTP
+    // Получаем сырую телеметрию с устройства по HTTP
     let raw = reqwest::get(format!("http://bmc-{device_id}/telemetry"))
         .await?
         .json::<RawTelemetry>()
         .await?;
 
-    // Business logic: convert raw sensor readings to calibrated values
+    // Бизнес-логика: преобразуем сырые показания датчиков в калиброванные значения
     let mut readings = Vec::new();
     for sensor in &raw.sensors {
         let calibrated = (sensor.raw_value as f64) * sensor.scale + sensor.offset;
@@ -324,7 +324,7 @@ async fn get_device_report(Path(device_id): Path<String>) -> Result<Json<Report>
         });
     }
 
-    // Business logic: classify device health
+    // Бизнес-логика: классифицируем состояние устройства
     let critical_count = readings.iter()
         .filter(|r| r.value > 90.0)
         .count();
@@ -332,7 +332,7 @@ async fn get_device_report(Path(device_id): Path<String>) -> Result<Json<Report>
                  else if critical_count > 0 { Health::Warning }
                  else { Health::Ok };
 
-    // Fetch device metadata from inventory service
+    // Получаем метаданные устройства из сервиса инвентаризации
     let meta = reqwest::get(format!("http://inventory/devices/{device_id}"))
         .await?
         .json::<DeviceMetadata>()
@@ -348,21 +348,21 @@ async fn get_device_report(Path(device_id): Path<String>) -> Result<Json<Report>
 }
 ```
 
-**Your goals:**
+**Ваши задачи:**
 
-1. Create `core.rs` with sync functions: `calibrate_sensors`, `classify_health`, and `build_report`
-2. Create `shell.rs` with a thin async handler that fetches, then calls the sync core
-3. Write `#[test]` (not `#[tokio::test]`) for: a sensor out of range, health classification thresholds, and a normal report
+1. Создайте `core.rs` с синхронными функциями: `calibrate_sensors`, `classify_health` и `build_report`
+2. Создайте `shell.rs` с тонким асинхронным обработчиком, который сначала получает данные, а затем вызывает синхронное ядро
+3. Напишите `#[test]` (а не `#[tokio::test]`) для: датчика вне диапазона, порогов классификации состояния и обычного отчёта
 
-**Hints:**
-- The sync core should take `RawTelemetry` and `DeviceMetadata` as inputs — it should never know those came from HTTP.
-- You'll need to define small test helper functions (e.g., `raw_telemetry()`, `sensor()`, `reading()`, `device_meta()`) that construct test fixtures. Their signatures should be obvious from usage.
+**Подсказки:**
+- Синхронное ядро должно принимать `RawTelemetry` и `DeviceMetadata` как входные данные — оно никогда не должно знать, что они пришли по HTTP.
+- Понадобятся небольшие вспомогательные функции для тестов (например, `raw_telemetry()`, `sensor()`, `reading()`, `device_meta()`), которые конструируют тестовые фикстуры. Их сигнатуры должны быть очевидны из использования.
 
 <details>
-<summary>🔑 Solution</summary>
+<summary>🔑 Решение</summary>
 
 ```rust
-// core.rs — zero async dependency
+// core.rs — ноль зависимостей от async
 
 pub fn calibrate_sensors(raw: &RawTelemetry) -> Result<Vec<CalibratedReading>, AppError> {
     raw.sensors.iter().map(|sensor| {
@@ -406,7 +406,7 @@ pub fn build_report(
 ```
 
 ```rust
-// shell.rs — async boundary only
+// shell.rs — только асинхронная граница
 
 pub async fn get_device_report(
     Path(device_id): Path<String>,
@@ -428,9 +428,9 @@ pub async fn get_device_report(
 ```
 
 ```rust
-// core_tests.rs — no runtime needed
+// core_tests.rs — рантайм не нужен
 
-// Test fixture helpers — construct data without any I/O
+// Вспомогательные функции для фикстур — создают данные без какого-либо ввода-вывода
 fn sensor(name: &str, raw_value: f64, valid_range: std::ops::Range<f64>) -> RawSensor {
     RawSensor {
         name: name.into(),
@@ -484,19 +484,19 @@ fn normal_report() {
 }
 ```
 
-**What changed:** The async handler went from 30 lines of mixed logic and I/O to 8 lines of pure orchestration. The business rules (calibration math, range validation, health thresholds) are now tested with `#[test]`, run in milliseconds, and have zero dependency on tokio, reqwest, or any HTTP mock server.
+**Что изменилось:** асинхронный обработчик сократился с 30 строк смешанной логики и ввода-вывода до 8 строк чистой оркестрации. Бизнес-правила (математика калибровки, проверка диапазонов, пороги состояния) теперь проверяются через `#[test]`, выполняются за миллисекунды и не зависят ни от tokio, ни от reqwest, ни от какого-либо мок-сервера HTTP.
 
 </details>
 </details>
 
 ---
 
-> **Key Takeaways:**
+> **Ключевые выводы:**
 >
-> 1. Async is an **I/O multiplexing optimization**, not an application architecture. Most business logic is sync.
-> 2. **Sync core, async shell:** keep business rules in pure sync functions that take I/O results as arguments. The async shell orchestrates fetches and calls the core.
-> 3. If you're wrapping large blocks in `spawn_blocking`, **the boundary is in the wrong place** — refactor the logic into a sync module instead.
-> 4. **Libraries should default to sync APIs.** An async library forces all callers into a runtime; a sync library lets the caller own the async boundary.
-> 5. Async earns its keep for **fan-out/fan-in, streaming, and stateful connections** — the cases where the concurrency *is* the business logic.
+> 1. Async — это **оптимизация мультиплексирования I/O**, а не архитектура приложения. Большая часть бизнес-логики синхронна.
+> 2. **Синхронное ядро, асинхронная оболочка:** держите бизнес-правила в чистых синхронных функциях, которые принимают результаты I/O как аргументы. Асинхронная оболочка организует запросы и вызывает ядро.
+> 3. Если вы оборачиваете большие блоки в `spawn_blocking`, **граница проведена не там** — вместо этого вынесите логику в синхронный модуль.
+> 4. **Библиотеки должны по умолчанию предлагать синхронные API.** Асинхронная библиотека заставляет всех вызывающих работать с рантаймом; синхронная позволяет вызывающему самому определять асинхронную границу.
+> 5. Async окупает себя в **fan-out/fan-in, потоковой обработке и состоятельных соединениях** — там, где конкурентность *и есть* бизнес-логика.
 >
-> **See also:** [Ch12 — Common Pitfalls](ch12-common-pitfalls.md) (spawn_blocking as a tactical fix) · [Ch13 — Production Patterns](ch13-production-patterns.md) (backpressure, structured concurrency) · [Ch17 — Capstone: Async Chat Server](ch17-capstone-project.md) (a case where async is the right architecture)
+> **См. также:** [Гл. 12 — Типичные ловушки](ch12-common-pitfalls.md) (spawn_blocking как тактическое решение) · [Гл. 13 — Продакшен-паттерны](ch13-production-patterns.md) (обратное давление, структурированная конкурентность) · [Гл. 17 — Итоговый проект: асинхронный чат-сервер](ch17-capstone-project.md) (случай, когда async — правильная архитектура)
