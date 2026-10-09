@@ -123,7 +123,6 @@ fn connect(host: impl Into<String>, port: u16) -> Connection {
 }
 connect("localhost", 5432);     // &str: без лишних усилий
 connect(hostname, 5432);        // String: перемещаем, без клонирования
-connect(arc_str, 5432);         // Arc<str>, если реализован From
 ```
 
 Это работает, потому что пара трейтов `From`/`Into` обеспечивает общие преобразования. Принимая `impl Into<T>`, вы говорите: «дайте мне всё, что умеет стать `T`».
@@ -216,6 +215,7 @@ println!("{}", fixed.to_uppercase());
 pub struct DiagRunner {
     name: String,
     config_path: PathBuf,
+    results: HashMap<String, TestResult>,
 }
 
 impl DiagRunner {

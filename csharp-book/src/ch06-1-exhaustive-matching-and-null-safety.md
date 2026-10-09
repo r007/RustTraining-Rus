@@ -15,8 +15,8 @@ public string HandleResponse(HttpStatus status) => status switch
     HttpStatus.Ok => "Success",
     HttpStatus.NotFound => "Resource not found",
     HttpStatus.ServerError => "Internal error",
-    // Missing Unauthorized case - compiles fine!
-    // Runtime: System.InvalidOperationException at runtime
+    // Missing Unauthorized case — compiles with warning CS8524, but NOT an error!
+    // Runtime: SwitchExpressionException if status is Unauthorized
 };
 
 // Even with nullable warnings, this compiles:
@@ -30,18 +30,20 @@ public string ProcessUser(User? user) => user switch
 {
     { IsActive: true } => $"Active: {user.Name}",
     { IsActive: false } => $"Inactive: {user.Name}",
-    // Missing null case - warning only, not error
-    // Runtime: NullReferenceException possible
+    // Missing null case — compiler warning CS8655, but NOT an error!
+    // Runtime: SwitchExpressionException when user is null
 };
+```
 
-// Adding enum values breaks existing code silently
+```csharp
+// Adding an enum variant later doesn't break compilation of existing switches
 public enum HttpStatus 
 { 
     Ok, 
     NotFound, 
     ServerError, 
     Unauthorized,
-    Forbidden  // Adding this doesn't break compilation of HandleResponse()!
+    Forbidden  // Adding this produces another CS8524 warning but doesn't break compilation!
 }
 ```
 
@@ -147,7 +149,9 @@ public string GetUserDisplayName(User user)
     }
     return "Unknown User";
 }
+```
 
+```csharp
 // C# 8+ Nullable Reference Types
 public class User
 {

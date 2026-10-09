@@ -31,6 +31,7 @@
 - [**Niko Matsakis**](https://smallcultfollowing.com/babysteps/) — дизайн языка, внутреннее устройство borrow checker, Polonius
 - [**Rust by Example**](https://doc.rust-lang.org/rust-by-example/) и [**Rustonomicon**](https://doc.rust-lang.org/nomicon/) — практические паттерны и углублённое изучение unsafe
 - [**This Week in Rust**](https://this-week-in-rust.org/) — находки сообщества, которые повлияли на многие примеры
+- [**Binary Musings - Tag(Rust)**](https://binarymusings.org/posts/category/rust/) — глубокое погружение во внутреннее устройство Rust
 - …и многие другие участники **сообщества Rust**, чьи статьи, доклады, RFC и обсуждения на форумах легли в основу этих материалов. Их слишком много, чтобы перечислить поимённо, но мы искренне благодарны каждому
 
 ## 📖 С чего начать
@@ -47,25 +48,24 @@
 
 | Книга | Уровень | Для кого |
 |-------|---------|----------|
-| [**Rust для программистов C/C++**](c-cpp-book/src/SUMMARY.md) | 🟢 Мост | Семантика перемещения, RAII, FFI, embedded, no_std |
-| [**Rust для программистов C#**](csharp-book/src/SUMMARY.md) | 🟢 Мост | Swift / C# / Java → владение и система типов |
-| [**Rust для программистов Python**](python-book/src/SUMMARY.md) | 🟢 Мост | От динамической типизации к статической, конкурентность без GIL |
-| [**Async Rust**](async-book/src/SUMMARY.md) | 🔵 Погружение | Tokio, потоки (streams), отмена и безопасность при отмене |
-| [**Паттерны Rust**](rust-patterns-book/src/SUMMARY.md) | 🟡 Продвинутый | Pin, аллокаторы, lock-free-структуры, unsafe |
-| [**Корректность на уровне типов**](type-driven-correctness-book/src/SUMMARY.md) | 🟣 Эксперт | Typestate, phantom-типы, capability-токены |
-| [**Инженерные практики Rust**](engineering-book/src/SUMMARY.md) | 🟤 Практики | Build scripts, кросс-компиляция, CI/CD, Miri |
+| [**Rust для программистов C/C++**](https://microsoft.github.io/RustTraining/c-cpp-book/) | 🟢 Мост | Семантика перемещения, RAII, FFI, embedded, no_std |
+| [**Rust для программистов C#**](https://microsoft.github.io/RustTraining/csharp-book/) | 🟢 Мост | Swift / C# / Java → владение и система типов |
+| [**Rust для программистов Python**](https://microsoft.github.io/RustTraining/python-book/) | 🟢 Мост | От динамической типизации к статической, конкурентность без GIL |
+| [**Async Rust**](https://microsoft.github.io/RustTraining/async-book/) | 🔵 Погружение | Tokio, потоки (streams), отмена и безопасность при отмене |
+| [**Паттерны Rust**](https://microsoft.github.io/RustTraining/rust-patterns-book/) | 🟡 Продвинутый | Pin, аллокаторы, lock-free-структуры, unsafe |
+| [**Корректность на уровне типов**](https://microsoft.github.io/RustTraining/type-driven-correctness-book/) | 🟣 Эксперт | Typestate, phantom-типы, capability-токены |
+| [**Инженерные практики Rust**](https://microsoft.github.io/RustTraining/engineering-book/) | 🟤 Практики | Build scripts, кросс-компиляция, CI/CD, Miri |
 
 В каждой книге 15–16 глав с диаграммами Mermaid, редактируемыми песочницами Rust, упражнениями и полнотекстовым поиском.
 
-> **Совет:** Исходный markdown можно читать прямо на GitHub или открыть сайт с навигацией по главам и поиском на GitHub Pages (ссылка указана в разделе About репозитория).
+> **Совет:** Просматривайте готовые книги с навигацией по боковой панели и поиском на [сайте GitHub Pages](https://microsoft.github.io/RustTraining/).
 >
-> **Локальный просмотр:** Для лучшего опыта чтения (навигация по главам с клавиатуры, мгновенный поиск, работа без интернета) склонируйте репозиторий и выполните:
+> **Локальный просмотр:** Для работы без интернета или при участии в разработке (сначала [установите Rust](https://rustup.rs/)):
 > ```
-> # Если Rust ещё не установлен, поставьте его через rustup:
-> # https://rustup.rs/
->
+> git clone https://github.com/microsoft/RustTraining.git
+> cd RustTraining
 > cargo install mdbook mdbook-mermaid
-> cargo xtask serve          # собирает все книги и открывает локальный сервер
+> cargo xtask serve    # собирает все книги и запускает сервер: http://localhost:3000
 > ```
 
 ---
@@ -80,7 +80,14 @@
 Установите [Rust через **rustup**](https://rustup.rs/), если у вас его ещё нет, затем выполните:
 
 ```bash
-cargo install mdbook mdbook-mermaid
+cargo install mdbook@0.4.52 mdbook-mermaid@0.14.0
+```
+
+### Клонирование репозитория
+
+```bash
+git clone https://github.com/microsoft/RustTraining.git
+cd RustTraining
 ```
 
 ### Сборка и запуск
@@ -100,6 +107,6 @@ cd c-cpp-book && mdbook serve --open    # http://localhost:3000
 
 ### Публикация
 
-Сайт автоматически публикуется на GitHub Pages при push в `master` через `.github/workflows/pages.yml`. Никаких ручных действий не требуется.
+Сайт автоматически публикуется на GitHub Pages при push в `main` через `.github/workflows/pages.yml`. Никаких ручных действий не требуется.
 
 </details>

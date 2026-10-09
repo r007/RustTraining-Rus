@@ -11,7 +11,7 @@
     }
     
     fn main() {
-        // Initializes an array of 10 elements and sets all to 42
+        // Initializes an array of 3 elements and sets all to 42
         let a : [u8; 3] = [42; 3];
         // Alternative syntax
         // let a = [42u8, 42u8, 42u8];
@@ -63,7 +63,7 @@ fn main() {
 ### Rust references
 - References in Rust are roughly equivalent to pointers in C with some key differences
     - It is legal to have any number of read-only (immutable) references to a variable at any point of time. A reference cannot outlive the variable scope (this is a key concept called **lifetime**; discussed in detail later)
-    - Only a single writable (mutable) reference to a mutable variable is permitted and it must no overlap with any other reference.
+    - Only a single writable (mutable) reference to a mutable variable is permitted and it must not overlap with any other reference.
 ```rust
 fn main() {
     let mut a = 42;
@@ -71,8 +71,18 @@ fn main() {
         let b = &a;
         let c = b;
         println!("{} {}", *b, *c); // The compiler automatically dereferences *c
-        // Illegal because b and still are still in scope
-        // let d = &mut a;
+        
+        let d = &mut a;
+        
+        /*
+         * Uncommenting the line below would cause the
+         * program to not compile, because `b` is used
+         * while the mutable reference `d` is live in the current scope
+         * 
+         * You cannot have a mutable and immutable reference in use in the same scope
+         * at the same time!
+         */
+        // println!("{}", *b);
     }
     let d = &mut a; // Ok: b and c are not in scope
     *d = 43;
@@ -81,7 +91,7 @@ fn main() {
 
 ----
 # Rust slices
-- Rust references can be used create subsets of arrays
+- Rust references can be used to create subsets of arrays
     - Unlike arrays, which have a static fixed length determined at compile time, slices can be of arbitrary size. Internally, slices are implemented as a "fat-pointer" that contains the length of the slice and a pointer to the starting element in the original array
 ```rust
 fn main() {
@@ -226,7 +236,7 @@ fn main() {
 
 # Rust tuple structs
 - Rust tuple structs are similar to tuples and individual fields don't have names
-    - Like tuples, individual elements are accessed using .0, .1, .2, .... A common use case for tuple structs is to wrap primitive types to create custom types. **This can useful to avoid mixing differing values of the same type**
+    - Like tuples, individual elements are accessed using .0, .1, .2, .... A common use case for tuple structs is to wrap primitive types to create custom types. **This can be useful to avoid mixing differing values of the same type**
 ```rust
 struct WeightInGrams(u32);
 struct WeightInMilligrams(u32);

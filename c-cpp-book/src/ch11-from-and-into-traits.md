@@ -3,7 +3,8 @@
 > **What you'll learn:** Rust's type conversion traits — `From<T>` and `Into<T>` for infallible conversions, `TryFrom` and `TryInto` for fallible ones. Implement `From` and get `Into` for free. Replaces C++ conversion operators and constructors.
 
 - ```From``` and ```Into``` are complementary traits to facilitate type conversion
-- Types normally implement on the ```From``` trait. the ```String::from()``` converts from "&str" to ```String```, and compiler can automatically derive ```&str.into```
+- Types normally implement the ```From``` trait.```String::from("Rust")``` converts a ```&str``` into a ```String```.
+When ```From<T> for U``` exists, Rust also provides ```Into<U> for T```, so ```let s: String = "Rust".into();``` works too.
 ```rust
 struct Point {x: u32, y: u32}
 // Construct a Point from a tuple
@@ -16,7 +17,7 @@ fn main() {
     let s = String::from("Rust");
     let x = u32::from(true);
     let p = Point::from((40, 42));
-    // let p : Point = (40.42)::into(); // Alternate form of the above
+    // let p : Point = (40,42).into(); // Alternate form of the above
     println!("s: {s} x:{x} p.x:{} p.y {}", p.x, p.y);   
 }
 ```
@@ -99,14 +100,14 @@ fn main() {
 
 ### Other Rust type conversions
 - Rust doesn't support implicit type conversions and ```as``` can be used for ```explicit``` conversions
-- ```as``` should be sparingly used because it's subject to loss of data by narrowing and so forth. In general, it's preferrable to use ```into()``` or ```from()``` where possible
+- ```as``` should be sparingly used because it's subject to loss of data by narrowing and so forth. In general, it's preferable to use ```into()``` or ```from()``` where possible
 ```rust
 fn main() {
     let f = 42u8;
     // let g : u32 = f;    // Will not compile
     let g = f as u32;      // Ok, but not preferred. Subject to rules around narrowing
-    let g : u32 = f.into(); // Most preferred form; infalliable and checked by the compiler
-    //let k : u8 = f.into();  // Fails to compile; narrowing can result in loss of data
+    let g : u32 = f.into(); // Most preferred form; infallible and checked by the compiler
+    // let k : u8 = g.into();  // Fails to compile; narrowing can result in loss of data
     
     // Attempting a narrowing operation requires use of try_into
     if let Ok(k) = TryInto::<u8>::try_into(g) {

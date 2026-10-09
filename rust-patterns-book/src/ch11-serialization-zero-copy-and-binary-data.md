@@ -313,7 +313,7 @@ struct IpmiHeader {
 // --- Безопасный разбор бинарных данных вручную ---
 impl IpmiHeader {
     fn from_bytes(data: &[u8]) -> Option<Self> {
-        if data.len() < std::mem::size_of::<Self>() {
+        if data.len() < size_of::<Self>() {
             return None;
         }
         Some(IpmiHeader {

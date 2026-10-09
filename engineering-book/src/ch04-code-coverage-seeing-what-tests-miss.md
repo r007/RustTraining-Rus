@@ -35,7 +35,7 @@ rustup component add llvm-tools-preview
 # Run tests and show per-file coverage summary
 cargo llvm-cov
 
-# Generate HTML report (browseable, line-by-line highlighting)
+# Generate HTML report (browsable, line-by-line highlighting)
 cargo llvm-cov --html
 # Output: target/llvm-cov/html/index.html
 
@@ -381,11 +381,11 @@ done
 flowchart TD
     START["Need code coverage?"] --> ACCURACY{"Priority?"}
     
-    ACCURACY -->|"Most accurate"| LLVM["cargo-llvm-cov\nSource-based, compiler-native"]
-    ACCURACY -->|"Quick check"| TARP["cargo-tarpaulin\nLinux only, fast"]
-    ACCURACY -->|"Multi-run aggregate"| GRCOV["grcov\nMozilla, combines profiles"]
+    ACCURACY -->|"Most accurate"| LLVM["cargo-llvm-cov<br/>Source-based, compiler-native"]
+    ACCURACY -->|"Quick check"| TARP["cargo-tarpaulin<br/>Linux only, fast"]
+    ACCURACY -->|"Multi-run aggregate"| GRCOV["grcov<br/>Mozilla, combines profiles"]
     
-    LLVM --> CI_GATE["CI coverage gate\n--fail-under-lines 80"]
+    LLVM --> CI_GATE["CI coverage gate<br/>--fail-under-lines 80"]
     TARP --> CI_GATE
     
     CI_GATE --> UPLOAD{"Upload to?"}

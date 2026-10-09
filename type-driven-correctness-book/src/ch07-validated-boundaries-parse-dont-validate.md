@@ -998,6 +998,11 @@ impl SdrLinearization {
 Вместо свёртывания всего в `has_critical_events: bool` классифицируем каждое разобранное событие SEL по корзине здоровья подсистемы:
 
 ```rust,ignore
+/// Худшее значение здоровья — Ord даёт нам `.max()` бесплатно.
+/// (Полное определение в гл. 18; здесь повторено для конвейера SEL.)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum HealthValue { OK, Warning, Critical }
+
 /// Вклад одного события SEL в здоровье, классифицированный по подсистемам.
 #[derive(Debug, Clone)]
 pub enum SubsystemHealth {
@@ -1233,12 +1238,12 @@ pub fn summarize_sel(
 
 ```mermaid
 flowchart LR
-    RAW["Сырые [u8; 16]\nзаписи SEL"]
-    PARSE["TryFrom:\nValidSelRecord\n(дерево enum)"]
-    CLASSIFY["classify_event_health\n(исчерпывающее match)"]
-    LINEARIZE["Линеаризация SDR\nсырое → Celsius/Rpm/Watts"]
-    SUMMARY["TypedSelSummary\n(здоровье по подсистемам\n+ размерные показания)"]
-    REDFISH["гл. 18: агрегация здоровья\n→ JSON Status.Health"]
+    RAW["Сырые [u8; 16]<br/>записи SEL"]
+    PARSE["TryFrom:<br/>ValidSelRecord<br/>(дерево enum)"]
+    CLASSIFY["classify_event_health<br/>(исчерпывающее match)"]
+    LINEARIZE["Линеаризация SDR<br/>сырое → Celsius/Rpm/Watts"]
+    SUMMARY["TypedSelSummary<br/>(здоровье по подсистемам<br/>+ размерные показания)"]
+    REDFISH["гл. 18: агрегация здоровья<br/>→ JSON Status.Health"]
 
     RAW -->|"гл. 07 §Разбор"| PARSE
     PARSE -->|"типизированные события"| CLASSIFY

@@ -37,12 +37,14 @@ fn max_of_str<'a>(a: &'a str, b: &'a str) -> &'a str { if a >= b { a } else { b 
 
 **Сравнение с C++**: обобщения в Rust работают как шаблоны C++, но есть одно принципиальное отличие — **проверка ограничений происходит в момент определения, а не инстанцирования**. В C++ шаблон компилируется только при использовании с конкретным типом, поэтому ошибки всплывают глубоко в библиотечном коде и выглядят запутанно. В Rust `T: PartialOrd` проверяется при определении функции, поэтому ошибки находятся раньше, а сообщения понятны.
 
-```rust
+```rust,compile_fail
 // Rust: ошибка уже в месте определения — "T doesn't implement Display"
 fn broken<T>(val: T) {
     println!("{val}"); // ❌ Error: T doesn't implement Display
 }
+```
 
+```rust
 // Исправление: добавляем ограничение
 fn fixed<T: std::fmt::Display>(val: T) {
     println!("{val}"); // ✅
@@ -53,7 +55,7 @@ fn fixed<T: std::fmt::Display>(val: T) {
 
 У мономорфизации есть цена — размер бинарного файла. Каждая уникальная инстанциация дублирует тело функции:
 
-```rust
+```rust,ignore
 // Эта невинная функция...
 fn serialize<T: serde::Serialize>(value: &T) -> Vec<u8> {
     serde_json::to_vec(value).unwrap()
@@ -64,7 +66,7 @@ fn serialize<T: serde::Serialize>(value: &T) -> Vec<u8> {
 
 **Стратегии смягчения**:
 
-```rust
+```rust,ignore
 // 1. Вынести необобщённое ядро (паттерн «outline»)
 fn serialize<T: serde::Serialize>(value: &T) -> Result<Vec<u8>, serde_json::Error> {
     // Обобщённая часть: только вызов сериализации
@@ -97,7 +99,7 @@ fn log_item(item: &dyn std::fmt::Display) {
 | **Перечисление** | Ветка `match` | Компиляции | ❌ (закрытое множество) | Нулевые — без vtable |
 | **Трейт-объект** (`dyn Trait`) | Динамическая (vtable) | Выполнения | ✅ (открытое множество) | Указатель на vtable и косвенный вызов |
 
-```rust
+```rust,ignore
 // --- ОБОБЩЕНИЯ: открытое множество, нулевые затраты, решается на этапе компиляции ---
 fn process<H: Handler>(handler: H, request: Request) -> Response {
     handler.handle(request) // Мономорфизировано — по одной копии на каждый H
@@ -269,11 +271,11 @@ const SENSOR_THRESHOLDS: [u16; 4] = {
 - вызов других `const fn`
 - ссылки (`&`, `&mut` в пределах константного контекста)
 - `panic!()` (становится ошибкой компиляции, если достигается на этапе компиляции)
+- базовая арифметика с плавающей точкой (`+`, `-`, `*`, `/`; сложные операции вроде `sqrt`/`sin` не могут быть `const`)
 
 **Чего НЕЛЬЗЯ** (пока):
 - выделение памяти в куче (`Box`, `Vec`, `String`)
 - вызов методов трейтов (только собственные методы типа)
-- операции с плавающей точкой в некоторых контекстах (стабилизированы только базовые операции)
 - ввод-вывод и побочные эффекты
 
 ```rust
@@ -335,6 +337,10 @@ impl<K: Eq + Hash + Clone, V> Cache<K, V> {
     }
 
     fn insert(&mut self, key: K, value: V) {
+        if self.capacity == 0 {
+            // нет ёмкости!
+            return;
+        }
         if self.map.contains_key(&key) {
             self.map.insert(key, value);
             return;
@@ -358,6 +364,7 @@ impl<K: Eq + Hash + Clone, V> Cache<K, V> {
 }
 
 fn main() {
+    // Тест базового кэша
     let mut cache = Cache::new(3);
     cache.insert("a", 1);
     cache.insert("b", 2);
@@ -367,6 +374,14 @@ fn main() {
     cache.insert("d", 4); // Вытесняет "a"
     assert_eq!(cache.get(&"a"), None);
     assert_eq!(cache.get(&"d"), Some(&4));
+
+    // Упражнение для читателя: каким должен быть тип атрибута `capacity`,
+    // чтобы нельзя было создать такой бесполезный кэш?
+    let mut empty_cache = Cache::new(0);
+    empty_cache.insert("0", 0);
+    assert_eq!(empty_cache.get(&"0"), None);
+    assert_eq!(empty_cache.len(), 0);
+
     println!("Кэш работает! len = {}", cache.len());
 }
 ```

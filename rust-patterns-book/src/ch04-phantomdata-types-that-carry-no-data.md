@@ -46,45 +46,58 @@ struct Slice<'a, T> {
 Используйте `PhantomData`, чтобы не допустить смешивания значений из разных «сессий» или «контекстов»:
 
 ```rust
+use std::cell::RefCell;
 use std::marker::PhantomData;
 
-/// Дескриптор, действительный только в пределах времени жизни конкретной арены
+/// Дескриптор, привязанный к конкретному экземпляру арены.
+/// Инвариантен по 'arena — не позволяет использовать дескриптор одной арены с другой.
 struct ArenaHandle<'arena> {
     index: usize,
-    _brand: PhantomData<&'arena ()>,
+    _brand: PhantomData<*mut &'arena ()>,
 }
 
-struct Arena {
-    data: Vec<String>,
+/// Арена, которая помечает каждый дескриптор своим уникальным временем жизни.
+struct Arena<'arena> {
+    data: RefCell<Vec<String>>,
+    _phantom: PhantomData<&'arena ()>,
 }
 
-impl Arena {
-    fn new() -> Self {
-        Arena { data: Vec::new() }
-    }
+/// Создаёт арену и передаёт её в замыкание.
+/// Каждый вызов получает уникальное непрозрачное время жизни, которое нельзя подделать.
+fn with_arena<R>(f: impl for<'arena> FnOnce(&Arena<'arena>) -> R) -> R {
+    let arena = Arena {
+        data: RefCell::new(Vec::new()),
+        _phantom: PhantomData,
+    };
+    f(&arena)
+}
 
+impl<'arena> Arena<'arena> {
     /// Выделяет строку и возвращает дескриптор с маркером арены
-    fn alloc<'a>(&'a mut self, value: String) -> ArenaHandle<'a> {
-        let index = self.data.len();
-        self.data.push(value);
+    fn alloc(&self, value: String) -> ArenaHandle<'arena> {
+        let mut data = self.data.borrow_mut();
+        let index = data.len();
+        data.push(value);
         ArenaHandle { index, _brand: PhantomData }
     }
 
     /// Поиск по дескриптору: принимает только дескрипторы ЭТОЙ арены
-    fn get<'a>(&'a self, handle: ArenaHandle<'a>) -> &'a str {
-        &self.data[handle.index]
+    fn get(&self, handle: &ArenaHandle<'arena>) -> String {
+        let data = self.data.borrow();
+        data[handle.index].clone()
     }
 }
 
 fn main() {
-    let mut arena1 = Arena::new();
-    let handle1 = arena1.alloc("hello".to_string());
+    with_arena(|arena1| {
+        let handle1 = arena1.alloc("hello".to_string());
+        println!("{}", arena1.get(&handle1)); // ✅
 
-    // С другой ареной handle1 использовать нельзя: времена жизни не совпадут
-    // let mut arena2 = Arena::new();
-    // arena2.get(handle1); // ❌ Lifetime mismatch
-
-    println!("{}", arena1.get(handle1)); // ✅
+        // Нельзя использовать handle1 с другой ареной — ошибка на этапе компиляции
+        // with_arena(|arena2| {
+        //     arena2.get(&handle1); // ❌ заимствованные данные выходят за пределы замыкания
+        // });
+    });
 }
 ```
 
@@ -284,7 +297,7 @@ struct SessionToken<'a> {
     id: u64,
     _brand: PhantomData<&'a ()>,  // ✅ Ковариантна: вызывающий код может сократить 'a
     // _brand: PhantomData<fn(&'a ())>,  // ❌ Контравариантна: ломает эргономику
-    // _brand: PhantomData<&'a mut ()>;  // ❌ Инвариантна по (): слишком ограничительно
+    // _brand: PhantomData<&'a mut ()>;  // По-прежнему ковариантна по 'a (инвариантна по T, но T фиксирован как ())
 }
 
 fn use_token(token: &SessionToken<'_>) {

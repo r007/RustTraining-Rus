@@ -1,0 +1,18 @@
+# Keep the build context small and deterministic.
+# NOTE: do NOT exclude *.md — the book sources are markdown.
+
+.git
+.github
+.gitignore
+
+# Build output (mirrors .gitignore)
+target/
+site/
+docs/
+**/book/
+
+# Editor / OS noise
+.vscode/
+.idea/
+**/*:Zone.Identifier
+.DS_Store

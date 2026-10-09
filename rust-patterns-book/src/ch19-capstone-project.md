@@ -253,6 +253,7 @@ fn main() {
                 }
             },
         );
+        // ПРИМЕЧАНИЕ: .unwrap() используется для краткости — в продакшене обрабатывайте SendError.
         scheduler.submit(item).unwrap();
     }
 
