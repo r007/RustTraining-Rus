@@ -1,106 +1,105 @@
-# Summary and Reference Card
+# Итоги и справочная карточка
 
-## Quick Reference Card
+## Краткая справочная карточка
 
-### Async Mental Model
+### Ментальная модель async
 
 ```text
 ┌─────────────────────────────────────────────────────┐
-│  async fn → State Machine (enum) → impl Future     │
-│  .await   → poll() the inner future                 │
-│  executor → loop { poll(); sleep_until_woken(); }   │
-│  waker    → "hey executor, poll me again"           │
-│  Pin      → "promise I won't move in memory"        │
+│  async fn → конечный автомат (enum) → impl Future   │
+│  .await   → poll() вложенного future                │
+│  исполнитель → loop { poll(); спать_до_пробуждения; }│
+│  waker    → «эй, исполнитель, опроси меня снова»    │
+│  Pin      → «обещаю, что не переместят в памяти»    │
 └─────────────────────────────────────────────────────┘
 ```
 
-### Common Patterns Cheat Sheet
+### Шпаргалка по частым паттернам
 
-| Goal | Use |
-|------|-----|
-| Run two futures concurrently | `tokio::join!(a, b)` |
-| Race two futures | `tokio::select! { ... }` |
-| Spawn a background task | `tokio::spawn(async { ... })` |
-| Run blocking code in async | `tokio::task::spawn_blocking(\|\| { ... })` |
-| Limit concurrency | `Semaphore::new(N)` |
-| Collect many task results | `JoinSet` |
-| Share state across tasks | `Arc<Mutex<T>>` or channels |
+| Задача | Решение |
+|--------|---------|
+| Запустить два future одновременно | `tokio::join!(a, b)` |
+| Состязать два future | `tokio::select! { ... }` |
+| Запустить фоновую задачу | `tokio::spawn(async { ... })` |
+| Выполнить блокирующий код в async | `tokio::task::spawn_blocking(\|\| { ... })` |
+| Ограничить конкурентность | `Semaphore::new(N)` |
+| Собрать результаты многих задач | `JoinSet` |
+| Делить состояние между задачами | `Arc<Mutex<T>>` или каналы |
 | Graceful shutdown | `watch::channel` + `select!` |
-| Process a stream N-at-a-time | `.buffer_unordered(N)` |
-| Timeout a future | `tokio::time::timeout(dur, fut)` |
-| Retry with backoff | Custom combinator (see Ch. 13) |
+| Обрабатывать поток по N элементов | `.buffer_unordered(N)` |
+| Установить таймаут на future | `tokio::time::timeout(dur, fut)` |
+| Повтор с задержкой | Собственный комбинатор (см. гл. 13) |
 
-### Pinning Quick Reference
+### Краткая справка по закреплению (pinning)
 
-| Situation | Use |
-|-----------|-----|
-| Pin a future on the heap | `Box::pin(fut)` |
-| Pin a future on the stack | `tokio::pin!(fut)` |
-| Pin an `Unpin` type | `Pin::new(&mut val)` — safe, free |
-| Return a pinned trait object | `-> Pin<Box<dyn Future<Output = T> + Send>>` |
+| Ситуация | Что использовать |
+|----------|------------------|
+| Закрепить future в куче | `Box::pin(fut)` |
+| Закрепить future на стеке | `tokio::pin!(fut)` |
+| Закрепить тип `Unpin` | `Pin::new(&mut val)` — безопасно и бесплатно |
+| Вернуть закреплённый трейт-объект | `-> Pin<Box<dyn Future<Output = T> + Send>>` |
 
-### Channel Selection Guide
+### Выбор канала
 
-| Channel | Producers | Consumers | Values | Use When |
-|---------|-----------|-----------|--------|----------|
-| `mpsc` | N | 1 | Stream | Work queues, event buses |
-| `oneshot` | 1 | 1 | Single | Request/response, completion notification |
-| `broadcast` | N | N | All recv all | Fan-out notifications, shutdown signals |
-| `watch` | 1 | N | Latest only | Config updates, health status |
+| Канал | Отправители | Получатели | Значения | Когда использовать |
+|-------|-------------|------------|----------|--------------------|
+| `mpsc` | N | 1 | Поток | Очереди задач, шины событий |
+| `oneshot` | 1 | 1 | Одно | Запрос/ответ, уведомление о завершении |
+| `broadcast` | N | N | Все получают всё | Рассылка уведомлений, сигналы остановки |
+| `watch` | 1 | N | Только последнее | Обновления конфигурации, статус здоровья |
 
-### Mutex Selection Guide
+### Выбор мьютекса
 
-| Mutex | Use When |
-|-------|----------|
-| `std::sync::Mutex` | Lock is held briefly, never across `.await` |
-| `tokio::sync::Mutex` | Lock must be held across `.await` |
-| `parking_lot::Mutex` | High contention, no `.await`, need performance |
-| `tokio::sync::RwLock` | Many readers, few writers, locks cross `.await` |
+| Мьютекс | Когда использовать |
+|---------|--------------------|
+| `std::sync::Mutex` | Блокировка удерживается недолго, никогда через `.await` |
+| `tokio::sync::Mutex` | Блокировку нужно удерживать через `.await` |
+| `parking_lot::Mutex` | Высокая конкуренция, без `.await`, нужна производительность |
+| `tokio::sync::RwLock` | Много читателей, мало писателей, блокировки пересекают `.await` |
 
-### Decision Quick Reference
+### Краткая справка по решениям
 
 ```text
-Need concurrency?
-├── I/O-bound → async/await
-├── CPU-bound → rayon / std::thread
-└── Mixed → spawn_blocking for CPU parts
+Нужна конкурентность?
+├── Ограничена I/O → async/await
+├── Ограничена CPU → rayon / std::thread
+└── Смешанная → spawn_blocking для CPU-части
 
-Choosing runtime?
-├── Server app → tokio
-├── Library → runtime-agnostic (futures crate)
-├── Embedded → embassy
-└── Minimal → smol
+Выбор рантайма?
+├── Серверное приложение → tokio
+├── Библиотека → не привязана к рантайму (крейт futures)
+├── Встраиваемая система → embassy
+└── Минимальный → smol
 
-Need concurrent futures?
-├── Can be 'static + Send → tokio::spawn
-├── Can be 'static + !Send → LocalSet
-├── Can't be 'static → FuturesUnordered
-└── Need to track/abort → JoinSet
+Нужны конкурентные future?
+├── Могут быть 'static + Send → tokio::spawn
+├── Могут быть 'static + !Send → LocalSet
+├── Не могут быть 'static → FuturesUnordered
+└── Нужно отслеживать/прерывать → JoinSet
 ```
 
-### Common Error Messages and Fixes
+### Частые сообщения об ошибках и их исправление
 
-| Error | Cause | Fix |
-|-------|-------|-----|
-| `future is not Send` | Holding `!Send` type across `.await` | Scope the value so it's dropped before `.await`, or use `current_thread` runtime |
-| `borrowed value does not live long enough` in spawn | `tokio::spawn` requires `'static` | Use `Arc`, `clone()`, or `FuturesUnordered` |
-| `the trait Future is not implemented for ()` | Missing `.await` | Add `.await` to the async call |
-| `cannot borrow as mutable` in poll | Self-referential borrow | Use `Pin<&mut Self>` correctly (see Ch. 4) |
-| Program hangs silently | Forgot to call `waker.wake()` | Ensure every `Pending` path registers and triggers the waker |
+| Ошибка | Причина | Исправление |
+|--------|---------|-------------|
+| `future is not Send` | Тип `!Send` удерживается через `.await` | Ограничьте область видимости значения, чтобы оно уничтожалось до `.await`, или используйте рантайм `current_thread` |
+| `borrowed value does not live long enough` в spawn | `tokio::spawn` требует `'static` | Используйте `Arc`, `clone()` или `FuturesUnordered` |
+| `the trait Future is not implemented for ()` | Пропущен `.await` | Добавьте `.await` к асинхронному вызову |
+| `cannot borrow as mutable` в poll | Самоссылающееся заимствование | Правильно используйте `Pin<&mut Self>` (см. гл. 4) |
+| Программа молча зависает | Забыли вызвать `waker.wake()` | Убедитесь, что каждый путь с `Pending` регистрирует waker и вызывает его |
 
-### Further Reading
+### Дополнительная литература
 
-| Resource | Why |
-|----------|-----|
-| [Tokio Tutorial](https://tokio.rs/tokio/tutorial) | Official hands-on guide — excellent for first projects |
-| [Async Book (official)](https://rust-lang.github.io/async-book/) | Covers `Future`, `Pin`, `Stream` at the language level |
-| [Jon Gjengset — Crust of Rust: async/await](https://www.youtube.com/watch?v=ThjvMReOXYM) | 2-hour deep dive into internals with live coding |
-| [Alice Ryhl — Actors with Tokio](https://ryhl.io/blog/actors-with-tokio/) | Production architecture pattern for stateful services |
-| [Without Boats — Pin, Unpin, and why Rust needs them](https://without.boats/blog/pin/) | The original motivation from the language designer |
-| [Tokio mini-Redis](https://github.com/tokio-rs/mini-redis) | Complete async Rust project — study-quality production code |
-| [Tower documentation](https://docs.rs/tower) | Middleware/service architecture used by axum, tonic, hyper |
+| Ресурс | Зачем |
+|--------|-------|
+| [Tokio Tutorial](https://tokio.rs/tokio/tutorial) | Официальное практическое руководство — отлично для первых проектов |
+| [Async Book (официальная)](https://rust-lang.github.io/async-book/) | Рассказывает о `Future`, `Pin`, `Stream` на уровне языка |
+| [Jon Gjengset — Crust of Rust: async/await](https://www.youtube.com/watch?v=ThjvMReOXYM) | Двухчасовой глубокий разбор внутреннего устройства с живым кодом |
+| [Alice Ryhl — Actors with Tokio](https://ryhl.io/blog/actors-with-tokio/) | Архитектурный паттерн для продакшен-сервисов с состоянием |
+| [Without Boats — Pin, Unpin, and why Rust needs them](https://without.boats/blog/pin/) | Исходная мотивация от автора языка |
+| [Tokio mini-Redis](https://github.com/tokio-rs/mini-redis) | Полный асинхронный проект на Rust — учебный код продакшен-качества |
+| [Документация Tower](https://docs.rs/tower) | Архитектура middleware/сервисов, которую используют axum, tonic, hyper |
 
 ***
 
-*End of Async Rust Training Guide*
-
+*Конец руководства по асинхронному Rust*
