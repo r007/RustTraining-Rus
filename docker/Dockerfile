@@ -1,13 +1,13 @@
 # syntax=docker/dockerfile:1
 #
-# Multi-stage build for the RustTraining book collection.
+# Многоэтапная сборка для сборника книг RustTraining.
 #
-#   Stage 1 (builder) — Rust toolchain + mdbook + mdbook-mermaid, runs
-#                       `cargo xtask build` to produce site/.
-#   Stage 2 (runtime) — unprivileged nginx serving the static output.
-#                       No Rust, no mdbook, no source in the final image.
+#   Этап 1 (builder) — тулчейн Rust, mdbook и mdbook-mermaid; запускает
+#                      `cargo xtask build`, который создаёт site/.
+#   Этап 2 (runtime) — непривилегированный nginx, раздающий готовые файлы.
+#                      В итоговом образе нет Rust, mdbook и исходников.
 #
-# Build from the REPOSITORY ROOT, not from docker/:
+# Собирайте из КОРНЯ РЕПОЗИТОРИЯ, а не из docker/:
 #   docker build -f docker/Dockerfile -t rust-training .
 
 ARG RUST_VERSION=1
@@ -16,7 +16,7 @@ ARG MDBOOK_MERMAID_VERSION=0.14.0
 ARG NGINX_VERSION=1.27
 
 # ──────────────────────────────────────────────────────────────────────
-# Stage 1: build the books
+# Этап 1: сборка книг
 # ──────────────────────────────────────────────────────────────────────
 FROM rust:${RUST_VERSION}-slim-bookworm AS builder
 
@@ -30,27 +30,28 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Prefer prebuilt release binaries — `cargo install mdbook mdbook-mermaid`
-# compiles both from source and adds several minutes to every cold build.
+# По возможности берём готовые бинарники: `cargo install mdbook mdbook-mermaid`
+# компилирует оба инструмента из исходников и добавляет несколько минут
+# к каждой холодной сборке.
 #
-# Upstream does not ship a complete set of prebuilt targets, so we fall back
-# to compiling when an asset is missing:
-#   - mdbook         has linux-gnu on amd64, linux-musl on arm64
-#   - mdbook-mermaid has NO published arm64 Linux binary at all
-# musl builds are statically linked and run fine on this glibc base image.
+# Upstream публикует не все архитектуры, поэтому при отсутствии бинарника
+# выполняется компиляция:
+#   - mdbook         есть для linux-gnu на amd64 и linux-musl на arm64
+#   - mdbook-mermaid НЕ публикует бинарников для arm64 Linux вообще
+# Статические сборки musl работают и на glibc-образе.
 RUN set -eux; \
     case "${TARGETARCH:-amd64}" in \
         amd64) mdbook_triple=x86_64-unknown-linux-gnu;  mermaid_triple=x86_64-unknown-linux-gnu ;; \
         arm64) mdbook_triple=aarch64-unknown-linux-musl; mermaid_triple=aarch64-unknown-linux-musl ;; \
-        *) echo "unsupported TARGETARCH: ${TARGETARCH}" >&2; exit 1 ;; \
+        *) echo "неподдерживаемый TARGETARCH: ${TARGETARCH}" >&2; exit 1 ;; \
     esac; \
     \
     install_tool() { \
         bin="$1"; url="$2"; crate="$3"; ver="$4"; \
         if curl -fsSL "$url" 2>/dev/null | tar -xz -C /usr/local/bin "$bin" 2>/dev/null; then \
-            echo "==> installed $bin from prebuilt binary"; \
+            echo "==> $bin установлен из готового бинарника"; \
         else \
-            echo "==> no prebuilt $bin for ${TARGETARCH}, compiling from source"; \
+            echo "==> готового $bin для ${TARGETARCH} нет, компилируем из исходников"; \
             cargo install "$crate" --version "$ver" --locked --root /usr/local; \
         fi; \
     }; \
@@ -65,23 +66,25 @@ RUN set -eux; \
     mdbook --version; \
     mdbook-mermaid --version
 
-# Copy the whole workspace. xtask resolves the project root from
-# CARGO_MANIFEST_DIR at compile time, so it must be built and run in place.
+# Копируем весь воркспейс. xtask определяет корень проекта через
+# CARGO_MANIFEST_DIR во время компиляции, поэтому собирать и запускать его
+# нужно на месте.
 COPY . .
 
-# `cargo xtask build` writes to site/ (the deploy target, docs/, is for
-# GitHub Pages and additionally prints commit instructions we don't want here).
+# `cargo xtask build` пишет в site/. Цель deploy (docs/) предназначена для
+# GitHub Pages и дополнительно печатает инструкции по коммиту, здесь они не нужны.
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/build/target \
     cargo run --release --package xtask -- build \
     && test -f site/index.html \
-    && echo "==> built $(find site -mindepth 1 -maxdepth 1 -type d | wc -l) books"
+    && echo "==> собрано книг: $(find site -mindepth 1 -maxdepth 1 -type d | wc -l)"
 
 # ──────────────────────────────────────────────────────────────────────
-# Stage 2: serve
+# Этап 2: раздача
 # ──────────────────────────────────────────────────────────────────────
-# nginx-unprivileged is the stock nginx image reconfigured to run as uid 101
-# and listen on 8080, so the container needs no root and no NET_BIND_SERVICE.
+# nginx-unprivileged — стандартный образ nginx, переконфигурированный на
+# работу от uid 101 и порт 8080. Поэтому контейнеру не нужны root-права
+# и NET_BIND_SERVICE.
 FROM nginxinc/nginx-unprivileged:${NGINX_VERSION}-alpine AS runtime
 
 COPY docker/nginx.conf /etc/nginx/conf.d/default.conf

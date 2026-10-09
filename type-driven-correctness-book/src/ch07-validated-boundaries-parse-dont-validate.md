@@ -774,9 +774,13 @@ fn should_alert(record: &ValidSelRecord) -> bool {
                     | ProcessorEvent::ThermalTrip
                     | ProcessorEvent::UncorrectableMachineCheck
                 ),
-                // Новый вариант типа датчика, добавленный в будущей версии?
-                // ❌ Ошибка компиляции: non-exhaustive patterns
-                _ => false,
+                // Без запасной ветки `_`: новый вариант датчика заставит явно решить,
+                // вызывает ли он оповещение. Иначе компилятор выдаст ошибку non-exhaustive patterns
+                SensorSpecificEvent::Temperature(_)
+                | SensorSpecificEvent::Voltage(_)
+                | SensorSpecificEvent::Fan(_)
+                | SensorSpecificEvent::PhysicalSecurity(_)
+                | SensorSpecificEvent::Watchdog(_) => false,
             },
             TypedEvent::Discrete { .. } => false,
         },

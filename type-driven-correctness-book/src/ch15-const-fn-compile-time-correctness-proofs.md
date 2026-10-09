@@ -115,8 +115,8 @@ fn main() {
 # pub struct Region { pub base: u32, pub size: u32 }
 # impl Region {
 #     pub const fn new(base: u32, size: u32) -> Self {
-#         assert!(size > 0, "region size must be non-zero");
-#         assert!(base as u64 + size as u64 <= u32::MAX as u64, "overflow");
+#         assert!(size > 0, "размер региона должен быть ненулевым");
+#         assert!(base as u64 + size as u64 <= u32::MAX as u64, "переполнение");
 #         Self { base, size }
 #     }
 #     pub const fn end(&self) -> u32 { self.base + self.size }

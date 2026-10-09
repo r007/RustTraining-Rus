@@ -1,14 +1,19 @@
-<!-- BEGIN MICROSOFT SECURITY.MD V1.0.0 BLOCK -->
+# Политика безопасности
 
-## Security
+Проект содержит учебные материалы и примеры кода, а не производственную библиотеку. Тем не менее, если вы нашли проблему безопасности в скриптах сборки, `xtask`, Docker-конфигурации или в примерах, которые могут навредить читателю, сообщите о ней.
 
-Microsoft takes the security of our software products and services seriously, which
-includes all source code repositories in our GitHub organizations.
+## Как сообщить об уязвимости
 
-**Please do not report security vulnerabilities through public GitHub issues.**
+**Не создавайте публичный Issue**, если речь идёт о проблеме безопасности.
 
-For security reporting information, locations, contact information, and policies,
-please review the latest guidance for Microsoft repositories at
-[https://aka.ms/SECURITY.md](https://aka.ms/SECURITY.md).
+Используйте приватное уведомление: вкладка **Security** репозитория → **Report a vulnerability**. Это работает через GitHub Private Vulnerability Reporting.
 
-<!-- END MICROSOFT SECURITY.MD BLOCK -->
+Если эта функция недоступна, напишите мейнтейнеру через профиль GitHub: [@r007](https://github.com/r007).
+
+## Что важно указать
+
+- Какой файл или компонент затронут: книга, `xtask`, Dockerfile, nginx-конфигурация или CI.
+- Шаги для воспроизведения и ожидаемое поведение.
+- Версии инструментов, если они важны.
+
+Ошибки в тексте, неточности и опечатки не являются уязвимостями. Их лучше сообщать обычным Issue.

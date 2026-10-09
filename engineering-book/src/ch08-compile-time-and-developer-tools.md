@@ -157,8 +157,8 @@ cargo install cargo-geiger
 cargo geiger
 # Output:
 # Metric output format: x/y
-#   x = unsafe code used by the build
-#   y = total unsafe code found in the crate
+#   x = небезопасный код, используемый при сборке
+#   y = весь небезопасный код, найденный в крейте
 #
 # Functions  Expressions  Impls  Traits  Methods
 # 0/0        0/0          0/0    0/0     0/0      ✅ my_crate

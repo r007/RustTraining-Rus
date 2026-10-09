@@ -1,72 +1,69 @@
-<div style="background-color: #d9d9d9; padding: 16px; border-radius: 6px; color: #000000;">
-
-**Лицензия** Проект распространяется по двойной лицензии: [MIT License](LICENSE) и [Creative Commons Attribution 4.0 International (CC-BY-4.0)](LICENSE-DOCS).
-
-</div>
-
-<div style="background-color: #d9d9d9; padding: 16px; border-radius: 6px; color: #000000;">
-
-**Товарные знаки** Проект может содержать товарные знаки или логотипы проектов, продуктов и сервисов. Использование товарных знаков и логотипов Microsoft допускается только в соответствии с [правилами использования товарных знаков и фирменного стиля Microsoft](https://www.microsoft.com/en-us/legal/intellectualproperty/trademarks/usage/general). Использование товарных знаков или логотипов Microsoft в изменённых версиях проекта не должно вводить в заблуждение и создавать впечатление поддержки со стороны Microsoft. Использование сторонних товарных знаков и логотипов регулируется политиками их правообладателей.
-
-</div>
-
-> *Это перевод README на русский язык. Для юридических формулировок (лицензии и товарные знаки) приоритет имеет английская версия.*
-
 # Учебные книги по Rust
 
-Семь учебных курсов по Rust для разработчиков с разным опытом, а также углублённые материалы по async, продвинутым паттернам и инженерным практикам.
+Семь учебных курсов по Rust на русском языке: от перехода с C/C++, C#, Python до асинхронного программирования, продвинутых паттернов, корректности на уровне типов и инженерной практики в продакшене.
 
-Материалы сочетают оригинальное содержание с идеями и примерами, вдохновлёнными лучшими ресурсами экосистемы Rust. Цель — подробная и технически точная программа, которая собирает знания, разбросанные по книгам, блогам, докладам и видеосериям, в цельный и педагогически выстроенный курс.
+Каждую книгу можно читать отдельно, но порядок в таблице ниже соответствует естественному пути обучения. Текст — на русском. Код, имена крейтов, команды и сообщения компилятора остаются на английском, как принято в экосистеме Rust.
 
-> **Важно:** Эти книги — учебные материалы, а не авторитетный справочник. Мы стремимся к точности, но критически важные детали всегда сверяйте с [официальной документацией Rust](https://doc.rust-lang.org/) и [Rust Reference](https://doc.rust-lang.org/reference/).
+> **Важно:** это учебные материалы, а не авторитетный справочник. Мы стремимся к точности, но ключевые детали сверяйте с [официальной документацией Rust](https://doc.rust-lang.org/) и [Rust Reference](https://doc.rust-lang.org/reference/).
 
-### Источники вдохновения и благодарности
-
-- [**The Rust Programming Language**](https://doc.rust-lang.org/book/) — основа, на которой строится всё остальное
-- [**Jon Gjengset**](https://www.youtube.com/c/JonGjengset) — глубокие стримы о внутреннем устройстве Rust, серия `Crust of Rust`
-- [**withoutboats**](https://without.boats/blog/) — дизайн async, `Pin` и модель futures
-- [**fasterthanlime (Amos)**](https://fasterthanli.me/) — системное программирование с нуля и подробные развёрнутые разборы
-- [**Mara Bos**](https://marabos.nl/) — *Rust Atomics and Locks*, примитивы конкурентности
-- [**Aleksey Kladov (matklad)**](https://matklad.github.io/) — идеи о rust-analyzer, дизайне API и обработке ошибок
-- [**Niko Matsakis**](https://smallcultfollowing.com/babysteps/) — дизайн языка, внутреннее устройство borrow checker, Polonius
-- [**Rust by Example**](https://doc.rust-lang.org/rust-by-example/) и [**Rustonomicon**](https://doc.rust-lang.org/nomicon/) — практические паттерны и углублённое изучение unsafe
-- [**This Week in Rust**](https://this-week-in-rust.org/) — находки сообщества, которые повлияли на многие примеры
-- [**Binary Musings - Tag(Rust)**](https://binarymusings.org/posts/category/rust/) — глубокое погружение во внутреннее устройство Rust
-- …и многие другие участники **сообщества Rust**, чьи статьи, доклады, RFC и обсуждения на форумах легли в основу этих материалов. Их слишком много, чтобы перечислить поимённо, но мы искренне благодарны каждому
+**Читать онлайн:** [r007.github.io/RustTraining-Rus](https://r007.github.io/RustTraining-Rus/)
+**Исходный код:** [github.com/r007/RustTraining-Rus](https://github.com/r007/RustTraining-Rus)
 
 ## 📖 С чего начать
 
-Выберите книгу, которая соответствует вашему опыту. Книги сгруппированы по сложности, чтобы вы могли построить путь обучения:
+Выберите книгу, которая соответствует вашему опыту. Книги сгруппированы по сложности:
 
 | Уровень | Описание |
 |---------|----------|
-| 🟢 **Мост** | Изучение Rust для тех, кто пришёл из другого языка — начните отсюда |
+| 🟢 **Мост** | Изучение Rust для тех, кто пришёл из другого языка. Начните отсюда |
 | 🔵 **Погружение** | Углублённое изучение крупной подсистемы Rust |
 | 🟡 **Продвинутый** | Паттерны и приёмы для опытных Rust-разработчиков |
 | 🟣 **Эксперт** | Передовые техники на уровне типов и корректности |
-| 🟤 **Практики** | Инженерия, инструменты и готовность к продакшну |
+| 🟤 **Практики** | Инженерия, инструменты и готовность к продакшену |
 
 | Книга | Уровень | Для кого |
 |-------|---------|----------|
-| [**Rust для программистов C/C++**](https://microsoft.github.io/RustTraining/c-cpp-book/) | 🟢 Мост | Семантика перемещения, RAII, FFI, embedded, no_std |
-| [**Rust для программистов C#**](https://microsoft.github.io/RustTraining/csharp-book/) | 🟢 Мост | Swift / C# / Java → владение и система типов |
-| [**Rust для программистов Python**](https://microsoft.github.io/RustTraining/python-book/) | 🟢 Мост | От динамической типизации к статической, конкурентность без GIL |
-| [**Async Rust**](https://microsoft.github.io/RustTraining/async-book/) | 🔵 Погружение | Tokio, потоки (streams), отмена и безопасность при отмене |
-| [**Паттерны Rust**](https://microsoft.github.io/RustTraining/rust-patterns-book/) | 🟡 Продвинутый | Pin, аллокаторы, lock-free-структуры, unsafe |
-| [**Корректность на уровне типов**](https://microsoft.github.io/RustTraining/type-driven-correctness-book/) | 🟣 Эксперт | Typestate, phantom-типы, capability-токены |
-| [**Инженерные практики Rust**](https://microsoft.github.io/RustTraining/engineering-book/) | 🟤 Практики | Build scripts, кросс-компиляция, CI/CD, Miri |
+| [**Rust для программистов на C/C++**](https://r007.github.io/RustTraining-Rus/c-cpp-book/) | 🟢 Мост | Семантика перемещения, RAII, FFI, embedded, no_std |
+| [**Rust для программистов C#**](https://r007.github.io/RustTraining-Rus/csharp-book/) | 🟢 Мост | Swift / C# / Java → владение и система типов |
+| [**Rust для программистов на Python**](https://r007.github.io/RustTraining-Rus/python-book/) | 🟢 Мост | От динамической типизации к статической, конкурентность без GIL |
+| [**Async Rust**](https://r007.github.io/RustTraining-Rus/async-book/) | 🔵 Погружение | Tokio, потоки (streams), отмена и безопасность при отмене |
+| [**Паттерны Rust**](https://r007.github.io/RustTraining-Rus/rust-patterns-book/) | 🟡 Продвинутый | Pin, аллокаторы, lock-free-структуры, unsafe |
+| [**Корректность на уровне типов**](https://r007.github.io/RustTraining-Rus/type-driven-correctness-book/) | 🟣 Эксперт | Typestate, phantom-типы, capability-токены |
+| [**Инженерные практики Rust**](https://r007.github.io/RustTraining-Rus/engineering-book/) | 🟤 Практики | Build-скрипты, кросс-компиляция, CI/CD, Miri |
 
-В каждой книге 15–16 глав с диаграммами Mermaid, редактируемыми песочницами Rust, упражнениями и полнотекстовым поиском.
+Книги содержат диаграммы Mermaid, редактируемые песочницы Rust, упражнения и полнотекстовый поиск.
 
-> **Совет:** Просматривайте готовые книги с навигацией по боковой панели и поиском на [сайте GitHub Pages](https://microsoft.github.io/RustTraining/).
+> **Совет:** читайте книги на [сайте](https://r007.github.io/RustTraining-Rus/): там есть навигация по боковой панели и поиск.
 >
-> **Локальный просмотр:** Для работы без интернета или при участии в разработке (сначала [установите Rust](https://rustup.rs/)):
+> **Локальный просмотр:** для работы без интернета или при участии в разработке (сначала [установите Rust](https://rustup.rs/)):
 > ```
-> git clone https://github.com/microsoft/RustTraining.git
-> cd RustTraining
+> git clone https://github.com/r007/RustTraining-Rus.git
+> cd RustTraining-Rus
 > cargo install mdbook mdbook-mermaid
 > cargo xtask serve    # собирает все книги и запускает сервер: http://localhost:3000
 > ```
+
+---
+
+## 💡 Источники вдохновения и благодарности
+
+- [**The Rust Programming Language**](https://doc.rust-lang.org/book/): основа, на которой строится всё остальное
+- [**Jon Gjengset**](https://www.youtube.com/c/JonGjengset): глубокие стримы о внутреннем устройстве Rust, серия `Crust of Rust`
+- [**withoutboats**](https://without.boats/blog/): дизайн async, `Pin` и модель futures
+- [**fasterthanlime (Amos)**](https://fasterthanli.me/): системное программирование с нуля и подробные разборы
+- [**Mara Bos**](https://marabos.nl/): *Rust Atomics and Locks*, примитивы конкурентности
+- [**Aleksey Kladov (matklad)**](https://matklad.github.io/): идеи о rust-analyzer, дизайне API и обработке ошибок
+- [**Niko Matsakis**](https://smallcultfollowing.com/babysteps/): дизайн языка, внутреннее устройство borrow checker, Polonius
+- [**Rust by Example**](https://doc.rust-lang.org/rust-by-example/) и [**Rustonomicon**](https://doc.rust-lang.org/nomicon/): практические паттерны и углублённое изучение unsafe
+- [**This Week in Rust**](https://this-week-in-rust.org/): находки сообщества, которые повлияли на многие примеры
+- [**Binary Musings — Tag(Rust)**](https://binarymusings.org/posts/category/rust/): глубокое погружение во внутреннее устройство Rust
+- …и многие другие участники **сообщества Rust**, чьи статьи, доклады, RFC и обсуждения на форумах легли в основу этих материалов. Их слишком много, чтобы перечислить поимённо, но мы искренне благодарны каждому
+
+---
+
+## 🤝 Участие в проекте
+
+Исправления опечаток, неточностей, перевода и примеров приветствуются. Порядок работы и стиль перевода описаны в [CONTRIBUTING.md](CONTRIBUTING.md). Сообщить об уязвимости можно по правилам из [SECURITY.md](SECURITY.md).
 
 ---
 
@@ -86,17 +83,17 @@ cargo install mdbook@0.4.52 mdbook-mermaid@0.14.0
 ### Клонирование репозитория
 
 ```bash
-git clone https://github.com/microsoft/RustTraining.git
-cd RustTraining
+git clone https://github.com/r007/RustTraining-Rus.git
+cd RustTraining-Rus
 ```
 
 ### Сборка и запуск
 
 ```bash
-cargo xtask build               # Собрать все книги в site/ (для локального просмотра)
-cargo xtask serve               # Собрать и запустить на http://localhost:3000
-cargo xtask deploy              # Собрать все книги в docs/ (для GitHub Pages)
-cargo xtask clean               # Удалить site/ и docs/
+cargo xtask build               # собрать все книги в site/ (для локального просмотра)
+cargo xtask serve               # собрать и запустить на http://localhost:3000
+cargo xtask deploy              # собрать все книги в docs/ (для GitHub Pages)
+cargo xtask clean               # удалить site/ и docs/
 ```
 
 Чтобы собрать или запустить одну книгу:
@@ -107,6 +104,21 @@ cd c-cpp-book && mdbook serve --open    # http://localhost:3000
 
 ### Публикация
 
-Сайт автоматически публикуется на GitHub Pages при push в `main` через `.github/workflows/pages.yml`. Никаких ручных действий не требуется.
+Сайт публикуется на GitHub Pages при push в `main` через `.github/workflows/pages.yml`. Вручную ничего делать не нужно, но в настройках репозитория должен быть выбран источник **GitHub Actions** (Settings → Pages → Build and deployment).
+
+### Docker
+
+Контейнер для самостоятельного хостинга описан в [docker/README.md](docker/README.md).
 
 </details>
+
+---
+
+## 📜 Лицензия
+
+- Код (включая `xtask`, примеры и конфигурацию сборки) распространяется по лицензии [MIT](LICENSE).
+- Текст книг и документация распространяются по лицензии [Creative Commons Attribution 4.0 International (CC BY 4.0)](LICENSE-DOCS).
+
+Материалы основаны на оригинальном курсе Rust Training, распространяемом по тем же лицензиям. Авторские уведомления оригинала сохранены в файлах [LICENSE](LICENSE) и [LICENSE-DOCS](LICENSE-DOCS). Русский перевод и адаптацию выполнили участники проекта RustTraining-Rus.
+
+Названия языков, инструментов и библиотек (Rust, Cargo, Tokio, .NET, mdBook и другие) принадлежат их правообладателям. Для юридических формулировок приоритет имеет английский текст файлов лицензий.

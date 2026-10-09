@@ -1,14 +1,15 @@
 [book]
-title = "Async Rust: From Futures to Production"
-authors = ["Rust Training Team"]
-language = "en"
+title = "Async Rust: от Future до продакшена"
+authors = ["Rust Training Team (оригинал)", "Участники проекта RustTraining-Rus (перевод)"]
+language = "ru"
 src = "src"
 
 [build]
 build-dir = "book"
 
 [output.html]
-git-repository-url = "https://github.com/microsoft/RustTraining"
+git-repository-url = "https://github.com/r007/RustTraining-Rus"
+edit-url-template = "https://github.com/r007/RustTraining-Rus/edit/main/async-book/src/{path}"
 default-theme = "light"
 preferred-dark-theme = "ayu"
 additional-js = ["mermaid.min.js", "mermaid-init.js"]

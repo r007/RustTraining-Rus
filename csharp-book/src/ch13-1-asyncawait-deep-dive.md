@@ -245,7 +245,7 @@ fn make_future() -> Pin<Box<dyn Future<Output = i32> + Send>> {
 - `tokio::select!` (используйте макрос `pin!()`)
 - Методы трейтов, возвращающие `dyn Future` (используйте `Box::pin(async { ... })`)
 
-> **Хотите глубже?** Сопутствующее руководство [Async Rust Training](../../async-book/src/ch04-pin-and-unpin.md) подробно рассматривает Pin, Unpin, самоссылающиеся структуры и структурное закрепление.
+> **Хотите глубже?** Сопутствующее руководство [Async Rust Training](https://r007.github.io/RustTraining-Rus/async-book/ch04-pin-and-unpin.html) подробно рассматривает Pin, Unpin, самоссылающиеся структуры и структурное закрепление.
 
 ***
 

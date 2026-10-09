@@ -98,7 +98,7 @@
 
 #### 11. Трейты From и Into 🟡
 - [Преобразование типов в Rust](ch11-from-and-into-traits.md#преобразование-типов-в-rust)
-- [From, Into, TryFrom](ch11-from-and-into-traits.md#rust-frominto)
+- [From, Into, TryFrom](ch11-from-and-into-traits.md#frominto-в-rust)
 - [Паттерны преобразования строк](ch11-from-and-into-traits.md#паттерны-преобразования-строк)
 
 #### 12. Замыкания и итераторы 🟡
