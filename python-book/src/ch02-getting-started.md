@@ -1,106 +1,105 @@
-## Installation and Setup
+## Установка и настройка
 
-> **What you'll learn:** How to install Rust and its toolchain, the Cargo build system vs pip/Poetry,
-> IDE setup, your first `Hello, world!` program, and essential Rust keywords mapped to Python equivalents.
+> **Что вы узнаете:** как установить Rust и его тулчейн, чем система сборки Cargo отличается от pip/Poetry, как настроить IDE, как написать первую программу `Hello, world!` и какие ключевые слова Rust соответствуют конструкциям Python.
 >
-> **Difficulty:** 🟢 Beginner
+> **Сложность:** 🟢 Начальный
 
-### Installing Rust
+### Установка Rust
 ```bash
-# Install Rust via rustup (Linux/macOS/WSL)
+# Установка Rust через rustup (Linux/macOS/WSL)
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
-# Verify installation
-rustc --version     # Rust compiler
-cargo --version     # Build tool + package manager (like pip + setuptools combined)
+# Проверка установки
+rustc --version     # Компилятор Rust
+cargo --version     # Инструмент сборки + менеджер пакетов (как pip и setuptools вместе)
 
-# Update Rust
+# Обновление Rust
 rustup update
 ```
 
-### Rust Tools vs Python Tools
+### Инструменты Rust и инструменты Python
 
-| Purpose | Python | Rust |
-|---------|--------|------|
-| Language runtime | `python` (interpreter) | `rustc` (compiler, rarely called directly) |
-| Package manager | `pip` / `poetry` / `uv` | `cargo` (built-in) |
-| Project config | `pyproject.toml` | `Cargo.toml` |
-| Lock file | `poetry.lock` / `requirements.txt` | `Cargo.lock` |
-| Virtual env | `venv` / `conda` | Not needed (deps are per-project) |
-| Formatter | `black` / `ruff format` | `rustfmt` (built-in: `cargo fmt`) |
-| Linter | `ruff` / `flake8` / `pylint` | `clippy` (built-in: `cargo clippy`) |
-| Type checker | `mypy` / `pyright` | Built into compiler (always on) |
-| Test runner | `pytest` | `cargo test` (built-in) |
-| Docs | `sphinx` / `mkdocs` | `cargo doc` (built-in) |
-| REPL | `python` / `ipython` | None (use `cargo test` or Rust Playground) |
+| Назначение | Python | Rust |
+|------------|--------|------|
+| Среда выполнения языка | `python` (интерпретатор) | `rustc` (компилятор, напрямую вызывается редко) |
+| Менеджер пакетов | `pip` / `poetry` / `uv` | `cargo` (встроен) |
+| Конфигурация проекта | `pyproject.toml` | `Cargo.toml` |
+| Lock-файл | `poetry.lock` / `requirements.txt` | `Cargo.lock` |
+| Виртуальное окружение | `venv` / `conda` | Не нужно (зависимости хранятся для каждого проекта) |
+| Форматтер | `black` / `ruff format` | `rustfmt` (встроен: `cargo fmt`) |
+| Линтер | `ruff` / `flake8` / `pylint` | `clippy` (встроен: `cargo clippy`) |
+| Проверка типов | `mypy` / `pyright` | Встроена в компилятор (всегда включена) |
+| Запуск тестов | `pytest` | `cargo test` (встроен) |
+| Документация | `sphinx` / `mkdocs` | `cargo doc` (встроен) |
+| REPL | `python` / `ipython` | Нет (используйте `cargo test` или Rust Playground) |
 
-### IDE Setup
+### Настройка IDE
 
-**VS Code** (recommended):
+**VS Code** (рекомендуется):
 ```text
-Extensions to install:
-- rust-analyzer        ← Essential: IDE features, type hints, completions
-- Even Better TOML     ← Syntax highlighting for Cargo.toml
-- CodeLLDB             ← Debugger support
+Расширения для установки:
+- rust-analyzer        ← Обязательно: возможности IDE, подсказки типов, автодополнение
+- Even Better TOML     ← Подсветка синтаксиса для Cargo.toml
+- CodeLLDB             ← Поддержка отладчика
 
-# Python equivalent mapping:
-# rust-analyzer ≈ Pylance (but with 100% type coverage, always)
-# cargo clippy  ≈ ruff (but checks correctness, not just style)
+# Соответствие с Python:
+# rust-analyzer ≈ Pylance (но с полным покрытием типами всегда)
+# cargo clippy  ≈ ruff (но проверяет корректность, а не только стиль)
 ```
 
 ***
 
-## Your First Rust Program
+## Ваша первая программа на Rust
 
-### Python Hello World
+### Hello World на Python
 ```python
-# hello.py — just run it
+# hello.py — просто запустите
 print("Hello, World!")
 
-# Run:
+# Запуск:
 # python hello.py
 ```
 
-### Rust Hello World
+### Hello World на Rust
 ```rust
-// src/main.rs — must be compiled first
+// src/main.rs — сначала нужно скомпилировать
 fn main() {
-    println!("Hello, World!");   // println! is a macro (note the !)
+    println!("Hello, World!");   // println! — это макрос (обратите внимание на !)
 }
 
-// Build and run:
+// Сборка и запуск:
 // cargo run
 ```
 
-### Key Differences for Python Developers
+### Ключевые различия для разработчиков на Python
 
 ```text
 Python:                              Rust:
 ─────────                            ─────
-- No main() needed                   - fn main() is the entry point
-- Indentation = blocks               - Curly braces {} = blocks
-- print() is a function              - println!() is a macro (the ! matters)
-- No semicolons                      - Semicolons end statements
-- No type declarations               - Types inferred but always known
-- Interpreted (run directly)         - Compiled (cargo build, then run)
-- Errors at runtime                  - Most errors at compile time
+- main() не нужен                    - fn main() — точка входа
+- Отступы = блоки                    - Фигурные скобки {} = блоки
+- print() — это функция              - println!() — это макрос (важен восклицательный знак)
+- Без точек с запятой                - Точка с запятой завершает инструкции
+- Без объявлений типов               - Типы выводятся, но всегда известны
+- Интерпретируется (запуск напрямую) - Компилируется (cargo build, затем запуск)
+- Ошибки во время выполнения         - Большинство ошибок на этапе компиляции
 ```
 
-### Creating Your First Project
+### Создание первого проекта
 ```bash
 # Python                              # Rust
 mkdir myproject                        cargo new myproject
 cd myproject                           cd myproject
-python -m venv .venv                   # No virtual env needed
-source .venv/bin/activate              # No activation needed
-# Create files manually               # src/main.rs already created
+python -m venv .venv                   # Виртуальное окружение не нужно
+source .venv/bin/activate              # Активация не нужна
+# Создаём файлы вручную               # src/main.rs уже создан
 
-# Python project structure:            Rust project structure:
+# Структура проекта Python:            Структура проекта Rust:
 # myproject/                           myproject/
-# ├── pyproject.toml                   ├── Cargo.toml        (like pyproject.toml)
+# ├── pyproject.toml                   ├── Cargo.toml        (аналог pyproject.toml)
 # ├── src/                             ├── src/
-# │   └── myproject/                   │   └── main.rs       (entry point)
-# │       ├── __init__.py              └── (no __init__.py needed)
+# │   └── myproject/                   │   └── main.rs       (точка входа)
+# │       ├── __init__.py              └── (__init__.py не нужен)
 # │       └── main.py
 # └── tests/
 #     └── test_main.py
@@ -108,30 +107,30 @@ source .venv/bin/activate              # No activation needed
 
 ```mermaid
 graph LR
-    subgraph Python ["Python Project"]
+    subgraph Python ["Проект Python"]
         PP["pyproject.toml"] --- PS["src/"]
         PS --- PM["myproject/"]
         PM --- PI["__init__.py"]
         PM --- PMN["main.py"]
         PP --- PT["tests/"]
     end
-    subgraph Rust ["Rust Project"]
+    subgraph Rust ["Проект Rust"]
         RC["Cargo.toml"] --- RS["src/"]
         RS --- RM["main.rs"]
-        RC --- RTG["target/ (auto-generated)"]
+        RC --- RTG["target/ (генерируется автоматически)"]
     end
     Python ~~~ Rust
     style Python fill:#ffeeba
     style Rust fill:#d4edda
 ```
 
-> **Key difference**: Rust projects are simpler — no `__init__.py`, no virtual environments, no `setup.py` vs `setup.cfg` vs `pyproject.toml` confusion. Just `Cargo.toml` + `src/`.
+> **Ключевое отличие**: проекты на Rust проще. Не нужны `__init__.py`, виртуальные окружения и путаница между `setup.py`, `setup.cfg` и `pyproject.toml`. Достаточно `Cargo.toml` и `src/`.
 
 ***
 
-## Cargo vs pip/Poetry
+## Cargo и pip/Poetry
 
-### Project Configuration
+### Конфигурация проекта
 
 ```toml
 # Python — pyproject.toml
@@ -153,170 +152,170 @@ dev = ["pytest", "ruff", "mypy"]
 [package]
 name = "myproject"
 version = "0.1.0"
-edition = "2021"          # Rust edition (like Python version)
+edition = "2021"          # Редакция Rust (аналог версии Python)
 
 [dependencies]
-reqwest = "0.12"          # HTTP client (like requests)
-serde = { version = "1.0", features = ["derive"] }  # Serialization (like pydantic)
+reqwest = "0.12"          # HTTP-клиент (аналог requests)
+serde = { version = "1.0", features = ["derive"] }  # Сериализация (аналог pydantic)
 
 [dev-dependencies]
-# Test dependencies — only compiled for `cargo test`
-# (No separate test config needed — `cargo test` is built in)
+# Тестовые зависимости — собираются только для `cargo test`
+# (Отдельная конфигурация для тестов не нужна — `cargo test` встроен)
 ```
 
-### Common Cargo Commands
+### Частые команды Cargo
 ```bash
-# Python equivalent                # Rust
+# Аналог в Python                  # Rust
 pip install requests               cargo add reqwest
-pip install -r requirements.txt    cargo build           # auto-installs deps
-pip install -e .                   cargo build            # always "editable"
+pip install -r requirements.txt    cargo build           # автоматически устанавливает зависимости
+pip install -e .                   cargo build            # всегда «редактируемая» сборка
 python -m pytest                   cargo test
-python -m mypy .                   # Built into compiler — always runs
+python -m mypy .                   # Встроено в компилятор — работает всегда
 ruff check .                       cargo clippy
 ruff format .                      cargo fmt
 python main.py                     cargo run
-python -c "..."                    # No equivalent — use cargo run or tests
+python -c "..."                    # Аналога нет — используйте cargo run или тесты
 
-# Rust-specific:
-cargo new myproject                # Create new project
-cargo build --release              # Optimized build (10-100x faster than debug)
-cargo doc --open                   # Generate and browse API docs
-cargo update                       # Update deps (like pip install --upgrade)
+# Специфичное для Rust:
+cargo new myproject                # Создать новый проект
+cargo build --release              # Оптимизированная сборка (в 10–100 раз быстрее отладочной)
+cargo doc --open                   # Сгенерировать и открыть документацию API
+cargo update                       # Обновить зависимости (аналог pip install --upgrade)
 ```
 
 ***
 
 
-## Essential Rust Keywords for Python Developers
+## Ключевые слова Rust для разработчиков на Python
 
-### Variable and Mutability Keywords
+### Ключевые слова для переменных и изменяемости
 
 ```rust
-// let — declare a variable (like Python assignment, but immutable by default)
-let name = "Alice";          // Python: name = "Alice" (but mutable)
-// name = "Bob";             // ❌ Compile error! Immutable by default
+// let — объявление переменной (как присваивание в Python, но неизменяемой по умолчанию)
+let name = "Alice";          // Python: name = "Alice" (но изменяемая)
+// name = "Bob";             // ❌ Ошибка компиляции! По умолчанию неизменяемая
 
-// mut — opt into mutability
-let mut count = 0;           // Python: count = 0 (always mutable in Python)
-count += 1;                  // ✅ Allowed because of `mut`
+// mut — явное включение изменяемости
+let mut count = 0;           // Python: count = 0 (в Python всегда изменяемая)
+count += 1;                  // ✅ Разрешено благодаря `mut`
 
-// const — compile-time constant (like Python's convention of UPPER_CASE, but enforced)
-const MAX_SIZE: usize = 1024;   // Python: MAX_SIZE = 1024 (convention only)
+// const — константа времени компиляции (как соглашение Python об UPPER_CASE, но с принудительной проверкой)
+const MAX_SIZE: usize = 1024;   // Python: MAX_SIZE = 1024 (только соглашение)
 
-// static — global variable (use sparingly; Python has module-level globals)
+// static — глобальная переменная (используйте осторожно; в Python есть глобальные переменные уровня модуля)
 static VERSION: &str = "1.0";
 ```
 
-### Ownership and Borrowing Keywords
+### Ключевые слова владения и заимствования
 
 ```rust
-// These have NO Python equivalents — they're Rust-specific concepts
+// У этих ключевых слов НЕТ аналогов в Python — это специфичные для Rust концепции
 
-// & — borrow (read-only reference)
-fn print_name(name: &str) { }    // Python: def print_name(name: str) — but Python passes ref always
+// & — заимствование (ссылка только для чтения)
+fn print_name(name: &str) { }    // Python: def print_name(name: str) — но Python всегда передаёт по ссылке
 
-// &mut — mutable borrow
-fn append(list: &mut Vec<i32>) { }  // Python: def append(lst: list) — always mutable in Python
+// &mut — изменяемое заимствование
+fn append(list: &mut Vec<i32>) { }  // Python: def append(lst: list) — в Python всегда изменяемый
 
-// move — transfer ownership (happens implicitly in Rust, never in Python)
+// move — передача владения (в Rust происходит неявно, в Python — никогда)
 let s1 = String::from("hello");
-let s2 = s1;    // s1 is MOVED to s2 — s1 is no longer valid
-// println!("{}", s1);  // ❌ Compile error: value moved
+let s2 = s1;    // s1 ПЕРЕМЕЩЁН в s2 — s1 больше не действителен
+// println!("{}", s1);  // ❌ Ошибка компиляции: значение перемещено
 ```
 
-### Type Definition Keywords
+### Ключевые слова определения типов
 
 ```rust
-// struct — like a Python dataclass or NamedTuple
+// struct — как dataclass или NamedTuple в Python
 struct Point {               // @dataclass
     x: f64,                  // class Point:
     y: f64,                  //     x: float
 }                            //     y: float
 
-// enum — like Python's enum but MUCH more powerful (carries data)
-enum Shape {                 // No direct Python equivalent
-    Circle(f64),             // Each variant can hold different data
+// enum — как enum в Python, но гораздо мощнее (хранит данные)
+enum Shape {                 // Прямого аналога в Python нет
+    Circle(f64),             // Каждый вариант может хранить свои данные
     Rectangle(f64, f64),
 }
 
-// impl — attach methods to a type (like defining methods in a class)
+// impl — присоединяет методы к типу (как определение методов в классе)
 impl Point {                 // class Point:
     fn distance(&self) -> f64 {  //     def distance(self) -> float:
         (self.x.powi(2) + self.y.powi(2)).sqrt()
     }
 }
 
-// trait — like Python's ABC or Protocol (PEP 544)
+// trait — как ABC или Protocol (PEP 544) в Python
 trait Drawable {             // class Drawable(Protocol):
     fn draw(&self);          //     def draw(self) -> None: ...
 }
 
-// type — type alias (like Python's TypeAlias)
-type UserId = i64;           // UserId = int  (or TypeAlias)
+// type — псевдоним типа (как TypeAlias в Python)
+type UserId = i64;           // UserId = int  (или TypeAlias)
 ```
 
-### Control Flow Keywords
+### Ключевые слова управления потоком
 
 ```rust
-// match — exhaustive pattern matching (like Python 3.10+ match, but enforced)
+// match — исчерпывающее сопоставление с образцом (как match в Python 3.10+, но с обязательной проверкой)
 match value {
     1 => println!("one"),
     2 | 3 => println!("two or three"),
-    _ => println!("other"),          // _ = wildcard (like Python's case _:)
+    _ => println!("other"),          // _ = подстановка (как case _: в Python)
 }
 
-// if let — destructure + conditional (Pythonic: if (m := regex.match(s)):)
+// if let — деструктуризация с условием (по-питоновски: if (m := regex.match(s)):)
 if let Some(x) = optional_value {
     println!("{}", x);
 }
 
-// loop — infinite loop (like while True:)
+// loop — бесконечный цикл (как while True:)
 loop {
-    break;  // Must break to exit
+    break;  // Для выхода нужен break
 }
 
-// for — iteration (like Python's for, but needs .iter() more often)
+// for — итерация (как for в Python, но .iter() нужен чаще)
 for item in collection.iter() {      // for item in collection:
     println!("{}", item);
 }
 
-// while let — loop with destructuring
+// while let — цикл с деструктуризацией
 while let Some(item) = stack.pop() {
     process(item);
 }
 ```
 
-### Visibility Keywords
+### Ключевые слова видимости
 
 ```rust
-// pub — public (Python has no real private; uses _ convention)
-pub fn greet() { }           // def greet():  — everything is "public" in Python
+// pub — публичный (в Python нет настоящего private; используется соглашение с _)
+pub fn greet() { }           // def greet():  — в Python всё «публично»
 
-// pub(crate) — visible within the crate only
-pub(crate) fn internal() { } // def _internal():  — single underscore convention
+// pub(crate) — видим только внутри крейта
+pub(crate) fn internal() { } // def _internal():  — соглашение с одним подчёркиванием
 
-// (no keyword) — private to the module
-fn private_helper() { }      // def __private():  — double underscore name mangling
+// (без ключевого слова) — приватный для модуля
+fn private_helper() { }      // def __private():  — искажение имён с двумя подчёркиваниями
 
-// In Python, "private" is a gentleman's agreement.
-// In Rust, private is enforced by the compiler.
+// В Python «приватность» — это джентльменское соглашение.
+// В Rust приватность гарантирует компилятор.
 ```
 
 ---
 
-## Exercises
+## Упражнения
 
 <details>
-<summary><strong>🏋️ Exercise: First Rust Program</strong> (click to expand)</summary>
+<summary><strong>🏋️ Упражнение: первая программа на Rust</strong> (нажмите, чтобы раскрыть)</summary>
 
-**Challenge**: Create a new Rust project and write a program that:
-1. Declares a variable `name` with your name (type `&str`)
-2. Declares a mutable variable `count` starting at 0
-3. Uses a `for` loop from 1..=5 to increment `count` and print `"Hello, {name}! (count: {count})"`
-4. After the loop, print whether count is even or odd using a `match` expression
+**Задание**: создайте новый проект на Rust и напишите программу, которая:
+1. Объявляет переменную `name` с вашим именем (тип `&str`)
+2. Объявляет изменяемую переменную `count`, начальное значение 0
+3. Использует цикл `for` от 1..=5, чтобы увеличивать `count` и выводить `"Привет, {name}! (счётчик: {count})"`
+4. После цикла выводит, чётное или нечётное значение `count`, с помощью выражения `match`
 
 <details>
-<summary>🔑 Solution</summary>
+<summary>🔑 Решение</summary>
 
 ```bash
 cargo new hello_rust && cd hello_rust
@@ -330,26 +329,25 @@ fn main() {
 
     for _ in 1..=5 {
         count += 1;
-        println!("Hello, {name}! (count: {count})");
+        println!("Привет, {name}! (счётчик: {count})");
     }
 
     let parity = match count % 2 {
-        0 => "even",
-        _ => "odd",
+        0 => "чётное",
+        _ => "нечётное",
     };
-    println!("Final count {count} is {parity}");
+    println!("Итоговый счётчик {count} — {parity}");
 }
 ```
 
-**Key takeaways**:
-- `let` is immutable by default (you need `mut` to change `count`)
-- `1..=5` is inclusive range (Python's `range(1, 6)`)
-- `match` is an expression that returns a value
-- No `self`, no `if __name__ == "__main__"` — just `fn main()`
+**Главные выводы**:
+- `let` по умолчанию неизменяем (чтобы менять `count`, нужен `mut`)
+- `1..=5` — диапазон с включённой правой границей (аналог `range(1, 6)` в Python)
+- `match` — это выражение, которое возвращает значение
+- Никакого `self` и никакого `if __name__ == "__main__"`, только `fn main()`
 
 </details>
 </details>
 
 ***
-
 

@@ -1,67 +1,66 @@
-## Conditional Statements
+## Условные конструкции
 
-> **What you'll learn:** `if`/`else` without parentheses (but with braces), `loop`/`while`/`for` vs Python's iteration model,
-> expression blocks (everything returns a value), and function signatures with mandatory return types.
+> **Что вы узнаете:** `if`/`else` без скобок (но с фигурными скобками), `loop`/`while`/`for` в сравнении с моделью итерации Python, блоки-выражения (всё возвращает значение) и сигнатуры функций с обязательными типами возвращаемых значений.
 >
-> **Difficulty:** 🟢 Beginner
+> **Сложность:** 🟢 Начальный
 
 ### if/else
 
 ```python
 # Python
 if temperature > 100:
-    print("Too hot!")
+    print("Слишком жарко!")
 elif temperature < 0:
-    print("Too cold!")
+    print("Слишком холодно!")
 else:
-    print("Just right")
+    print("В самый раз")
 
-# Ternary
+# Тернарный оператор
 status = "hot" if temperature > 100 else "ok"
 ```
 
 ```rust
-// Rust — braces required, no colons, `else if` not `elif`
+// Rust — фигурные скобки обязательны, двоеточий нет, пишется `else if`, а не `elif`
 if temperature > 100 {
-    println!("Too hot!");
+    println!("Слишком жарко!");
 } else if temperature < 0 {
-    println!("Too cold!");
+    println!("Слишком холодно!");
 } else {
-    println!("Just right");
+    println!("В самый раз");
 }
 
-// if is an EXPRESSION — returns a value (like Python ternary, but more powerful)
+// if — это ВЫРАЖЕНИЕ, оно возвращает значение (как тернарный оператор Python, но мощнее)
 let status = if temperature > 100 { "hot" } else { "ok" };
 ```
 
-### Important Differences
+### Важные различия
 ```rust
-// 1. Condition must be a bool — no truthy/falsy
+// 1. Условие должно быть bool — никакой «истинности» и «ложности»
 let x = 42;
-// if x { }          // ❌ Error: expected bool, found integer
-if x != 0 { }        // ✅ Explicit comparison required
+// if x { }          // ❌ Ошибка: ожидался bool, найден целый тип
+if x != 0 { }        // ✅ Нужно явное сравнение
 
-// In Python, these are all truthy/falsy:
-// if []:      → False    (empty list)
-// if "":      → False    (empty string)
-// if 0:       → False    (zero)
+// В Python всё это приводится к True/False:
+// if []:      → False    (пустой список)
+// if "":      → False    (пустая строка)
+// if 0:       → False    (ноль)
 // if None:    → False
 
-// In Rust, ONLY bool works in conditions:
+// В Rust в условиях работает ТОЛЬКО bool:
 let items: Vec<i32> = vec![];
-// if items { }           // ❌ Error
-if !items.is_empty() { }  // ✅ Explicit check
+// if items { }           // ❌ Ошибка
+if !items.is_empty() { }  // ✅ Явная проверка
 
 let name = "";
-// if name { }             // ❌ Error
-if !name.is_empty() { }    // ✅ Explicit check
+// if name { }             // ❌ Ошибка
+if !name.is_empty() { }    // ✅ Явная проверка
 ```
 
 ***
 
-## Loops and Iteration
+## Циклы и итерация
 
-### for Loops
+### Циклы for
 ```python
 # Python
 for i in range(5):
@@ -83,7 +82,7 @@ for i in 0..5 {                           // range(5) → 0..5
     println!("{}", i);
 }
 
-for item in ["a", "b", "c"] {             // Direct iteration
+for item in ["a", "b", "c"] {             // Прямая итерация
     println!("{}", item);
 }
 
@@ -91,24 +90,24 @@ for (i, item) in ["a", "b", "c"].iter().enumerate() {  // enumerate()
     println!("{}: {}", i, item);
 }
 
-// HashMap iteration
+// Итерация по HashMap
 use std::collections::HashMap;
 let map = HashMap::from([("x", 1), ("y", 2)]);
-for (key, value) in &map {                // & borrows the map
+for (key, value) in &map {                // & — заимствование словаря
     println!("{} = {}", key, value);
 }
 ```
 
-### Range Syntax
+### Синтаксис диапазонов
 ```rust
-Python:              Rust:               Notes:
-range(5)             0..5                Half-open (excludes end)
-range(1, 10)         1..10               Half-open
-range(1, 11)         1..=10              Inclusive (includes end)
-range(0, 10, 2)      (0..10).step_by(2)  Step (method, not syntax)
+Python:              Rust:               Примечания:
+range(5)             0..5                Полуоткрытый (правая граница не включается)
+range(1, 10)         1..10               Полуоткрытый
+range(1, 11)         1..=10              Закрытый (правая граница включается)
+range(0, 10, 2)      (0..10).step_by(2)  Шаг (метод, а не синтаксис)
 ```
 
-### while Loops
+### Циклы while
 ```python
 # Python
 count = 0
@@ -116,7 +115,7 @@ while count < 5:
     print(count)
     count += 1
 
-# Infinite loop
+# Бесконечный цикл
 while True:
     data = get_input()
     if data == "quit":
@@ -131,7 +130,7 @@ while count < 5 {
     count += 1;
 }
 
-// Infinite loop — use `loop`, not `while true`
+// Бесконечный цикл — используйте `loop`, а не `while true`
 loop {
     let data = get_input();
     if data == "quit" {
@@ -139,67 +138,66 @@ loop {
     }
 }
 
-// loop can return a value! (unique to Rust)
+// loop может вернуть значение! (уникально для Rust)
 let result = loop {
     let input = get_input();
     if let Ok(num) = input.parse::<i32>() {
-        break num;  // `break` with a value — like return for loops
+        break num;  // `break` со значением — как return для циклов
     }
-    println!("Not a number, try again");
+    println!("Не число, попробуйте ещё раз");
 };
 ```
 
-### List Comprehensions vs Iterator Chains
+### Списочные включения и цепочки итераторов
 ```python
-# Python — list comprehensions
+# Python — списочные включения (list comprehensions)
 squares = [x ** 2 for x in range(10)]
 evens = [x for x in range(20) if x % 2 == 0]
 pairs = [(x, y) for x in range(3) for y in range(3)]
 ```
 
 ```rust
-// Rust — iterator chains (.map, .filter, .collect)
+// Rust — цепочки итераторов (.map, .filter, .collect)
 let squares: Vec<i32> = (0..10).map(|x| x * x).collect();
 let evens: Vec<i32> = (0..20).filter(|x| x % 2 == 0).collect();
 let pairs: Vec<(i32, i32)> = (0..3)
     .flat_map(|x| (0..3).map(move |y| (x, y)))
     .collect();
 
-// These are LAZY — nothing runs until .collect()
-// Python comprehensions are eager (run immediately)
-// Rust iterators can be more efficient for large datasets
+// Они ЛЕНИВЫЕ — ничего не выполняется до .collect()
+// Списочные включения в Python энергичные (выполняются сразу)
+// Итераторы Rust могут быть эффективнее на больших наборах данных
 ```
 
 ***
 
-## Expression Blocks
+## Блоки-выражения
 
-Everything in Rust is an expression (or can be). This is a big shift from Python,
-where `if`/`for` are statements.
+Всё в Rust является выражением (или может им быть). Это большой сдвиг по сравнению с Python, где `if` и `for` — это инструкции.
 
 ```python
-# Python — if is a statement (except ternary)
+# Python — if — это инструкция (кроме тернарного оператора)
 if condition:
     result = "yes"
 else:
     result = "no"
 
-# Or ternary (limited to one expression):
+# Или тернарный оператор (только одно выражение):
 result = "yes" if condition else "no"
 ```
 
 ```rust
-// Rust — if is an expression (returns a value)
+// Rust — if — это выражение (возвращает значение)
 let result = if condition { "yes" } else { "no" };
 
-// Blocks are expressions — the last line (without semicolon) is the return value
+// Блоки — это выражения: последняя строка (без точки с запятой) и есть возвращаемое значение
 let value = {
     let x = 5;
     let y = 10;
-    x + y    // No semicolon → this is the value of the block (15)
+    x + y    // Без точки с запятой → это значение блока (15)
 };
 
-// match is an expression too
+// match — тоже выражение
 let description = match temperature {
     t if t > 100 => "boiling",
     t if t > 50 => "hot",
@@ -208,72 +206,70 @@ let description = match temperature {
 };
 ```
 
-The following diagram illustrates the core difference between Python's statement-based and Rust's expression-based control flow:
+Диаграмма ниже иллюстрирует ключевое различие между управлением потоком в Python на основе инструкций и в Rust на основе выражений:
 
 ```mermaid
 flowchart LR
-    subgraph Python ["Python — Statements"]
+    subgraph Python ["Python — инструкции"]
         P1["if condition:"] --> P2["result = 'yes'"]
         P1 --> P3["result = 'no'"]
-        P2 --> P4["result used later"]
+        P2 --> P4["результат используется позже"]
         P3 --> P4
     end
 
     Python ~~~ Rust
-    subgraph Rust ["Rust — Expressions"]
+    subgraph Rust ["Rust — выражения"]
         R1["let result = if cond"] --> R2["{ 'yes' }"]
         R1 --> R3["{ 'no' }"]
-        R2 --> R4["value returned directly"]
+        R2 --> R4["значение возвращается напрямую"]
         R3 --> R4
     end
     style Python fill:#ffeeba
     style Rust fill:#d4edda
 ```
 
-> **The semicolon rule**: In Rust, the last expression in a block **without a semicolon**
-> is the block's return value. Adding a semicolon makes it a statement (returns `()`).
-> This trips up Python developers initially — it's like an implicit `return`.
+> **Правило точки с запятой**: в Rust последнее выражение блока **без точки с запятой** — это возвращаемое значение блока. Добавленная точка с запятой превращает его в инструкцию (возвращается `()`). Поначалу это сбивает с толку разработчиков на Python: это похоже на неявный `return`.
 
 ***
 
-## Functions and Type Signatures
+## Функции и сигнатуры типов
 
-### Python Functions
+### Функции в Python
 ```python
-# Python — types optional, dynamic dispatch
+# Python — типы необязательны, диспетчеризация динамическая
 def greet(name: str, greeting: str = "Hello") -> str:
     return f"{greeting}, {name}!"
 
-# Default args, *args, **kwargs
+# Аргументы по умолчанию, *args, **kwargs
 def flexible(*args, **kwargs):
     pass
 
-# First-class functions
+# Функции первого класса
 def apply(f, x):
     return f(x)
 
 result = apply(lambda x: x * 2, 5)  # 10
 ```
 
-### Rust Functions
+### Функции в Rust
 ```rust
-// Rust — types REQUIRED on function signatures, no defaults
+// Rust — типы в сигнатурах функций ОБЯЗАТЕЛЬНЫ, значений по умолчанию нет
 fn greet(name: &str, greeting: &str) -> String {
     format!("{}, {}!", greeting, name)
 }
 
-// No default arguments — use builder pattern or Option
+// Аргументов по умолчанию нет — используйте паттерн «строитель» или Option
 fn greet_with_default(name: &str, greeting: Option<&str>) -> String {
     let greeting = greeting.unwrap_or("Hello");
     format!("{}, {}!", greeting, name)
 }
 
-// No *args/**kwargs — use slices or structs
+// Нет *args/**kwargs — используйте срезы или структуры
 fn sum_all(numbers: &[i32]) -> i32 {
     numbers.iter().sum()
 }
 
-// First-class functions and closures
+// Функции первого класса и замыкания
 fn apply(f: fn(i32) -> i32, x: i32) -> i32 {
     f(x)
 }
@@ -281,29 +277,29 @@ fn apply(f: fn(i32) -> i32, x: i32) -> i32 {
 let result = apply(|x| x * 2, 5);  // 10
 ```
 
-### Return Values
+### Возвращаемые значения
 ```python
-# Python — return is explicit, None is implicit
+# Python — return пишется явно, None подразумевается
 def divide(a, b):
     if b == 0:
-        return None  # Or raise an exception
+        return None  # Или выбросить исключение
     return a / b
 ```
 
 ```rust
-// Rust — last expression is the return value (no semicolon)
+// Rust — последнее выражение и есть возвращаемое значение (без точки с запятой)
 fn divide(a: f64, b: f64) -> Option<f64> {
     if b == 0.0 {
-        None              // Early return (could also write `return None;`)
+        None              // Ранний возврат (можно также написать `return None;`)
     } else {
-        Some(a / b)       // Last expression — implicit return
+        Some(a / b)       // Последнее выражение — неявный возврат
     }
 }
 ```
 
-### Multiple Return Values
+### Несколько возвращаемых значений
 ```python
-# Python — return a tuple
+# Python — возвращаем кортеж
 def min_max(numbers):
     return min(numbers), max(numbers)
 
@@ -311,7 +307,7 @@ lo, hi = min_max([3, 1, 4, 1, 5])
 ```
 
 ```rust
-// Rust — return a tuple (same concept!)
+// Rust — возвращаем кортеж (та же концепция!)
 fn min_max(numbers: &[i32]) -> (i32, i32) {
     let min = *numbers.iter().min().unwrap();
     let max = *numbers.iter().max().unwrap();
@@ -321,38 +317,38 @@ fn min_max(numbers: &[i32]) -> (i32, i32) {
 let (lo, hi) = min_max(&[3, 1, 4, 1, 5]);
 ```
 
-### Methods: self vs &self vs &mut self
+### Методы: self, &self и &mut self
 ```rust
-// In Python, `self` is always a mutable reference to the object.
-// In Rust, you choose:
+// В Python `self` — это всегда изменяемая ссылка на объект.
+// В Rust выбираете вы:
 
 impl MyStruct {
-    fn new() -> Self { ... }                // No self — "static method" / "classmethod"
-    fn read_only(&self) { ... }             // &self — borrows immutably (can't modify)
-    fn modify(&mut self) { ... }            // &mut self — borrows mutably (can modify)
-    fn consume(self) { ... }                // self — takes ownership (object is moved)
+    fn new() -> Self { ... }                // Без self — «статический метод» / «classmethod»
+    fn read_only(&self) { ... }             // &self — заимствует неизменяемо (нельзя менять)
+    fn modify(&mut self) { ... }            // &mut self — заимствует изменяемо (можно менять)
+    fn consume(self) { ... }                // self — забирает владение (объект перемещается)
 }
 
-// Python equivalent:
+// Аналог в Python:
 // class MyStruct:
 //     @classmethod
-//     def new(cls): ...                    # No instance needed
-//     def read_only(self): ...             # All three are the same in Python:
-//     def modify(self): ...                # Python self is always mutable
-//     def consume(self): ...               # Python never "consumes" self
+//     def new(cls): ...                    # Экземпляр не нужен
+//     def read_only(self): ...             # В Python все три варианта одинаковы:
+//     def modify(self): ...                # Python self всегда изменяем
+//     def consume(self): ...               # Python никогда не «потребляет» self
 ```
 
 ---
 
-## Exercises
+## Упражнения
 
 <details>
-<summary><strong>🏋️ Exercise: FizzBuzz with Expressions</strong> (click to expand)</summary>
+<summary><strong>🏋️ Упражнение: FizzBuzz на выражениях</strong> (нажмите, чтобы раскрыть)</summary>
 
-**Challenge**: Write FizzBuzz for 1..=30 using Rust's expression-based `match`. Each number should print "Fizz", "Buzz", "FizzBuzz", or the number. Use `match (n % 3, n % 5)` as the expression.
+**Задание**: напишите FizzBuzz для 1..=30 с использованием `match` как выражения Rust. Каждое число должно выводить `"Fizz"`, `"Buzz"`, `"FizzBuzz"` или само число. Используйте `match (n % 3, n % 5)` в качестве выражения.
 
 <details>
-<summary>🔑 Solution</summary>
+<summary>🔑 Решение</summary>
 
 ```rust
 fn main() {
@@ -368,7 +364,7 @@ fn main() {
 }
 ```
 
-**Key takeaway**: `match` is an expression that returns a value — no need for `if/elif/else` chains. The `_` wildcard replaces Python's `case _:` default.
+**Ключевой вывод**: `match` — это выражение, которое возвращает значение, поэтому цепочки `if/elif/else` не нужны. Подстановка `_` заменяет `case _:` из Python в роли значения по умолчанию.
 
 </details>
 </details>
