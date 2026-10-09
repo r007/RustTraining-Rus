@@ -109,6 +109,7 @@ impl IpmiSession<Idle> {
 // Переход: Authenticated → Active
 impl IpmiSession<Authenticated> {
     pub fn activate(self) -> Result<IpmiSession<Active>, String> {
+        // session_id гарантированно Some благодаря переходу между состояниями типа.
         println!("Активация сессии {}", self.session_id.unwrap());
         Ok(IpmiSession {
             transport: self.transport,
@@ -121,11 +122,13 @@ impl IpmiSession<Authenticated> {
 // Операции доступны ТОЛЬКО в состоянии Active
 impl IpmiSession<Active> {
     pub fn send_command(&mut self, netfn: u8, cmd: u8, data: &[u8]) -> Vec<u8> {
+        // session_id гарантированно Some в состоянии Active.
         println!("Отправка команды 0x{cmd:02X} в сессии {}", self.session_id.unwrap());
         vec![0x00] // заглушка: код завершения OK
     }
 
     pub fn close(self) -> IpmiSession<Closed> {
+        // session_id гарантированно Some в состоянии Active.
         println!("Закрытие сессии {}", self.session_id.unwrap());
         IpmiSession {
             transport: self.transport,

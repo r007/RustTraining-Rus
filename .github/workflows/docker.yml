@@ -1,0 +1,61 @@
+name: Docker image
+
+# Build-only. Nothing is published, so this adds no release surface or
+# registry credentials — it exists so the Dockerfile cannot silently rot.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docker/**'
+      - '.dockerignore'
+      - 'xtask/**'
+      - '**/book.toml'
+      - '.github/workflows/docker.yml'
+  pull_request:
+    paths:
+      - 'docker/**'
+      - '.dockerignore'
+      - 'xtask/**'
+      - '**/book.toml'
+      - '.github/workflows/docker.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+
+      - name: Build image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: docker/Dockerfile
+          push: false
+          load: true
+          tags: rust-training:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke test
+        run: |
+          docker run -d --name books -p 3000:8080 rust-training:ci
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:3000/ >/dev/null 2>&1; then ok=1; break; fi
+            sleep 2
+          done
+          if [ "${ok:-0}" != "1" ]; then
+            echo "::error::server did not come up"; docker logs books; exit 1
+          fi
+          # Landing page and at least one book must resolve.
+          # NB: match the <title>; the <h1> is split by a <span> tag.
+          curl -fsS http://localhost:3000/ | grep -q "<title>Rust Training Books</title>"
+          curl -fsS -o /dev/null -w '%{http_code}\n' http://localhost:3000/async-book/ | grep -q 200
+          # Extensionless links must resolve via try_files.
+          curl -fsS -o /dev/null -w '%{http_code}\n' http://localhost:3000/async-book/ch00-introduction | grep -q 200
+          docker rm -f books

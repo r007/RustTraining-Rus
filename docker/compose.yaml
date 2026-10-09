@@ -1,0 +1,28 @@
+name: rust-training
+
+services:
+  books:
+    build:
+      # Context is the repo root: the build needs the book sources and the
+      # xtask crate, which live above this file.
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: rust-training:local
+    container_name: rust-training-books
+
+    # Host port is configurable; the container always listens on 8080 because
+    # nginx-unprivileged runs as a non-root user.
+    ports:
+      - "${PORT:-3000}:8080"
+
+    restart: unless-stopped
+
+    security_opt:
+      - no-new-privileges:true
+
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/"]
+      interval: 30s
+      timeout: 5s
+      start_period: 5s
+      retries: 3

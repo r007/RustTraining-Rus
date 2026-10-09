@@ -1,14 +1,14 @@
-# 5. Channels and Message Passing 🟢
+# 5. Каналы и передача сообщений 🟢
 
-> **What you'll learn:**
-> - `std::sync::mpsc` basics and when to upgrade to crossbeam-channel
-> - Channel selection with `select!` for multi-source message handling
-> - Bounded vs unbounded channels and backpressure strategies
-> - The actor pattern for encapsulating concurrent state
+> **Что вы узнаете:**
+> - Основы `std::sync::mpsc` и когда стоит перейти на crossbeam-channel
+> - Выбор канала через `select!` для обработки сообщений из нескольких источников
+> - Ограниченные и неограниченные каналы и стратегии обратного давления (backpressure)
+> - Паттерн актора для инкапсуляции конкурентного состояния
 
-## std::sync::mpsc — The Standard Channel
+## std::sync::mpsc: стандартный канал
 
-Rust's standard library provides a multi-producer, single-consumer channel:
+Стандартная библиотека Rust предоставляет канал с несколькими отправителями и одним получателем (multi-producer, single-consumer):
 
 ```rust
 use std::sync::mpsc;
@@ -16,56 +16,60 @@ use std::thread;
 use std::time::Duration;
 
 fn main() {
-    // Create a channel: tx (transmitter) and rx (receiver)
+    // Создаём канал: tx (отправитель) и rx (получатель)
     let (tx, rx) = mpsc::channel();
 
-    // Spawn a producer thread
-    let tx1 = tx.clone(); // Clone for multiple producers
+    // Запускаем поток-производитель
+    let tx1 = tx.clone(); // Клонируем для нескольких производителей
     thread::spawn(move || {
         for i in 0..5 {
-            tx1.send(format!("producer-1: msg {i}")).unwrap();
+            tx1.send(format!("производитель-1: сообщение {i}")).unwrap();
             thread::sleep(Duration::from_millis(100));
         }
     });
 
-    // Second producer
+    // Второй производитель
     thread::spawn(move || {
         for i in 0..5 {
-            tx.send(format!("producer-2: msg {i}")).unwrap();
+            tx.send(format!("производитель-2: сообщение {i}")).unwrap();
             thread::sleep(Duration::from_millis(150));
         }
     });
 
-    // Consumer: receive all messages
+    // Потребитель: получает все сообщения
     for msg in rx {
-        // rx iterator ends when ALL senders are dropped
-        println!("Received: {msg}");
+        // Итератор rx завершается, когда уничтожены ВСЕ отправители
+        println!("Получено: {msg}");
     }
-    println!("All producers done.");
+    println!("Все производители завершили работу.");
 }
 ```
 
-**Key properties**:
-- **Unbounded** by default (can fill memory if consumer is slow)
-- `mpsc::sync_channel(N)` creates a **bounded** channel with backpressure
-- `rx.recv()` blocks the current thread until a message arrives
-- `rx.try_recv()` returns immediately with `Err(TryRecvError::Empty)` if nothing is ready
-- The channel closes when all `Sender`s are dropped
+> **Примечание:** `.unwrap()` при `.send()` используется для краткости. Он паникует, если получатель уже уничтожен. Продакшен-код должен корректно обрабатывать `SendError`.
+
+**Ключевые свойства**:
+- **Неограниченный** по умолчанию: может заполнить память, если потребитель медленный
+- `mpsc::sync_channel(N)` создаёт **ограниченный** канал с обратным давлением
+- `rx.recv()` блокирует текущий поток, пока не придёт сообщение
+- `rx.try_recv()` сразу возвращает `Err(TryRecvError::Empty)`, если ничего не готово
+- Канал закрывается, когда уничтожены все `Sender`
 
 ```rust
-// Bounded channel with backpressure:
-let (tx, rx) = mpsc::sync_channel(10); // Buffer of 10 messages
+// Ограниченный канал с обратным давлением:
+let (tx, rx) = mpsc::sync_channel(10); // Буфер на 10 сообщений
 
 thread::spawn(move || {
     for i in 0..1000 {
-        tx.send(i).unwrap(); // BLOCKS if buffer is full — natural backpressure
+        tx.send(i).unwrap(); // БЛОКИРУЕТСЯ, если буфер полон: естественное обратное давление
     }
 });
 ```
 
-### crossbeam-channel — The Production Workhorse
+> **Примечание:** `.unwrap()` используется для краткости. В продакшене обрабатывайте `SendError` (получатель уничтожен), а не паникуйте.
 
-`crossbeam-channel` is the de facto standard for production channel usage. It's faster than `std::sync::mpsc` and supports multi-consumer (`mpmc`):
+### crossbeam-channel: рабочая лошадка для продакшена
+
+`crossbeam-channel` — де-факто стандарт для каналов в продакшене. Он быстрее `std::sync::mpsc` и поддерживает нескольких получателей (`mpmc`):
 
 ```rust,ignore
 // Cargo.toml:
@@ -76,30 +80,30 @@ use std::thread;
 use std::time::Duration;
 
 fn main() {
-    // Bounded MPMC channel
+    // Ограниченный канал MPMC
     let (tx, rx) = bounded::<String>(100);
 
-    // Multiple producers
+    // Несколько производителей
     for id in 0..4 {
         let tx = tx.clone();
         thread::spawn(move || {
             for i in 0..10 {
-                tx.send(format!("worker-{id}: item-{i}")).unwrap();
+                tx.send(format!("рабочий-{id}: элемент-{i}")).unwrap();
             }
         });
     }
-    drop(tx); // Drop the original sender so the channel can close
+    drop(tx); // Отбрасываем исходный отправитель, чтобы канал мог закрыться
 
-    // Multiple consumers (not possible with std::sync::mpsc!)
+    // Несколько потребителей (с std::sync::mpsc так нельзя!)
     let rx2 = rx.clone();
     let consumer1 = thread::spawn(move || {
         while let Ok(msg) = rx.recv() {
-            println!("[consumer-1] {msg}");
+            println!("[потребитель-1] {msg}");
         }
     });
     let consumer2 = thread::spawn(move || {
         while let Ok(msg) = rx2.recv() {
-            println!("[consumer-2] {msg}");
+            println!("[потребитель-2] {msg}");
         }
     });
 
@@ -108,9 +112,9 @@ fn main() {
 }
 ```
 
-### Channel Selection (select!)
+### Выбор канала (select!)
 
-Listen on multiple channels simultaneously — like `select` in Go:
+Слушайте несколько каналов одновременно, как `select` в Go:
 
 ```rust,ignore
 use crossbeam_channel::{bounded, tick, after, select};
@@ -118,14 +122,14 @@ use std::time::Duration;
 
 fn main() {
     let (work_tx, work_rx) = bounded::<String>(10);
-    let ticker = tick(Duration::from_secs(1));        // Periodic tick
-    let deadline = after(Duration::from_secs(10));     // One-shot timeout
+    let ticker = tick(Duration::from_secs(1));        // Периодический тик
+    let deadline = after(Duration::from_secs(10));     // Одноразовый таймаут
 
-    // Producer
+    // Производитель
     let tx = work_tx.clone();
     std::thread::spawn(move || {
         for i in 0..100 {
-            tx.send(format!("job-{i}")).unwrap();
+            tx.send(format!("задача-{i}")).unwrap();
             std::thread::sleep(Duration::from_millis(500));
         }
     });
@@ -135,18 +139,18 @@ fn main() {
         select! {
             recv(work_rx) -> msg => {
                 match msg {
-                    Ok(job) => println!("Processing: {job}"),
+                    Ok(job) => println!("Обработка: {job}"),
                     Err(_) => {
-                        println!("Work channel closed");
+                        println!("Канал задач закрыт");
                         break;
                     }
                 }
             },
             recv(ticker) -> _ => {
-                println!("Tick — heartbeat");
+                println!("Тик — сигнал жизни");
             },
             recv(deadline) -> _ => {
-                println!("Deadline reached — shutting down");
+                println!("Достигнут дедлайн — завершение работы");
                 break;
             },
         }
@@ -154,40 +158,38 @@ fn main() {
 }
 ```
 
-> **Go comparison**: This is exactly like Go's `select` statement over channels.
-> crossbeam's `select!` macro randomizes order to prevent starvation, just like Go.
+> **Сравнение с Go**: это в точности похоже на оператор `select` для каналов в Go. Макрос `select!` из crossbeam, как и в Go, случайным образом выбирает порядок веток, чтобы избежать голодания.
 
-### Bounded vs Unbounded and Backpressure
+### Ограниченные и неограниченные каналы и обратное давление
 
-| Type | Behavior When Full | Memory | Use Case |
-|------|-------------------|--------|----------|
-| **Unbounded** | Never blocks (grows heap) | Unbounded ⚠️ | Rare — only when producer is slower than consumer |
-| **Bounded** | `send()` blocks until space | Fixed | Production default — prevents OOM |
-| **Rendezvous** (bounded(0)) | `send()` blocks until receiver is ready | None | Synchronization / handoff |
+| Тип | Поведение при заполнении | Память | Сценарий использования |
+|-----|--------------------------|--------|------------------------|
+| **Неограниченный** | Никогда не блокирует (растёт в куче) | Не ограничена ⚠️ | Редко: только когда производитель медленнее потребителя |
+| **Ограниченный** | `send()` блокируется, пока не появится место | Фиксирована | Выбор по умолчанию в продакшене: защита от OOM |
+| **Рандеву** (bounded(0)) | `send()` блокируется, пока получатель не готов | Нет | Синхронизация и передача управления |
 
 ```rust
-// Rendezvous channel — zero capacity, direct handoff
+// Канал рандеву: нулевая ёмкость, прямая передача
 let (tx, rx) = crossbeam_channel::bounded(0);
-// tx.send(x) blocks until rx.recv() is called, and vice versa.
-// This synchronizes the two threads precisely.
+// tx.send(x) блокируется, пока не вызван rx.recv(), и наоборот.
+// Это точно синхронизирует два потока.
 ```
 
-**Rule**: Always use bounded channels in production unless you can prove the
-producer will never outpace the consumer.
+**Правило**: в продакшене всегда используйте ограниченные каналы, если только вы не можете доказать, что производитель никогда не обгонит потребителя.
 
-### Actor Pattern with Channels
+### Паттерн актора на каналах
 
-The actor pattern uses channels to serialize access to mutable state — no mutexes needed:
+Паттерн актора использует каналы, чтобы сериализовать доступ к изменяемому состоянию: никакие мьютексы не нужны.
 
 ```rust
 use std::sync::mpsc;
 use std::thread;
 
-// Messages the actor can receive
+// Сообщения, которые может получить актор
 enum CounterMsg {
     Increment,
     Decrement,
-    Get(mpsc::Sender<i64>), // Reply channel
+    Get(mpsc::Sender<i64>), // Канал для ответа
 }
 
 struct CounterActor {
@@ -213,7 +215,7 @@ impl CounterActor {
     }
 }
 
-// Actor handle — cheap to clone, Send + Sync
+// Дескриптор актора: дёшево клонируется, реализует Send + Sync
 #[derive(Clone)]
 struct Counter {
     tx: mpsc::Sender<CounterMsg>,
@@ -239,7 +241,7 @@ impl Counter {
 fn main() {
     let counter = Counter::spawn();
 
-    // Multiple threads can safely use the counter — no mutex!
+    // Несколько потоков могут безопасно использовать счётчик: никакого мьютекса!
     let handles: Vec<_> = (0..10).map(|_| {
         let counter = counter.clone();
         thread::spawn(move || {
@@ -250,32 +252,30 @@ fn main() {
     }).collect();
 
     for h in handles { h.join().unwrap(); }
-    println!("Final count: {}", counter.get()); // 10000
+    println!("Итоговое значение: {}", counter.get()); // 10000
 }
 ```
 
-> **When to use actors vs mutexes**: Actors are great when the state has complex
-> invariants, operations take a long time, or you want to serialize access
-> without thinking about lock ordering. Mutexes are simpler for short critical sections.
+> **Когда использовать акторы, а когда мьютексы**: акторы хороши, когда у состояния сложные инварианты, операции занимают много времени или вы хотите сериализовать доступ, не думая о порядке захвата блокировок. Для коротких критических секций мьютексы проще.
 
-> **Key Takeaways — Channels**
-> - `crossbeam-channel` is the production workhorse — faster and more feature-rich than `std::sync::mpsc`
-> - `select!` replaces complex multi-source polling with declarative channel selection
-> - Bounded channels provide natural backpressure; unbounded channels risk OOM
+> **Ключевые выводы: каналы**
+> - `crossbeam-channel` — рабочая лошадка для продакшена: быстрее и богаче по возможностям, чем `std::sync::mpsc`
+> - `select!` заменяет сложный опрос нескольких источников декларативным выбором канала
+> - Ограниченные каналы дают естественное обратное давление; неограниченные каналы рискуют привести к OOM
 
-> **See also:** [Ch 6 — Concurrency](ch06-concurrency-vs-parallelism-vs-threads.md) for threads, Mutex, and shared state. [Ch 15 — Async](ch15-asyncawait-essentials.md) for async channels (`tokio::sync::mpsc`).
+> **См. также:** [гл. 6 — Конкурентность](ch06-concurrency-vs-parallelism-vs-threads.md) о потоках, Mutex и разделяемом состоянии. [гл. 16 — Async](ch16-asyncawait-essentials.md) о каналах в async (`tokio::sync::mpsc`).
 
 ---
 
-### Exercise: Channel-Based Worker Pool ★★★ (~45 min)
+### Упражнение: пул воркеров на каналах ★★★ (~45 минут)
 
-Build a worker pool using channels where:
-- A dispatcher sends `Job` structs through a channel
-- N workers consume jobs and send results back
-- Use `std::sync::mpsc` with `Arc<Mutex<Receiver>>` for work-stealing
+Постройте пул воркеров на каналах, где:
+- диспетчер отправляет структуры `Job` через канал
+- N воркеров забирают задачи и отправляют результаты обратно
+- используйте `std::sync::mpsc` с `Arc<Mutex<Receiver>>` для общей очереди работы
 
 <details>
-<summary>🔑 Solution</summary>
+<summary>🔑 Решение</summary>
 
 ```rust
 use std::sync::mpsc;
@@ -310,7 +310,7 @@ fn worker_pool(jobs: Vec<Job>, num_workers: usize) -> Vec<JobResult> {
                 };
                 match job {
                     Ok(job) => {
-                        let output = format!("processed '{}' by worker {worker_id}", job.data);
+                        let output = format!("обработано '{}' воркером {worker_id}", job.data);
                         result_tx.send(JobResult {
                             job_id: job.id, output, worker_id,
                         }).unwrap();
@@ -337,12 +337,12 @@ fn worker_pool(jobs: Vec<Job>, num_workers: usize) -> Vec<JobResult> {
 
 fn main() {
     let jobs: Vec<Job> = (0..20).map(|i| Job {
-        id: i, data: format!("task-{i}"),
+        id: i, data: format!("задача-{i}"),
     }).collect();
 
     let results = worker_pool(jobs, 4);
     for r in &results {
-        println!("[worker {}] job {}: {}", r.worker_id, r.job_id, r.output);
+        println!("[воркер {}] задача {}: {}", r.worker_id, r.job_id, r.output);
     }
 }
 ```
@@ -350,4 +350,3 @@ fn main() {
 </details>
 
 ***
-

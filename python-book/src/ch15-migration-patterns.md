@@ -251,11 +251,11 @@ let db_host = get_config()["database"]["host"].as_str().unwrap();
 ## Incremental Adoption Strategy
 
 ```mermaid
-flowchart LR
-    A["1️⃣ Profile Python\n(find hotspots)"] --> B["2️⃣ Write Rust Extension\n(PyO3 + maturin)"]
-    B --> C["3️⃣ Replace Python Call\n(same API)"]
-    C --> D["4️⃣ Expand Gradually\n(more functions)"]
-    D --> E{"Full rewrite\nworth it?"}
+flowchart TB
+    A["1️⃣ Profile Python<br/>(find hotspots)"] --> B["2️⃣ Write Rust Extension<br/>(PyO3 + maturin)"]
+    B --> C["3️⃣ Replace Python Call<br/>(same API)"]
+    C --> D["4️⃣ Expand Gradually<br/>(more functions)"]
+    D --> E{"Full rewrite<br/>worth it?"}
     E -->|Yes| F["Pure Rust🦀"]
     E -->|No| G["Hybrid🐍+🦀"]
     style A fill:#ffeeba
@@ -387,7 +387,7 @@ fn process_transactions(path: &str) -> PyResult<Vec<(i64, String, String, String
     for record in reader.records() {
         let record = record.map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
         let amount_str = &record[0];
-        let amount_cents = parse_amount_cents(amount_str)?;  // Custom parser, no Decimal
+        let amount_cents = parse_amount_cents(amount_str)?;  // Your custom parser (no Decimal needed)
         let date = &record[1];  // Already in ISO format, just validate
         let merchant = record[2].trim().to_lowercase();
         let category = categorize(&merchant).to_string();
@@ -398,7 +398,7 @@ fn process_transactions(path: &str) -> PyResult<Vec<(i64, String, String, String
 }
 
 #[pymodule]
-fn fast_pipeline(_py: Python, m: &PyModule) -> PyResult<()> {
+fn fast_pipeline(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(process_transactions, m)?)?;
     Ok(())
 }

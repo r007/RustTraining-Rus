@@ -59,6 +59,7 @@ fn seal_in_place(
 
 ```rust,ignore
 fn bad_encrypt(key: &SealingKey, data1: &mut Vec<u8>, data2: &mut Vec<u8>) {
+    // .unwrap() безопасен — массив из 12 байт всегда является корректным nonce.
     let nonce = Nonce::try_assume_unique_for_key(&[0u8; 12]).unwrap();
     seal_in_place(key, nonce, data1).unwrap();  // ✅ nonce перемещён здесь
     // seal_in_place(key, nonce, data2).unwrap();
@@ -304,7 +305,7 @@ fn sensor_workflow() -> io::Result<()> {
 flowchart LR
     N["Nonce::new()"] -->|перемещение| E["encrypt(nonce, msg)"]
     E -->|потреблён| X["❌ nonce уничтожен"]
-    N -.->|"попытка повторного использования"| ERR["ОШИБКА КОМПИЛЯЦИИ:\nuse of moved value"]
+    N -.->|"попытка повторного использования"| ERR["ОШИБКА КОМПИЛЯЦИИ:<br/>use of moved value"]
     style N fill:#e1f5fe,color:#000
     style E fill:#c8e6c9,color:#000
     style X fill:#ffcdd2,color:#000

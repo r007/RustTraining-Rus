@@ -6,7 +6,7 @@
 >
 > **Difficulty:** 🔴 Advanced
 
-> **Deep dive**: For production async patterns (stream processing, graceful shutdown, connection pooling, cancellation safety), see the companion [Async Rust Training](../../source-docs/ASYNC_RUST_TRAINING.md) guide.
+> **Deep dive**: For production async patterns (stream processing, graceful shutdown, connection pooling, cancellation safety), see the companion [Async Rust Training](../../async-book/src/summary.md) guide.
 >
 > **Prerequisites**: [Ownership & Borrowing](ch07-ownership-and-borrowing.md) and [Smart Pointers](ch07-3-smart-pointers-beyond-single-ownership.md) (Rc vs Arc decision tree).
 
@@ -79,6 +79,8 @@ public class EventProcessor
         {
             DataReceived(data);
         }
+        // Modern C# (6+) mitigates the null race with: DataReceived?.Invoke(data);
+        // but the underlying event-delegate model still allows races on the list below
         
         // Another race condition - list not thread-safe
         eventLog.Add($"Processed: {data}");

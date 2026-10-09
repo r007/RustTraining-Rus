@@ -1,130 +1,129 @@
-## Quick Reference Card
+## Справочная карточка
 
-### Pattern Decision Guide
+### Руководство по выбору паттерна
 
 ```text
-Need type safety for primitives?
-└── Newtype pattern (Ch3)
+Нужна безопасность типов для примитивов?
+└── Паттерн newtype (гл. 3)
 
-Need compile-time state enforcement?
-└── Type-state pattern (Ch3)
+Нужно обеспечить состояния на этапе компиляции?
+└── Паттерн type-state (гл. 3)
 
-Need a "tag" with no runtime data?
-└── PhantomData (Ch4)
+Нужен «тег» без данных во время выполнения?
+└── PhantomData (гл. 4)
 
-Need to break Rc/Arc reference cycles?
-└── Weak<T> / sync::Weak<T> (Ch8)
+Нужно разорвать циклы ссылок Rc/Arc?
+└── Weak<T> / sync::Weak<T> (гл. 9)
 
-Need to wait for a condition without busy-looping?
-└── Condvar + Mutex (Ch6)
+Нужно дождаться условия без активного опроса?
+└── Condvar + Mutex (гл. 6)
 
-Need to handle "one of N types"?
-├── Known closed set → Enum
-├── Open set, hot path → Generics
-├── Open set, cold path → dyn Trait
-└── Completely unknown types → Any + TypeId (Ch2)
+Нужно обрабатывать «один из N типов»?
+├── Известное закрытое множество → перечисление (enum)
+├── Открытое множество, горячий путь → обобщения
+├── Открытое множество, холодный путь → dyn Trait
+└── Полностью неизвестные типы → Any + TypeId (гл. 2)
 
-Need shared state across threads?
-├── Simple counter/flag → Atomics
-├── Short critical section → Mutex
-├── Read-heavy → RwLock
-├── Lazy one-time init → OnceLock / LazyLock (Ch6)
-└── Complex state → Actor + Channels
+Нужно разделяемое состояние между потоками?
+├── Простой счётчик или флаг → атомарные типы
+├── Короткая критическая секция → Mutex
+├── Много чтений → RwLock
+├── Ленивая однократная инициализация → OnceLock / LazyLock (гл. 6)
+└── Сложное состояние → актор + каналы
 
-Need to parallelize computation?
-├── Collection processing → rayon::par_iter
-├── Background task → thread::spawn
-└── Borrow local data → thread::scope
+Нужно распараллелить вычисления?
+├── Обработка коллекций → rayon::par_iter
+├── Фоновая задача → thread::spawn
+└── Заимствование локальных данных → thread::scope
 
-Need async I/O or concurrent networking?
-├── Basic → tokio + async/await (Ch15)
-└── Advanced (streams, middleware) → see Async Rust Training
+Нужен асинхронный ввод-вывод или конкурентная работа с сетью?
+├── Базовый уровень → tokio + async/await (гл. 16)
+└── Продвинутый (потоки, middleware) → см. Async Rust Training
 
-Need error handling?
-├── Library → thiserror (#[derive(Error)])
-└── Application → anyhow (Result<T>)
+Нужна обработка ошибок?
+├── Библиотека → thiserror (#[derive(Error)])
+└── Приложение → anyhow (Result<T>)
 
-Need to prevent a value from being moved?
-└── Pin<T> (Ch8) — required for Futures, self-referential types
+Нужно запретить перемещение значения?
+└── Pin<T> (гл. 9): обязателен для Future и самоссылающихся типов
 ```
 
-### Trait Bounds Cheat Sheet
+### Шпаргалка по границам трейтов
 
-| Bound | Meaning |
-|-------|---------|
-| `T: Clone` | Can be duplicated |
-| `T: Send` | Can be moved to another thread |
-| `T: Sync` | `&T` can be shared between threads |
-| `T: 'static` | Contains no non-static references |
-| `T: Sized` | Size known at compile time (default) |
-| `T: ?Sized` | Size may not be known (`[T]`, `dyn Trait`) |
-| `T: Unpin` | Safe to move after pinning |
-| `T: Default` | Has a default value |
-| `T: Into<U>` | Can be converted to `U` |
-| `T: AsRef<U>` | Can be borrowed as `&U` |
-| `T: Deref<Target = U>` | Auto-derefs to `&U` |
-| `F: Fn(A) -> B` | Callable, borrows state immutably |
-| `F: FnMut(A) -> B` | Callable, may mutate state |
-| `F: FnOnce(A) -> B` | Callable exactly once, may consume state |
+| Ограничение | Значение |
+|-------------|----------|
+| `T: Clone` | Можно дублировать |
+| `T: Send` | Можно передать в другой поток |
+| `T: Sync` | `&T` можно разделять между потоками |
+| `T: 'static` | Не содержит заимствованных ссылок с ограниченным временем жизни |
+| `T: Sized` | Размер известен на этапе компиляции (по умолчанию) |
+| `T: ?Sized` | Размер может быть неизвестен (`[T]`, `dyn Trait`) |
+| `T: Unpin` | Безопасно перемещать после закрепления (pin) |
+| `T: Default` | Есть значение по умолчанию |
+| `T: Into<U>` | Можно преобразовать в `U` |
+| `T: AsRef<U>` | Можно заимствовать как `&U` |
+| `T: Deref<Target = U>` | Автоматически разыменовывается в `&U` |
+| `F: Fn(A) -> B` | Вызываемый, заимствует состояние неизменяемо |
+| `F: FnMut(A) -> B` | Вызываемый, может изменять состояние |
+| `F: FnOnce(A) -> B` | Вызываемый ровно один раз, может потребить состояние |
 
-### Lifetime Elision Rules
+### Правила elision времён жизни
 
-The compiler inserts lifetimes automatically in three cases (so you don't have to):
+Компилятор автоматически вставляет времена жизни в трёх случаях, чтобы вам не приходилось делать это вручную:
 
 ```rust
-// Rule 1: Each reference parameter gets its own lifetime
+// Правило 1: каждый параметр-ссылка получает собственное время жизни
 // fn foo(x: &str, y: &str)  →  fn foo<'a, 'b>(x: &'a str, y: &'b str)
 
-// Rule 2: If there's exactly ONE input lifetime, it's used for all outputs
+// Правило 2: если есть ровно ОДНО входное время жизни, оно используется для всех выходных
 // fn foo(x: &str) -> &str   →  fn foo<'a>(x: &'a str) -> &'a str
 
-// Rule 3: If one parameter is &self or &mut self, its lifetime is used
+// Правило 3: если один из параметров это &self или &mut self, используется его время жизни
 // fn foo(&self, x: &str) -> &str  →  fn foo<'a>(&'a self, x: &str) -> &'a str
 ```
 
-**When you MUST write explicit lifetimes**:
-- Multiple input references and a reference output (compiler can't guess which input)
-- Struct fields that hold references: `struct Ref<'a> { data: &'a str }`
-- `'static` bounds when you need data without borrowed references
+**Когда время жизни НУЖНО писать явно**:
+- Несколько входных ссылок и ссылка на выходе (компилятор не может угадать, какой вход имеется в виду)
+- Поля структур, которые хранят ссылки: `struct Ref<'a> { data: &'a str }`
+- Границы `'static`, когда нужны данные без заимствованных ссылок
 
-### Common Derive Traits
+### Распространённые производные трейты
 
 ```rust
 #[derive(
-    Debug,          // {:?} formatting
+    Debug,          // Форматирование {:?}
     Clone,          // .clone()
-    Copy,           // Implicit copy (only for simple types)
-    PartialEq, Eq,  // == comparison
-    PartialOrd, Ord, // < > comparison + sorting
-    Hash,           // HashMap/HashSet key
+    Copy,           // Неявное копирование (только для простых типов)
+    PartialEq, Eq,  // Сравнение ==
+    PartialOrd, Ord, // Сравнение < > и сортировка
+    Hash,           // Ключ HashMap/HashSet
     Default,        // Type::default()
 )]
 struct MyType { /* ... */ }
 ```
 
-### Module Visibility Quick Reference
+### Краткая справка по видимости модулей
 
 ```text
-pub           → visible everywhere
-pub(crate)    → visible within the crate
-pub(super)    → visible to parent module
-pub(in path)  → visible within a specific path
-(nothing)     → private to current module + children
+pub           → видим везде
+pub(crate)    → видим внутри крейта
+pub(super)    → видим родительскому модулю
+pub(in path)  → видим внутри конкретного пути
+(ничего)      → приватен для текущего модуля и его потомков
 ```
 
-### Further Reading
+### Дополнительная литература
 
-| Resource | Why |
-|----------|-----|
-| [Rust Design Patterns](https://rust-unofficial.github.io/patterns/) | Catalog of idiomatic patterns and anti-patterns |
-| [Rust API Guidelines](https://rust-lang.github.io/api-guidelines/) | Official checklist for polished public APIs |
-| [Rust Atomics and Locks](https://marabos.nl/atomics/) | Mara Bos's deep dive into concurrency primitives |
-| [The Rustonomicon](https://doc.rust-lang.org/nomicon/) | Official guide to unsafe Rust and dark corners |
-| [Error Handling in Rust](https://blog.burntsushi.net/rust-error-handling/) | Andrew Gallant's comprehensive guide |
-| [Jon Gjengset — Crust of Rust series](https://www.youtube.com/playlist?list=PLqbS7AVVErFiWDOAVrPt7aYmnuuOLYvOa) | Deep dives into iterators, lifetimes, channels, etc. |
-| [Effective Rust](https://www.lurklurk.org/effective-rust/) | 35 specific ways to improve your Rust code |
+| Ресурс | Почему стоит прочитать |
+|--------|------------------------|
+| [Rust Design Patterns](https://rust-unofficial.github.io/patterns/) | Каталог идиоматичных паттернов и антипаттернов |
+| [Rust API Guidelines](https://rust-lang.github.io/api-guidelines/) | Официальный чек-лист для аккуратных публичных API |
+| [Rust Atomics and Locks](https://marabos.nl/atomics/) | Глубокий разбор примитивов конкурентности от Mara Bos |
+| [The Rustonomicon](https://doc.rust-lang.org/nomicon/) | Официальное руководство по unsafe Rust и тёмным углам языка |
+| [Error Handling in Rust](https://blog.burntsushi.net/rust-error-handling/) | Подробное руководство Andrew Gallant |
+| [Jon Gjengset — Crust of Rust series](https://www.youtube.com/playlist?list=PLqbS7AVVErFiWDOAVrPt7aYmnuuOLYvOa) | Глубокие разборы итераторов, времён жизни, каналов и др. |
+| [Effective Rust](https://www.lurklurk.org/effective-rust/) | 35 конкретных способов улучшить ваш код на Rust |
 
 ***
 
-*End of Rust Patterns & Engineering How-Tos*
-
+*Конец книги «Паттерны Rust и практические руководства по инженерии»*

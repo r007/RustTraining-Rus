@@ -15,17 +15,17 @@
 ```mermaid
 flowchart LR
     subgraph Sources["Источники"]
-        SMBIOS["SMBIOS\nТип 1, Тип 17"]
-        SDR["Датчики IPMI\n(SDR + показания)"]
-        SEL["SEL IPMI\n(критические события)"]
-        PCIe["Конфигурационное\nпространство PCIe"]
-        FW["Таблица версий\nпрошивки"]
-        PWR["Регистр состояния\nпитания"]
+        SMBIOS["SMBIOS<br/>Тип 1, Тип 17"]
+        SDR["Датчики IPMI<br/>(SDR + показания)"]
+        SEL["SEL IPMI<br/>(критические события)"]
+        PCIe["Конфигурационное<br/>пространство PCIe"]
+        FW["Таблица версий<br/>прошивки"]
+        PWR["Регистр состояния<br/>питания"]
     end
 
     subgraph Server["Сервер Redfish"]
         Handler["Обработчик GET"]
-        Builder["Билдер\nComputerSystem"]
+        Builder["Билдер<br/>ComputerSystem"]
     end
 
     SMBIOS -->|"Имя, UUID, серийный номер"| Handler
@@ -35,7 +35,7 @@ flowchart LR
     FW -->|"Версия BIOS"| Handler
     PWR -->|"PowerState"| Handler
     Handler --> Builder
-    Builder -->|".build()"| JSON["JSON, соответствующий\nсхеме"]
+    Builder -->|".build()"| JSON["JSON, соответствующий<br/>схеме"]
 
     style JSON fill:#c8e6c9,color:#000
     style Builder fill:#e1f5fe,color:#000
@@ -249,6 +249,8 @@ impl ComputerSystemBuilder<HasField, HasField, HasField, HasField> {
             "@odata.id": format!("/redfish/v1/Systems/{id}"),
             "@odata.type": "#ComputerSystem.v1_13_0.ComputerSystem",
             "Id": id,
+            // Type-state гарантирует, что эти значения Some — .unwrap() здесь безопасен.
+            // В продакшене предпочтительнее .expect("guaranteed by type state").
             "Name": self.name.unwrap(),
             "UUID": self.uuid.unwrap(),
             "PowerState": self.power_state.unwrap(),
@@ -268,6 +270,8 @@ impl ComputerSystemBuilder<HasField, HasField, HasField, HasField> {
         if let Some(v) = self.bios_version {
             obj["BiosVersion"] = serde_json::json!(v);
         }
+        // ПРИМЕЧАНИЕ: .unwrap() при to_value() используется для краткости.
+        // В продакшене ошибки сериализации следует передавать через `?`.
         if let Some(ps) = self.processor_summary {
             obj["ProcessorSummary"] = serde_json::to_value(ps).unwrap();
         }
@@ -1119,6 +1123,7 @@ fn main() {
         Some("2.10.1".into()),
     );
 
+    // ПРИМЕЧАНИЕ: .unwrap() используется для краткости — в продакшене обрабатывайте ошибки.
     println!("{}", serde_json::to_string_pretty(&response).unwrap());
 }
 ```

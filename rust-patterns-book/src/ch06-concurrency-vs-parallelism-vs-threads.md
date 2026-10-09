@@ -1,82 +1,82 @@
-# 6. Concurrency vs Parallelism vs Threads 🟡
+# 6. Конкурентность, параллелизм и потоки 🟡
 
-> **What you'll learn:**
-> - The precise distinction between concurrency and parallelism
-> - OS threads, scoped threads, and rayon for data parallelism
-> - Shared state primitives: Arc, Mutex, RwLock, Atomics, Condvar
-> - Lazy initialization with OnceLock/LazyLock and lock-free patterns
+> **Что вы узнаете:**
+> - Точное различие между конкурентностью и параллелизмом
+> - Потоки ОС, scoped-потоки и rayon для параллелизма по данным
+> - Примитивы разделяемого состояния: Arc, Mutex, RwLock, атомарные типы, Condvar
+> - Ленивая инициализация через OnceLock/LazyLock и паттерны без блокировок
 
-## Terminology: Concurrency ≠ Parallelism
+## Терминология: конкурентность ≠ параллелизм
 
-These terms are often confused. Here is the precise distinction:
+Эти термины часто путают. Вот точное различие:
 
-| | Concurrency | Parallelism |
+| | Конкурентность | Параллелизм |
 |---|---|---|
-| **Definition** | Managing multiple tasks that can make progress | Executing multiple tasks simultaneously |
-| **Hardware requirement** | One core is enough | Requires multiple cores |
-| **Analogy** | One cook, multiple dishes (switching between them) | Multiple cooks, each working on a dish |
-| **Rust tools** | `async/await`, channels, `select!` | `rayon`, `thread::spawn`, `par_iter()` |
+| **Определение** | Управление несколькими задачами, которые могут продвигаться вперёд | Одновременное выполнение нескольких задач |
+| **Требование к железу** | Достаточно одного ядра | Нужно несколько ядер |
+| **Аналогия** | Один повар, много блюд (переключается между ними) | Несколько поваров, каждый готовит своё блюдо |
+| **Инструменты Rust** | `async/await`, каналы, `select!` | `rayon`, `thread::spawn`, `par_iter()` |
 
 ```text
-Concurrency (single core):           Parallelism (multi-core):
-                                      
-Task A: ██░░██░░██                   Task A: ██████████
-Task B: ░░██░░██░░                   Task B: ██████████
-─────────────────→ time              ─────────────────→ time
-(interleaved on one core)           (simultaneous on two cores)
+Конкурентность (одно ядро):          Параллелизм (несколько ядер):
+
+Задача A: ██░░██░░██                 Задача A: ██████████
+Задача B: ░░██░░██░░                 Задача B: ██████████
+─────────────────→ время             ─────────────────→ время
+(чередуются на одном ядре)           (выполняются одновременно на двух ядрах)
 ```
 
-### std::thread — OS Threads
+### std::thread: потоки ОС
 
-Rust threads map 1:1 to OS threads. Each gets its own stack (typically 2-8 MB):
+Потоки Rust соответствуют потокам ОС один к одному. У каждого из них свой стек (обычно 2–8 МБ):
 
 ```rust
 use std::thread;
 use std::time::Duration;
 
 fn main() {
-    // Spawn a thread — takes a closure
+    // Запускаем поток: принимает замыкание
     let handle = thread::spawn(|| {
         for i in 0..5 {
-            println!("spawned thread: {i}");
+            println!("порождённый поток: {i}");
             thread::sleep(Duration::from_millis(100));
         }
-        42 // Return value
+        42 // Возвращаемое значение
     });
 
-    // Do work on the main thread simultaneously
+    // Одновременно работаем в главном потоке
     for i in 0..3 {
-        println!("main thread: {i}");
+        println!("главный поток: {i}");
         thread::sleep(Duration::from_millis(150));
     }
 
-    // Wait for the thread to finish and get its return value
-    let result = handle.join().unwrap(); // unwrap panics if thread panicked
-    println!("Thread returned: {result}");
+    // Ждём завершения потока и получаем его возвращаемое значение
+    let result = handle.join().unwrap(); // unwrap запаникует, если поток упал
+    println!("Поток вернул: {result}");
 }
 ```
 
-**Thread::spawn type requirements**:
+**Требования к типам в `Thread::spawn`**:
 
 ```rust
-// The closure must be:
-// 1. Send — can be transferred to another thread
-// 2. 'static — can't borrow from the calling scope
-// 3. FnOnce — takes ownership of captured variables
+// Замыкание должно быть:
+// 1. Send: может быть передано в другой поток
+// 2. 'static: не может заимствовать данные из вызывающей области видимости
+// 3. FnOnce: забирает владение захваченными переменными
 
 let data = vec![1, 2, 3];
 
-// ❌ Borrows data — not 'static
+// ❌ Заимствует data — не 'static
 // thread::spawn(|| println!("{data:?}"));
 
-// ✅ Move ownership into the thread
+// ✅ Передаём владение в поток
 thread::spawn(move || println!("{data:?}"));
-// data is no longer accessible here
+// data здесь больше недоступна
 ```
 
-### Scoped Threads (std::thread::scope)
+### Scoped-потоки (std::thread::scope)
 
-Since Rust 1.63, scoped threads solve the `'static` requirement — threads can borrow from the parent scope:
+Начиная с Rust 1.63, scoped-потоки снимают требование `'static`: потоки могут заимствовать данные из родительской области видимости:
 
 ```rust
 use std::thread;
@@ -85,36 +85,34 @@ fn main() {
     let mut data = vec![1, 2, 3, 4, 5];
 
     thread::scope(|s| {
-        // Thread 1: borrow shared reference
+        // Поток 1: заимствуем разделяемую ссылку
         s.spawn(|| {
             let sum: i32 = data.iter().sum();
-            println!("Sum: {sum}");
+            println!("Сумма: {sum}");
         });
 
-        // Thread 2: also borrow shared reference (multiple readers OK)
+        // Поток 2: тоже заимствует разделяемую ссылку (несколько читателей — это нормально)
         s.spawn(|| {
             let max = data.iter().max().unwrap();
-            println!("Max: {max}");
+            println!("Максимум: {max}");
         });
 
-        // ❌ Can't mutably borrow while shared borrows exist:
+        // ❌ Нельзя взять изменяемую ссылку, пока существуют разделяемые заимствования:
         // s.spawn(|| data.push(6));
     });
-    // ALL scoped threads joined here — guaranteed before scope returns
+    // ВСЕ scoped-потоки завершаются здесь: гарантированно до возврата из scope
 
-    // Now safe to mutate — all threads have finished
+    // Теперь безопасно менять данные: все потоки завершены
     data.push(6);
-    println!("Updated: {data:?}");
+    println!("Обновлено: {data:?}");
 }
 ```
 
-> **This is huge**: Before scoped threads, you had to `Arc::clone()` everything
-> to share with threads. Now you can borrow directly, and the compiler proves
-> all threads finish before the data goes out of scope.
+> **Это большое улучшение**: до scoped-потоков всё, что нужно было разделить с потоками, приходилось клонировать через `Arc::clone()`. Теперь можно заимствовать данные напрямую, а компилятор доказывает, что все потоки завершатся до того, как данные выйдут из области видимости.
 
-### rayon — Data Parallelism
+### rayon: параллелизм по данным
 
-`rayon` provides parallel iterators that distribute work across a thread pool automatically:
+`rayon` предоставляет параллельные итераторы, которые автоматически распределяют работу по пулу потоков:
 
 ```rust,ignore
 // Cargo.toml: rayon = "1"
@@ -123,19 +121,19 @@ use rayon::prelude::*;
 fn main() {
     let data: Vec<u64> = (0..1_000_000).collect();
 
-    // Sequential:
+    // Последовательно:
     let sum_seq: u64 = data.iter().map(|x| x * x).sum();
 
-    // Parallel — just change .iter() to .par_iter():
+    // Параллельно: достаточно заменить .iter() на .par_iter()
     let sum_par: u64 = data.par_iter().map(|x| x * x).sum();
 
     assert_eq!(sum_seq, sum_par);
 
-    // Parallel sort:
+    // Параллельная сортировка:
     let mut numbers = vec![5, 2, 8, 1, 9, 3];
     numbers.par_sort();
 
-    // Parallel processing with map/filter/collect:
+    // Параллельная обработка через map/filter/collect:
     let results: Vec<_> = data
         .par_iter()
         .filter(|&&x| x % 2 == 0)
@@ -144,30 +142,32 @@ fn main() {
 }
 
 fn expensive_computation(x: u64) -> u64 {
-    // Simulate CPU-heavy work
+    // Имитация вычислений, требующих много ресурсов CPU
     (0..1000).fold(x, |acc, _| acc.wrapping_mul(7).wrapping_add(13))
 }
 ```
 
-**When to use rayon vs threads**:
+**Когда использовать rayon, а когда потоки**:
 
-| Use | When |
-|-----|------|
-| `rayon::par_iter()` | Processing collections in parallel (map, filter, reduce) |
-| `thread::spawn` | Long-running background tasks, I/O workers |
-| `thread::scope` | Short-lived parallel tasks that borrow local data |
-| `async` + `tokio` | I/O-bound concurrency (networking, file I/O) |
+| Инструмент | Когда |
+|------------|-------|
+| `rayon::par_iter()` | Параллельная обработка коллекций (map, filter, reduce) |
+| `thread::spawn` | Долгоживущие фоновые задачи, рабочие потоки для I/O |
+| `thread::scope` | Короткоживущие параллельные задачи, которые заимствуют локальные данные |
+| `async` + `tokio` | Конкурентность, ограниченная I/O (сеть, файловый ввод-вывод) |
 
-### Shared State: Arc, Mutex, RwLock, Atomics
+### Разделяемое состояние: Arc, Mutex, RwLock, атомарные типы
 
-When threads need shared mutable state, Rust provides safe abstractions:
+Когда потокам нужно разделяемое изменяемое состояние, Rust предоставляет безопасные абстракции:
+
+> **Примечание:** `.unwrap()` при `.lock()`, `.read()` и `.write()` используется в этих примерах для краткости. Эти вызовы завершаются ошибкой только тогда, когда другой поток запаниковал, удерживая блокировку («отравление», poisoning). В продакшен-коде нужно решить, восстанавливаться ли после отравленной блокировки или передавать ошибку дальше.
 
 ```rust
 use std::sync::{Arc, Mutex, RwLock};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::thread;
 
-// --- Arc<Mutex<T>>: Shared + Exclusive access ---
+// --- Arc<Mutex<T>>: разделяемый и эксклюзивный доступ ---
 fn mutex_example() {
     let counter = Arc::new(Mutex::new(0u64));
     let mut handles = vec![];
@@ -178,28 +178,28 @@ fn mutex_example() {
             for _ in 0..1000 {
                 let mut guard = counter.lock().unwrap();
                 *guard += 1;
-            } // Guard dropped → lock released
+            } // Защитник уничтожен → блокировка снята
         }));
     }
 
     for h in handles { h.join().unwrap(); }
-    println!("Counter: {}", counter.lock().unwrap()); // 10000
+    println!("Счётчик: {}", counter.lock().unwrap()); // 10000
 }
 
-// --- Arc<RwLock<T>>: Multiple readers OR one writer ---
+// --- Arc<RwLock<T>>: несколько читателей ИЛИ один писатель ---
 fn rwlock_example() {
     let config = Arc::new(RwLock::new(String::from("initial")));
 
-    // Many readers — don't block each other
+    // Много читателей: не блокируют друг друга
     let readers: Vec<_> = (0..5).map(|id| {
         let config = Arc::clone(&config);
         thread::spawn(move || {
             let guard = config.read().unwrap();
-            println!("Reader {id}: {guard}");
+            println!("Читатель {id}: {guard}");
         })
     }).collect();
 
-    // Writer — blocks and waits for all readers to finish
+    // Писатель: ждёт, пока завершатся все читатели
     {
         let mut guard = config.write().unwrap();
         *guard = "updated".to_string();
@@ -208,7 +208,7 @@ fn rwlock_example() {
     for r in readers { r.join().unwrap(); }
 }
 
-// --- Atomics: Lock-free for simple values ---
+// --- Атомарные типы: без блокировок для простых значений ---
 fn atomic_example() {
     let counter = Arc::new(AtomicU64::new(0));
     let mut handles = vec![];
@@ -218,29 +218,28 @@ fn atomic_example() {
         handles.push(thread::spawn(move || {
             for _ in 0..1000 {
                 counter.fetch_add(1, Ordering::Relaxed);
-                // No lock, no mutex — hardware atomic instruction
+                // Без блокировки и мьютекса: аппаратная атомарная инструкция
             }
         }));
     }
 
     for h in handles { h.join().unwrap(); }
-    println!("Atomic counter: {}", counter.load(Ordering::Relaxed)); // 10000
+    println!("Атомарный счётчик: {}", counter.load(Ordering::Relaxed)); // 10000
 }
 ```
 
-### Quick Comparison
+### Краткое сравнение
 
-| Primitive | Use Case | Cost | Contention |
-|-----------|----------|------|------------|
-| `Mutex<T>` | Short critical sections | Lock + unlock | Threads wait in line |
-| `RwLock<T>` | Read-heavy, rare writes | Reader-writer lock | Readers concurrent, writer exclusive |
-| `AtomicU64` etc. | Counters, flags | Hardware CAS | Lock-free — no waiting |
-| Channels | Message passing | Queue ops | Producer/consumer decouple |
+| Примитив | Сценарий | Стоимость | Конкуренция |
+|----------|----------|-----------|-------------|
+| `Mutex<T>` | Короткие критические секции | Захват и освобождение | Потоки стоят в очереди |
+| `RwLock<T>` | Много чтений, редкая запись | Блокировка «читатель — писатель» | Читатели работают одновременно, писатель эксклюзивен |
+| `AtomicU64` и др. | Счётчики, флаги | Аппаратный CAS | Без блокировок, без ожидания |
+| Каналы | Передача сообщений | Операции с очередью | Производитель и потребитель разделены |
 
-### Condition Variables (`Condvar`)
+### Условные переменные (`Condvar`)
 
-A `Condvar` lets a thread **wait** until another thread signals that a condition is
-true, without busy-looping. It is always paired with a `Mutex`:
+`Condvar` позволяет потоку **ждать**, пока другой поток не сообщит, что условие выполнено, без активного опроса (busy-loop). Он всегда используется вместе с `Mutex`:
 
 ```rust
 use std::sync::{Arc, Mutex, Condvar};
@@ -249,89 +248,83 @@ use std::thread;
 let pair = Arc::new((Mutex::new(false), Condvar::new()));
 let pair2 = Arc::clone(&pair);
 
-// Spawned thread: wait until ready == true
+// Порождённый поток: ждём, пока ready == true
 let handle = thread::spawn(move || {
     let (lock, cvar) = &*pair2;
     let mut ready = lock.lock().unwrap();
     while !*ready {
-        ready = cvar.wait(ready).unwrap(); // atomically unlocks + sleeps
+        ready = cvar.wait(ready).unwrap(); // атомарно снимает блокировку и засыпает
     }
-    println!("Worker: condition met, proceeding");
+    println!("Рабочий: условие выполнено, продолжаем");
 });
 
-// Main thread: set ready = true, then signal
+// Главный поток: выставляем ready = true и сигнализируем
 {
     let (lock, cvar) = &*pair;
     let mut ready = lock.lock().unwrap();
     *ready = true;
-    cvar.notify_one(); // wake one waiting thread (use notify_all for many)
+    cvar.notify_one(); // будим один ждущий поток (для многих используйте notify_all)
 }
 handle.join().unwrap();
 ```
 
-> **Pattern**: Always re-check the condition in a `while` loop after `wait()` returns
-> — spurious wakeups are allowed by the OS.
+> **Шаблон**: после возврата из `wait()` всегда перепроверяйте условие в цикле `while`, потому что ОС допускает ложные пробуждения (spurious wakeups).
 
-### Lazy Initialization: OnceLock and LazyLock
+### Ленивая инициализация: OnceLock и LazyLock
 
-Before Rust 1.80, initializing a global static that requires runtime computation
-(e.g., parsing a config, compiling a regex) needed the `lazy_static!` macro or the
-`once_cell` crate. The standard library now provides two types that cover these
-use cases natively:
+До Rust 1.80 для инициализации глобальной `static`-переменной, которой нужны вычисления во время выполнения (например, разбор конфигурации или компиляция регулярного выражения), требовался макрос `lazy_static!` или крейт `once_cell`. Теперь стандартная библиотека предоставляет два типа, которые покрывают эти сценарии без внешних зависимостей:
 
 ```rust
 use std::sync::{OnceLock, LazyLock};
 use std::collections::HashMap;
 
-// OnceLock — initialize on first use via `get_or_init`.
-// Useful when the init value depends on runtime arguments.
+// OnceLock: инициализация при первом использовании через `get_or_init`.
+// Полезно, когда начальное значение зависит от аргументов времени выполнения.
 static CONFIG: OnceLock<HashMap<String, String>> = OnceLock::new();
 
 fn get_config() -> &'static HashMap<String, String> {
     CONFIG.get_or_init(|| {
-        // Expensive: read & parse config file — happens exactly once.
+        // Дорогая операция: читаем и разбираем файл конфигурации. Выполняется ровно один раз.
         let mut m = HashMap::new();
         m.insert("log_level".into(), "info".into());
         m
     })
 }
 
-// LazyLock — initialize on first access, closure provided at definition site.
-// Equivalent to lazy_static! but without a macro.
+// LazyLock: инициализация при первом обращении, замыкание задаётся в месте определения.
+// Эквивалент lazy_static!, но без макроса.
 static REGEX: LazyLock<regex::Regex> = LazyLock::new(|| {
     regex::Regex::new(r"^[a-zA-Z0-9_]+$").unwrap()
 });
 
 fn is_valid_identifier(s: &str) -> bool {
-    REGEX.is_match(s) // First call compiles the regex; subsequent calls reuse it.
+    REGEX.is_match(s) // Первый вызов компилирует регулярное выражение; последующие переиспользуют его.
 }
 ```
 
-| Type | Stabilized | Init Timing | Use When |
-|------|-----------|-------------|----------|
-| `OnceLock<T>` | Rust 1.70 | Call-site (`get_or_init`) | Init depends on runtime args |
-| `LazyLock<T>` | Rust 1.80 | Definition-site (closure) | Init is self-contained |
-| `lazy_static!` | — | Definition-site (macro) | Pre-1.80 codebases (migrate away) |
-| `const fn` + `static` | Always | Compile-time | Value is computable at compile time |
+| Тип | Стабилизирован | Момент инициализации | Когда использовать |
+|-----|----------------|----------------------|--------------------|
+| `OnceLock<T>` | Rust 1.70 | В месте вызова (`get_or_init`) | Инициализация зависит от аргументов времени выполнения |
+| `LazyLock<T>` | Rust 1.80 | В месте определения (замыкание) | Инициализация самодостаточна |
+| `lazy_static!` | — | В месте определения (макрос) | Кодовые базы до 1.80 (лучше мигрировать) |
+| `const fn` + `static` | Всегда | На этапе компиляции | Значение вычисляется на этапе компиляции |
 
-> **Migration tip**: Replace `lazy_static! { static ref X: T = expr; }` with
-> `static X: LazyLock<T> = LazyLock::new(|| expr);` — same semantics, no macro,
-> no external dependency.
+> **Совет по миграции**: замените `lazy_static! { static ref X: T = expr; }` на `static X: LazyLock<T> = LazyLock::new(|| expr);`. Семантика та же, но без макроса и без внешней зависимости.
 
-### Lock-Free Patterns
+### Паттерны без блокировок
 
-For high-performance code, avoid locks entirely:
+Для высокопроизводительного кода полностью избегайте блокировок:
 
 ```rust
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 
-// Pattern 1: Spin lock (educational — prefer std::sync::Mutex)
-// ⚠️ WARNING: This is a teaching example only. Real spinlocks need:
-//   - A RAII guard (so a panic while holding doesn't deadlock forever)
-//   - Fairness guarantees (this starves under contention)
-//   - Backoff strategies (exponential backoff, yield to OS)
-// Use std::sync::Mutex or parking_lot::Mutex in production.
+// Паттерн 1: спин-лок (учебный пример, в продакшене используйте std::sync::Mutex)
+// ⚠️ ВНИМАНИЕ: это только учебный пример. Настоящим спин-локам нужны:
+//   - RAII-защитник (чтобы паника во время удержания не привела к вечной блокировке)
+//   - Гарантии справедливости (при конкуренции этот вариант приводит к голоданию)
+//   - Стратегии отката (экспоненциальная задержка, передача управления ОС)
+// В продакшене используйте std::sync::Mutex или parking_lot::Mutex.
 struct SpinLock {
     locked: AtomicBool,
 }
@@ -344,7 +337,7 @@ impl SpinLock {
             .compare_exchange_weak(false, true, Ordering::Acquire, Ordering::Relaxed)
             .is_err()
         {
-            std::hint::spin_loop(); // CPU hint: we're spinning
+            std::hint::spin_loop(); // Подсказка процессору: мы крутимся в цикле
         }
     }
 
@@ -353,12 +346,13 @@ impl SpinLock {
     }
 }
 
-// Pattern 2: Lock-free SPSC (single producer, single consumer)
-// Use crossbeam::queue::ArrayQueue or similar in production
-// roll-your-own only for learning.
+// Паттерн 2: lock-free SPSC (один производитель, один потребитель)
+// В продакшене используйте crossbeam::queue::ArrayQueue или аналог;
+// писать свою реализацию стоит только для обучения.
 
-// Pattern 3: Sequence counter for wait-free reads
-// ⚠️ Best for single-machine-word types (u64, f64); wider T may tear on read.
+// Паттерн 3: счётчик последовательности для чтений без ожидания (wait-free)
+// ⚠️ Лучше всего для типов, помещающихся в одно машинное слово (u64, f64).
+// Более широкие T могут быть прочитаны «порванными» (tearing).
 struct SeqLock<T: Copy> {
     seq: AtomicUsize,
     data: std::cell::UnsafeCell<T>,
@@ -377,80 +371,70 @@ impl<T: Copy> SeqLock<T> {
     fn read(&self) -> T {
         loop {
             let s1 = self.seq.load(Ordering::Acquire);
-            if s1 & 1 != 0 { continue; } // Writer in progress, retry
+            if s1 & 1 != 0 { continue; } // Записывающий поток в процессе, повторяем
 
-            // SAFETY: We use ptr::read_volatile to prevent the compiler from
-            // reordering or caching the read. The SeqLock protocol (checking
-            // s1 == s2 after reading) ensures we retry if a writer was active.
-            // This mirrors the C SeqLock pattern where the data read must use
-            // volatile/relaxed semantics to avoid tearing under concurrency.
+            // SAFETY: используем ptr::read_volatile, чтобы компилятор не переупорядочивал
+            // и не кэшировал чтение. Протокол SeqLock (проверка s1 == s2 после чтения)
+            // гарантирует повтор, если писатель был активен.
+            // Это повторяет паттерн C SeqLock, где чтение данных должно использовать
+            // семантику volatile/relaxed, чтобы избежать «разрыва» значения при конкуренции.
             let value = unsafe { core::ptr::read_volatile(self.data.get() as *const T) };
 
-            // Acquire fence: ensures the data read above is ordered before
-            // we re-check the sequence counter.
+            // Acquire-барьер: гарантирует, что чтение данных выше упорядочено раньше
+            // повторной проверки счётчика последовательности.
             std::sync::atomic::fence(Ordering::Acquire);
             let s2 = self.seq.load(Ordering::Relaxed);
 
-            if s1 == s2 { return value; } // No writer intervened
-            // else retry
+            if s1 == s2 { return value; } // Писатель не вмешался
+            // иначе повторяем
         }
     }
 
-    /// # Safety contract
-    /// Only ONE thread may call `write()` at a time. If multiple writers
-    /// are needed, wrap the `write()` call in an external `Mutex`.
+    /// # Контракт безопасности
+    /// Только ОДИН поток может вызывать `write()` одновременно. Если нужны несколько писателей,
+    /// оберните вызов `write()` во внешний `Mutex`.
     fn write(&self, val: T) {
-        // Increment to odd (signals write in progress).
-        // AcqRel: the Acquire side prevents the subsequent data write
-        // from being reordered before this increment (readers must see
-        // odd before they could observe a partial write). The Release
-        // side is technically unnecessary for a single writer but
-        // harmless and consistent.
+        // Увеличиваем до нечётного значения (сигнал: запись в процессе).
+        // AcqRel: сторона Acquire не даёт последующей записи данных
+        // переупорядочиться раньше этого инкремента (читатели должны увидеть
+        // нечётное значение до того, как смогут наблюдать частичную запись). Сторона
+        // Release формально не нужна для единственного писателя, но безвредна и согласована.
         self.seq.fetch_add(1, Ordering::AcqRel);
+        // SAFETY: инвариант единственного писателя поддерживается вызывающим кодом (см. документацию выше).
+        // UnsafeCell разрешает внутреннюю мутацию; счётчик seq защищает читателей.
         unsafe { *self.data.get() = val; }
-        // Increment to even (signals write complete).
-        // Release: ensure the data write is visible before readers see the even seq.
+        // Увеличиваем до чётного значения (сигнал: запись завершена).
+        // Release: гарантирует, что запись данных видна раньше, чем читатели увидят чётный номер.
         self.seq.fetch_add(1, Ordering::Release);
     }
 }
 ```
 
-> **⚠️ Rust memory model caveat**: The non-atomic write through `UnsafeCell` in
-> `write()` concurrent with the non-atomic `ptr::read_volatile` in `read()` is
-> technically a data race under the Rust abstract machine — even though the
-> SeqLock protocol ensures readers always retry on stale data. This mirrors the
-> C kernel SeqLock pattern and is sound in practice on all modern hardware for
-> types `T` that fit in a single machine word (e.g., `u64`). For wider types,
-> consider using `AtomicU64` for the data field or wrapping access in a `Mutex`.
-> See [the Rust unsafe code guidelines](https://rust-lang.github.io/unsafe-code-guidelines/)
-> for the evolving story on `UnsafeCell` concurrency.
+> **⚠️ Оговорка о модели памяти Rust**: неатомарная запись через `UnsafeCell` в `write()`, выполняемая одновременно с неатомарным `ptr::read_volatile` в `read()`, формально является гонкой данных (data race) в абстрактной машине Rust, даже несмотря на то, что протокол SeqLock гарантирует повтор читателями при устаревших данных. Это повторяет паттерн SeqLock из ядра C и на всех современных процессорах корректно на практике для типов `T`, помещающихся в одно машинное слово (например, `u64`). Для более широких типов рассмотрите `AtomicU64` для поля данных или оберните доступ в `Mutex`. Актуальные обсуждения по `UnsafeCell` в конкурентности см. в [рекомендациях Rust по небезопасному коду](https://rust-lang.github.io/unsafe-code-guidelines/).
 
-> **Practical advice**: Lock-free code is hard to get right. Use `Mutex` or
-> `RwLock` unless profiling shows lock contention is your bottleneck. When you
-> do need lock-free, reach for proven crates (`crossbeam`, `arc-swap`, `dashmap`)
-> rather than rolling your own.
+> **Практический совет**: код без блокировок трудно написать правильно. Используйте `Mutex` или `RwLock`, если профилирование не показывает, что узкое место именно в конкуренции за блокировки. Если блокировки без них действительно не обойтись, берите проверенные крейты (`crossbeam`, `arc-swap`, `dashmap`), а не пишите собственные реализации.
 
-> **Key Takeaways — Concurrency**
-> - Scoped threads (`thread::scope`) let you borrow stack data without `Arc`
-> - `rayon::par_iter()` parallelizes iterators with one method call
-> - Use `OnceLock`/`LazyLock` instead of `lazy_static!`; use `Mutex` before reaching for atomics
-> - Lock-free code is hard — prefer proven crates over hand-rolled implementations
+> **Ключевые выводы: конкурентность**
+> - Scoped-потоки (`thread::scope`) позволяют заимствовать данные со стека без `Arc`
+> - `rayon::par_iter()` распараллеливает итераторы одним вызовом метода
+> - Используйте `OnceLock`/`LazyLock` вместо `lazy_static!`; берите `Mutex` раньше, чем атомарные типы
+> - Код без блокировок сложен: предпочитайте проверенные крейты собственным реализациям
 
-> **See also:** [Ch 5 — Channels](ch05-channels-and-message-passing.md) for message-passing concurrency. [Ch 8 — Smart Pointers](ch08-smart-pointers-and-interior-mutability.md) for Arc/Rc details.
+> **См. также:** [гл. 5 — Каналы](ch05-channels-and-message-passing.md) о конкурентности через передачу сообщений. [гл. 9 — Умные указатели](ch09-smart-pointers-and-interior-mutability.md) о подробностях Arc и Rc.
 
 ```mermaid
 flowchart TD
-    A["Need shared<br>mutable state?"] -->|Yes| B{"How much<br>contention?"}
-    A -->|No| C["Use channels<br>(Ch 5)"]
+    A["Нужно разделяемое<br>изменяемое состояние?"] -->|Да| B{"Насколько велика<br>конкуренция?"}
+    A -->|Нет| C["Используйте каналы<br>(гл. 5)"]
 
-    B -->|"Read-heavy"| D["RwLock"]
-    B -->|"Short critical<br>section"| E["Mutex"]
-    B -->|"Simple counter<br>or flag"| F["Atomics"]
-    B -->|"Complex state"| G["Actor + channels"]
+    B -->|"Много чтений"| D["RwLock"]
+    B -->|"Короткая критическая<br>секция"| E["Mutex"]
+    B -->|"Простой счётчик<br>или флаг"| F["Атомарные типы"]
+    B -->|"Сложное состояние"| G["Актор + каналы"]
 
-    H["Need parallelism?"] -->|"Collection<br>processing"| I["rayon::par_iter"]
-    H -->|"Background task"| J["thread::spawn"]
-    H -->|"Borrow local data"| K["thread::scope"]
+    H["Нужен параллелизм?"] -->|"Обработка<br>коллекций"| I["rayon::par_iter"]
+    H -->|"Фоновая задача"| J["thread::spawn"]
+    H -->|"Заимствовать<br>локальные данные"| K["thread::scope"]
 
     style A fill:#e8f4f8,stroke:#2980b9,color:#000
     style B fill:#fef9e7,stroke:#f1c40f,color:#000
@@ -467,12 +451,12 @@ flowchart TD
 
 ---
 
-### Exercise: Parallel Map with Scoped Threads ★★ (~25 min)
+### Упражнение: параллельный map на scoped-потоках ★★ (~25 минут)
 
-Write a function `parallel_map<T, R>(data: &[T], f: fn(&T) -> R, num_threads: usize) -> Vec<R>` that splits `data` into `num_threads` chunks and processes each in a scoped thread. Do not use `rayon` — use `std::thread::scope`.
+Напишите функцию `parallel_map<T, R>(data: &[T], f: fn(&T) -> R, num_threads: usize) -> Vec<R>`, которая делит `data` на `num_threads` частей и обрабатывает каждую часть в scoped-потоке. Не используйте `rayon`, используйте `std::thread::scope`.
 
 <details>
-<summary>🔑 Solution</summary>
+<summary>🔑 Решение</summary>
 
 ```rust
 fn parallel_map<T: Sync, R: Send>(data: &[T], f: fn(&T) -> R, num_threads: usize) -> Vec<R> {
@@ -498,11 +482,10 @@ fn main() {
     let data: Vec<u64> = (1..=20).collect();
     let squares = parallel_map(&data, |x| x * x, 4);
     assert_eq!(squares, (1..=20).map(|x: u64| x * x).collect::<Vec<_>>());
-    println!("Parallel squares: {squares:?}");
+    println!("Параллельные квадраты: {squares:?}");
 }
 ```
 
 </details>
 
 ***
-

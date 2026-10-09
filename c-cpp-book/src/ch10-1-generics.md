@@ -3,7 +3,7 @@
 > **What you'll learn:** Generic type parameters, monomorphization (zero-cost generics), trait bounds, and how Rust generics compare to C++ templates — with better error messages and no SFINAE.
 
 - Generics allow the same algorithm or data structure to be reused across data types
-    - The generic parameter appears as an identifer within ```<>```, e.g.: ```<T>```. The parameter have any legal identifier name, but is typically kept short for brevity
+    - The generic parameter appears as an identifier within ```<>```, e.g.: ```<T>```. The parameter can have any legal identifier name, but is typically kept short for brevity
     - The compiler performs monomorphization at compile time, i.e., it generates a new type for every variation of ```T``` that is encountered
 ```rust
 // Returns a tuple of type <T> composed of left and right of type <T>
@@ -124,7 +124,7 @@ fn main() {
 ```
 
 ### Rust traits constraints in data types
-- Traits constrainsts can be combined with generics in data types
+- Trait constraints can be combined with generics in data types
 - In the following example, we define the ```PrintDescription``` ```trait``` and a generic ```struct``` ```Shape``` with a member constrained by the trait
 ```rust
 trait PrintDescription {
@@ -142,7 +142,7 @@ impl<S: PrintDescription> Shape<S> {
 ```
 - [▶ Try it in the Rust Playground](https://play.rust-lang.org/)
 
-# Exercise: Traits constraints and generics
+# Exercise: Trait constraints and generics
 
 🟡 **Intermediate**
 - Implement a ```struct``` with a generic member ```cipher``` that implements ```CipherText```

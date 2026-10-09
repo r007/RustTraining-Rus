@@ -1,140 +1,146 @@
-# Rust Patterns & Engineering How-Tos
+# Паттерны Rust и практические руководства по инженерии
 
-## Speaker Intro
+## Об авторе
 
-- Principal Firmware Architect in Microsoft SCHIE (Silicon and Cloud Hardware Infrastructure Engineering) team
-- Industry veteran with expertise in security, systems programming (firmware, operating systems, hypervisors), CPU and platform architecture, and C++ systems
-- Started programming in Rust in 2017 (@AWS EC2), and have been in love with the language ever since
+- Ведущий архитектор прошивок в команде SCHIE (Silicon and Cloud Hardware Infrastructure Engineering) компании Microsoft
+- Опытный инженер с экспертизой в безопасности, системном программировании (прошивки, операционные системы, гипервизоры), архитектуре CPU и платформ, а также системах на C++
+- Начал программировать на Rust в 2017 году (@AWS EC2) и с тех пор влюблён в этот язык
 
 ---
 
-A practical guide to intermediate-and-above Rust patterns that arise in real codebases. This is not a language tutorial — it assumes you can write basic Rust and want to level up. Each chapter isolates one concept, explains when and why to use it, and provides compilable examples with inline exercises.
+Практическое руководство по паттернам Rust уровня «средний и выше», которые возникают в реальных кодовых базах. Это не учебник по языку: предполагается, что вы уже умеете писать простой код на Rust и хотите перейти на следующий уровень. Каждая глава посвящена одной концепции, объясняет, когда и зачем её применять, и содержит компилируемые примеры с упражнениями прямо в тексте.
 
-## Who This Is For
+## Для кого эта книга
 
-- Developers who have finished *The Rust Programming Language* but struggle with "how do I actually design this?"
-- C++/C# engineers translating production systems into Rust
-- Anyone who has hit a wall with generics, trait bounds, or lifetime errors and wants a systematic toolkit
+- Разработчики, которые прошли *The Rust Programming Language*, но не понимают, как на практике спроектировать решение
+- Инженеры, переносящие промышленные системы с C++ и C# на Rust
+- Все, кто упёрся в стену с обобщёнными типами, границами трейтов или ошибками времён жизни и хочет систематический набор инструментов
 
-## Prerequisites
+## Предварительные требования
 
-Before starting, you should be comfortable with:
-- Ownership, borrowing, and lifetimes (basic level)
-- Enums, pattern matching, and `Option`/`Result`
-- Structs, methods, and basic traits (`Display`, `Debug`, `Clone`)
-- Cargo basics: `cargo build`, `cargo test`, `cargo run`
+Прежде чем начать, вам стоит уверенно владеть:
+- владением, заимствованием и временами жизни (базовый уровень)
+- перечислениями, сопоставлением с образцом и `Option`/`Result`
+- структурами, методами и базовыми трейтами (`Display`, `Debug`, `Clone`)
+- основами Cargo: `cargo build`, `cargo test`, `cargo run`
 
-## How to Use This Book
+## Как пользоваться этой книгой
 
-### Difficulty Legend
+### Обозначения сложности
 
-Each chapter is tagged with a difficulty level:
+Каждая глава помечена уровнем сложности:
 
-| Symbol | Level | Meaning |
-|--------|-------|---------|
-| 🟢 | Fundamentals | Core concepts every Rust developer needs |
-| 🟡 | Intermediate | Patterns used in production codebases |
-| 🔴 | Advanced | Deep language mechanics — revisit as needed |
+| Символ | Уровень | Значение |
+|--------|---------|----------|
+| 🟢 | Основы | Базовые концепции, которые нужны каждому разработчику на Rust |
+| 🟡 | Средний | Паттерны, которые применяются в промышленных кодовых базах |
+| 🔴 | Продвинутый | Глубинные механизмы языка: возвращайтесь к ним по мере необходимости |
 
-### Pacing Guide
+### План изучения
 
-| Chapters | Topic | Suggested Time | Checkpoint |
-|----------|-------|----------------|------------|
-| **Part I: Type-Level Patterns** | | | |
-| 1. Generics 🟢 | Monomorphization, const generics, `const fn` | 1–2 hours | Can explain when `dyn Trait` beats generics |
-| 2. Traits 🟡 | Associated types, GATs, blanket impls, vtables | 3–4 hours | Can design a trait with associated types |
-| 3. Newtype & Type-State 🟡 | Zero-cost safety, compile-time FSMs | 2–3 hours | Can build a type-state builder pattern |
-| 4. PhantomData 🔴 | Lifetime branding, variance, drop check | 2–3 hours | Can explain why `PhantomData<fn(T)>` differs from `PhantomData<T>` |
-| **Part II: Concurrency & Runtime** | | | |
-| 5. Channels 🟢 | `mpsc`, crossbeam, `select!`, actors | 1–2 hours | Can implement a channel-based worker pool |
-| 6. Concurrency 🟡 | Threads, rayon, Mutex, RwLock, atomics | 2–3 hours | Can pick the right sync primitive for a scenario |
-| 7. Closures 🟢 | `Fn`/`FnMut`/`FnOnce`, combinators | 1–2 hours | Can write a higher-order function that accepts closures |
-| 8. Smart Pointers 🟡 | Box, Rc, Arc, RefCell, Cow, Pin | 2–3 hours | Can explain when to use each smart pointer |
-| **Part III: Systems & Production** | | | |
-| 9. Error Handling 🟢 | thiserror, anyhow, `?` operator | 1–2 hours | Can design an error type hierarchy |
-| 10. Serialization 🟡 | serde, zero-copy, binary data | 2–3 hours | Can write a custom serde deserializer |
-| 11. Unsafe 🔴 | Superpowers, FFI, UB pitfalls, allocators | 2–3 hours | Can wrap unsafe code in a sound safe API |
-| 12. Macros 🟡 | `macro_rules!`, proc macros, `syn`/`quote` | 2–3 hours | Can write a declarative macro with `tt` munching |
-| 13. Testing 🟢 | Unit/integration/doc tests, proptest, criterion | 1–2 hours | Can set up property-based tests |
-| 14. API Design 🟡 | Module layout, ergonomic APIs, feature flags | 2–3 hours | Can apply the "parse, don't validate" pattern |
-| 15. Async 🔴 | Futures, Tokio, common pitfalls | 1–2 hours | Can identify async anti-patterns |
-| **Appendices** | | | |
-| Reference Card | Quick-look trait bounds, lifetimes, patterns | As needed | — |
-| Capstone Project | Type-safe task scheduler | 4–6 hours | Submit a working implementation |
+| Главы | Тема | Рекомендуемое время | Контрольная точка |
+|-------|------|---------------------|-------------------|
+| **Часть I: Паттерны на уровне типов** | | | |
+| 1. Обобщённые типы 🟢 | Мономорфизация, const-обобщения, `const fn` | 1–2 часа | Может объяснить, когда `dyn Trait` предпочтительнее обобщений |
+| 2. Трейты 🟡 | Ассоциированные типы, GAT, blanket-реализации, vtable | 3–4 часа | Может спроектировать трейт с ассоциированными типами |
+| 3. Newtype и type-state 🟡 | Безопасность типов без затрат во время выполнения, автоматы на этапе компиляции | 2–3 часа | Может реализовать builder-паттерн на основе type-state |
+| 4. PhantomData 🔴 | Маркировка времён жизни, вариантность, проверка drop | 2–3 часа | Может объяснить, почему `PhantomData<fn(T)>` отличается от `PhantomData<T>` |
+| **Часть II: Конкурентность и рантайм** | | | |
+| 5. Каналы 🟢 | `mpsc`, crossbeam, `select!`, акторы | 1–2 часа | Может реализовать пул воркеров на каналах |
+| 6. Конкурентность 🟡 | Потоки, rayon, Mutex, RwLock, атомарные типы | 2–3 часа | Может подобрать подходящий примитив синхронизации для задачи |
+| 7. Замыкания 🟢 | `Fn`/`FnMut`/`FnOnce`, комбинаторы | 1–2 часа | Может написать функцию высшего порядка, принимающую замыкания |
+| 8. Функциональный и императивный стили 🟡 | Цепочки итераторов, комбинаторы `Option` и `Result`, когда выбирать цикл | 2–3 часа | Может объяснить, когда комбинатор понятнее цикла, а когда нет |
+| 9. Умные указатели 🟡 | Box, Rc, Arc, RefCell, Cow, Pin | 2–3 часа | Может объяснить, когда применять каждый умный указатель |
+| **Часть III: Системы и продакшн** | | | |
+| 10. Обработка ошибок 🟢 | thiserror, anyhow, оператор `?` | 1–2 часа | Может спроектировать иерархию типов ошибок |
+| 11. Сериализация 🟡 | serde, zero-copy, бинарные данные | 2–3 часа | Может написать собственный десериализатор serde |
+| 12. Unsafe 🔴 | Сверхспособности, FFI, подводные камни UB, аллокаторы | 2–3 часа | Может обернуть unsafe-код в корректный безопасный API |
+| 13. Макросы 🟡 | `macro_rules!`, процедурные макросы, `syn`/`quote` | 2–3 часа | Может написать декларативный макрос с tt munching |
+| 14. Тестирование 🟢 | Модульные, интеграционные и doc-тесты, proptest, criterion | 1–2 часа | Может настроить property-based тесты |
+| 15. Дизайн API 🟡 | Структура модулей, эргономичные API, флаги функций | 2–3 часа | Может применить паттерн «parse, don't validate» |
+| 16. Async 🔴 | Futures, Tokio, распространённые ошибки | 1–2 часа | Может находить анти-паттерны async |
+| **Приложения** | | | |
+| Справочная карточка | Краткая сводка по границам трейтов, временам жизни и паттернам | По необходимости | — |
+| Итоговый проект | Планировщик задач с безопасностью типов | 4–6 часов | Сдайте работающую реализацию |
 
-**Total estimated time**: 30–45 hours for thorough study with exercises.
+**Общее расчётное время**: 30–45 часов для основательного изучения с упражнениями.
 
-### Working Through Exercises
+### Работа с упражнениями
 
-Every chapter ends with a hands-on exercise. For maximum learning:
+Каждая глава заканчивается практическим упражнением. Чтобы извлечь из книги максимум:
 
-1. **Try it yourself first** — spend at least 15 minutes before opening the solution
-2. **Type the code** — don't copy-paste; typing builds muscle memory
-3. **Modify the solution** — add a feature, change a constraint, break something on purpose
-4. **Check cross-references** — most exercises combine patterns from multiple chapters
+1. **Сначала попробуйте сами**: потратьте минимум 15 минут, прежде чем открывать решение
+2. **Набирайте код**: не копируйте и не вставляйте, набор текста вырабатывает мышечную память
+3. **Меняйте решение**: добавьте функциональность, измените ограничение, намеренно что-нибудь сломайте
+4. **Проверяйте перекрёстные ссылки**: большинство упражнений сочетают паттерны из нескольких глав
 
-The capstone project (Appendix) ties together patterns from across the book into a single, production-quality system.
+Итоговый проект (в приложении) объединяет паттерны из всей книги в одну систему промышленного качества.
 
-## Table of Contents
+## Оглавление
 
-### Part I: Type-Level Patterns
+### Часть I: Паттерны на уровне типов
 
-**[1. Generics — The Full Picture](ch01-generics-the-full-picture.md)** 🟢
-Monomorphization, code bloat trade-offs, generics vs enums vs trait objects, const generics, `const fn`.
+**[1. Обобщённые типы — полная картина](ch01-generics-the-full-picture.md)** 🟢
+Мономорфизация, компромиссы по размеру кода, обобщения против перечислений и трейт-объектов, const-обобщения, `const fn`.
 
-**[2. Traits In Depth](ch02-traits-in-depth.md)** 🟡
-Associated types, GATs, blanket impls, marker traits, vtables, HRTBs, extension traits, enum dispatch.
+**[2. Трейты в деталях](ch02-traits-in-depth.md)** 🟡
+Ассоциированные типы, GAT, blanket-реализации, маркерные трейты, vtable, HRTB, трейты-расширения, диспетчеризация через перечисления.
 
-**[3. The Newtype and Type-State Patterns](ch03-the-newtype-and-type-state-patterns.md)** 🟡
-Zero-cost type safety, compile-time state machines, builder patterns, config traits.
+**[3. Паттерны newtype и type-state](ch03-the-newtype-and-type-state-patterns.md)** 🟡
+Безопасность типов без затрат во время выполнения, автоматы состояний на этапе компиляции, builder-паттерны, конфигурационные трейты.
 
-**[4. PhantomData — Types That Carry No Data](ch04-phantomdata-types-that-carry-no-data.md)** 🔴
-Lifetime branding, unit-of-measure pattern, drop check, variance.
+**[4. PhantomData — типы, которые не несут данных](ch04-phantomdata-types-that-carry-no-data.md)** 🔴
+Маркировка времён жизни, паттерн «единицы измерения», проверка drop, вариантность.
 
-### Part II: Concurrency & Runtime
+### Часть II: Конкурентность и рантайм
 
-**[5. Channels and Message Passing](ch05-channels-and-message-passing.md)** 🟢
-`std::sync::mpsc`, crossbeam, `select!`, backpressure, actor pattern.
+**[5. Каналы и передача сообщений](ch05-channels-and-message-passing.md)** 🟢
+`std::sync::mpsc`, crossbeam, `select!`, обратное давление (backpressure), паттерн актора.
 
-**[6. Concurrency vs Parallelism vs Threads](ch06-concurrency-vs-parallelism-vs-threads.md)** 🟡
-OS threads, scoped threads, rayon, Mutex/RwLock/Atomics, Condvar, OnceLock, lock-free patterns.
+**[6. Конкурентность, параллелизм и потоки](ch06-concurrency-vs-parallelism-vs-threads.md)** 🟡
+Потоки ОС, scoped-потоки, rayon, Mutex/RwLock/атомарные типы, Condvar, OnceLock, паттерны без блокировок.
 
-**[7. Closures and Higher-Order Functions](ch07-closures-and-higher-order-functions.md)** 🟢
-`Fn`/`FnMut`/`FnOnce`, closures as parameters/return values, combinators, higher-order APIs.
+**[7. Замыкания и функции высшего порядка](ch07-closures-and-higher-order-functions.md)** 🟢
+`Fn`/`FnMut`/`FnOnce`, замыкания как параметры и возвращаемые значения, комбинаторы, API высшего порядка.
 
-**[8. Smart Pointers and Interior Mutability](ch08-smart-pointers-and-interior-mutability.md)** 🟡
+**[8. Функциональный и императивный стили: когда выигрывает изящество](ch08-functional-vs-imperative-when-elegance-wins.md)** 🟡
+Комбинаторы `Option` и `Result`, цепочки итераторов против циклов, оператор `?`, построение коллекций, антипаттерны.
+
+**[9. Умные указатели и внутренняя изменяемость](ch09-smart-pointers-and-interior-mutability.md)** 🟡
 Box, Rc, Arc, Weak, Cell/RefCell, Cow, Pin, ManuallyDrop.
 
-### Part III: Systems & Production
+### Часть III: Системы и продакшн
 
-**[9. Error Handling Patterns](ch09-error-handling-patterns.md)** 🟢
-thiserror vs anyhow, `#[from]`, `.context()`, `?` operator, panics.
+**[10. Паттерны обработки ошибок](ch10-error-handling-patterns.md)** 🟢
+thiserror против anyhow, `#[from]`, `.context()`, оператор `?`, паника.
 
-**[10. Serialization, Zero-Copy, and Binary Data](ch10-serialization-zero-copy-and-binary-data.md)** 🟡
-serde fundamentals, enum representations, zero-copy deserialization, `repr(C)`, `bytes::Bytes`.
+**[11. Сериализация, zero-copy и бинарные данные](ch11-serialization-zero-copy-and-binary-data.md)** 🟡
+Основы serde, представления перечислений, десериализация без копирования, `repr(C)`, `bytes::Bytes`.
 
-**[11. Unsafe Rust — Controlled Danger](ch11-unsafe-rust-controlled-danger.md)** 🔴
-Five superpowers, sound abstractions, FFI, UB pitfalls, arena/slab allocators.
+**[12. Unsafe Rust — контролируемая опасность](ch12-unsafe-rust-controlled-danger.md)** 🔴
+Пять сверхспособностей, корректные абстракции, FFI, подводные камни UB, аллокаторы на основе арен и slab-аллокаторы.
 
-**[12. Macros — Code That Writes Code](ch12-macros-code-that-writes-code.md)** 🟡
-`macro_rules!`, when (not) to use macros, proc macros, derive macros, `syn`/`quote`.
+**[13. Макросы — код, который пишет код](ch13-macros-code-that-writes-code.md)** 🟡
+`macro_rules!`, когда (не) стоит использовать макросы, процедурные макросы, derive-макросы, `syn`/`quote`.
 
-**[13. Testing and Benchmarking Patterns](ch13-testing-and-benchmarking-patterns.md)** 🟢
-Unit/integration/doc tests, proptest, criterion, mocking strategies.
+**[14. Паттерны тестирования и бенчмаркинга](ch14-testing-and-benchmarking-patterns.md)** 🟢
+Модульные, интеграционные и doc-тесты, proptest, criterion, стратегии моков.
 
-**[14. Crate Architecture and API Design](ch14-crate-architecture-and-api-design.md)** 🟡
-Module layout, API design checklist, ergonomic parameters, feature flags, workspaces.
+**[15. Архитектура крейтов и дизайн API](ch15-crate-architecture-and-api-design.md)** 🟡
+Структура модулей, чек-лист дизайна API, эргономичные параметры, флаги функций, воркспейсы.
 
-**[15. Async/Await Essentials](ch15-asyncawait-essentials.md)** 🔴
-Futures, Tokio quick-start, common pitfalls. (For deep async coverage, see our Async Rust Training.)
+**[16. Основы async/await](ch16-asyncawait-essentials.md)** 🔴
+Futures, быстрый старт с Tokio, распространённые ошибки. (Подробнее об async см. в нашем курсе по Async Rust.)
 
-### Appendices
+**[17. Упражнения](ch17-exercises.md)**
+Сводный набор упражнений по главам книги.
 
-**[Summary and Reference Card](ch17-summary-and-reference-card.md)**
-Pattern decision guide, trait bounds cheat sheet, lifetime elision rules, further reading.
+### Приложения
 
-**[Capstone Project: Type-Safe Task Scheduler](ch18-capstone-project.md)**
-Integrate generics, traits, typestate, channels, error handling, and testing into a complete system.
+**[Итоги и справочная карточка](ch18-summary-and-reference-card.md)**
+Руководство по выбору паттерна, шпаргалка по границам трейтов, правила elision времён жизни, дополнительная литература.
+
+**[Итоговый проект: планировщик задач с безопасностью типов](ch19-capstone-project.md)**
+Объединение обобщённых типов, трейтов, typestate, каналов, обработки ошибок и тестирования в единую систему.
 
 ***
-

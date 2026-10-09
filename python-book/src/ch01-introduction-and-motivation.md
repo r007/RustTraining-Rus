@@ -24,7 +24,7 @@ Python is famously slow for CPU-bound work. Rust provides C-level performance
 with a high-level feel.
 
 ```python
-# Python — ~45 seconds for 10 million iterations
+# Python — ~2 seconds for 10 million calls
 import time
 
 def fibonacci(n: int) -> int:
@@ -36,13 +36,13 @@ def fibonacci(n: int) -> int:
     return b
 
 start = time.perf_counter()
-results = [fibonacci(i) for i in range(10_000_000)]
+results = [fibonacci(n % 30) for n in range(10_000_000)]
 elapsed = time.perf_counter() - start
-print(f"Elapsed: {elapsed:.2f}s")  # ~45s on typical hardware
+print(f"Elapsed: {elapsed:.2f}s")  # ~2s on typical hardware
 ```
 
 ```rust
-// Rust — ~0.3 seconds for the same 10 million iterations
+// Rust — ~0.07 seconds for the same 10 million calls
 use std::time::Instant;
 
 fn fibonacci(n: u64) -> u64 {
@@ -52,7 +52,7 @@ fn fibonacci(n: u64) -> u64 {
     let (mut a, mut b) = (0u64, 1u64);
     for _ in 2..=n {
         let temp = b;
-        b = a.wrapping_add(b);
+        b = a + b;
         a = temp;
     }
     b
@@ -60,11 +60,11 @@ fn fibonacci(n: u64) -> u64 {
 
 fn main() {
     let start = Instant::now();
-    let results: Vec<u64> = (0..10_000_000).map(fibonacci).collect();
-    println!("Elapsed: {:.2?}", start.elapsed());  // ~0.3s
+    let results: Vec<u64> = (0..10_000_000).map(|n| fibonacci(n % 30)).collect();
+    println!("Elapsed: {:.2?}", start.elapsed());  // ~0.07s
 }
 ```
-
+> Note: Rust should be run in release mode (`cargo run --release`) for a fair performance comparison.
 > **Why the difference?** Python dispatches every `+` through a dictionary lookup,
 > unboxes integers from heap objects, and checks types at every operation. Rust compiles
 > `fibonacci` directly to a handful of x86 `add`/`mov` instructions — the same code a
@@ -143,9 +143,8 @@ def process_user(user_id: int, name: str) -> dict:
     return {"id": user_id, "name": name.upper()}
 
 # These all "work" at the call site — fail at runtime
-process_user("not-a-number", 42)        # TypeError at .upper()
-process_user(None, "Alice")             # Works until you use user_id as int
-process_user(1, "Alice", extra="oops")  # Python doesn't care about extra kwargs here
+process_user("not-a-number", 42)        # TypeError: int has no .upper()
+process_user(None, "Alice")             # Silently stores None as id — bug hides until downstream code expects int
 
 # Even with mypy, you can still bypass types:
 data = json.loads('{"id": "oops"}')     # Always returns Any
@@ -266,7 +265,7 @@ fn cpu_work(n: u64) -> u64 {
 fn main() {
     let start = std::time::Instant::now();
     let handles: Vec<_> = (0..4)
-        .map(|_| thread::spawn(|| cpu_work(10_000_000)))
+        .map(|_| thread::spawn(|| cpu_work(3_000_000)))
         .collect();
 
     let results: Vec<u64> = handles.into_iter()
@@ -405,6 +404,7 @@ graph LR
         PY_GIL --> PY_OS["OS / Hardware"]
     end
 
+    PY ~~~ RS
     subgraph RS["🦀 Rust"]
         direction TB
         RS_CODE["Your Code"] --> RS_NONE["No runtime overhead"]

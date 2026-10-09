@@ -99,13 +99,13 @@ stateDiagram-v2
         a_owns --> shared: b = a
         shared --> b_only: del a (refcount 2→1)
         b_only --> freed: del b (refcount 1→0)
-        note right of shared: Both a and b point\nto the SAME object
+        note right of shared: Both a and b point<br/>to the SAME object
     }
     state "Rust (Ownership Move)" as RS {
         [*] --> a_owns2: let a = vec![1,2,3]
         a_owns2 --> b_owns: let b = a (MOVE)
         b_owns --> freed2: b goes out of scope
-        note right of b_owns: a is INVALID after move\nCompile error if used
+        note right of b_owns: a is INVALID after move<br/>Compile error if used
     }
 ```
 
@@ -136,7 +136,8 @@ println!("{s1} {s2}");  // ✅ hello hello (both valid)
 Python:                    Rust:
 ─────────                  ─────
 int, float, bool           Copy types (i32, f64, bool, char)
-→ copied on assignment     → copied on assignment (similar behavior)
+→ shared refs to immutable  → bitwise copied on assignment
+  objects (no real copy)     (always independent values)
                            (Note: Python caches small ints; Rust copies are always predictable)
 
 list, dict, str            Move types (Vec, HashMap, String)
@@ -202,9 +203,9 @@ Rust:    One person owns the book. Others can:
 
 ```mermaid
 flowchart TD
-    R["Borrowing Rules"] --> IMM["✅ Many &T\n(shared/immutable)"]
-    R --> MUT["✅ One &mut T\n(exclusive/mutable)"]
-    R --> CONFLICT["❌ &T + &mut T\n(NEVER at same time)"]
+    R["Borrowing Rules"] --> IMM["✅ Many &T<br/>(shared/immutable)"]
+    R --> MUT["✅ One &mut T<br/>(exclusive/mutable)"]
+    R --> CONFLICT["❌ &T + &mut T<br/>(NEVER at same time)"]
     IMM --> SAFE["Multiple readers, safe"]
     MUT --> SAFE2["Single writer, safe"]
     CONFLICT --> ERR["Compile error!"]

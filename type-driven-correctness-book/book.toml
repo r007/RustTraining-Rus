@@ -1,14 +1,14 @@
 [book]
-title = "Type-Driven Correctness in Rust"
+title = "Корректность на уровне типов в Rust"
 authors = ["Rust Training Team"]
-language = "en"
+language = "ru"
 src = "src"
 
 [build]
 build-dir = "book"
 
 [output.html]
-git-repository-url = "https://github.com/rust-systems-training/rust-training"
+git-repository-url = "https://github.com/microsoft/RustTraining"
 default-theme = "light"
 preferred-dark-theme = "ayu"
 additional-js = ["mermaid.min.js", "mermaid-init.js"]

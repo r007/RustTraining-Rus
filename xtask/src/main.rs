@@ -99,12 +99,30 @@ Commands:
 // ── build ────────────────────────────────────────────────────────────
 
 fn cmd_build() {
+    if !check_mdbook() {
+        eprintln!("Error: 'mdbook' not found in PATH. Please install it: https://rust-lang.github.io/mdbook/guide/installation.html");
+        std::process::exit(1);
+    }
     build_to("site");
 }
 
 fn cmd_deploy() {
+    if !check_mdbook() {
+        eprintln!("Error: 'mdbook' not found in PATH.");
+        std::process::exit(1);
+    }
     build_to("docs");
     println!("\nTo publish, commit docs/ and enable GitHub Pages → \"Deploy from a branch\" → /docs.");
+}
+
+fn check_mdbook() -> bool {
+    Command::new("mdbook")
+        .arg("--version")
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
 }
 
 fn build_to(dir_name: &str) {
@@ -143,6 +161,9 @@ fn build_to(dir_name: &str) {
     println!("\n  {ok}/{} books built", BOOKS.len());
 
     write_landing_page(&out);
+
+    // Prevent GitHub Pages from processing the output with Jekyll
+    fs::write(out.join(".nojekyll"), "").expect("failed to create .nojekyll");
     println!("\nDone! Output in {dir_name}/");
 }
 
@@ -289,17 +310,111 @@ fn write_landing_page(site: &Path) {
     println!("  ✓ index.html");
 }
 
+enum ResolveResult {
+    File(PathBuf),
+    Redirect(String),
+    NotFound,
+}
+
+/// Resolve `request_target` (HTTP request path, e.g. `/foo/bar?x=1`) to a file under `site_canon`.
+/// Returns `ResolveResult::File` for success, `Redirect` if a trailing slash is needed for a directory,
+/// or `NotFound` for traversal attempts or missing files.
+///
+/// NOTE: This function preserves and hardens the multi-layer security from PR#18:
+/// 1. Percent-decoding via `percent_decode_path`.
+/// 2. Null byte rejection.
+/// 3. Traversal blocking (`..`).
+/// 4. Symlink escape prevention via canonicalization and prefix checking.
+fn resolve_site_file(site_canon: &Path, request_target: &str) -> ResolveResult {
+    let path_only = match request_target
+        .split('?')
+        .next()
+        .and_then(|s| s.split('#').next())
+    {
+        Some(p) => p,
+        None => return ResolveResult::NotFound,
+    };
+
+    // [Security] Handle percent-encoding and reject null bytes (from PR#18)
+    let decoded = percent_decode_path(path_only);
+    if decoded.as_bytes().contains(&0) {
+        return ResolveResult::NotFound;
+    }
+
+    let rel = decoded.trim_start_matches('/');
+    let mut file_path = site_canon.to_path_buf();
+    if !rel.is_empty() {
+        for seg in rel.split('/').filter(|s| !s.is_empty()) {
+            // [Security] Block directory traversal (from PR#18)
+            if seg == ".." {
+                return ResolveResult::NotFound;
+            }
+            file_path.push(seg);
+        }
+    }
+
+    if file_path.is_dir() {
+        // If it refers to a directory but lacks a trailing slash, redirect so relative links work.
+        if !request_target.ends_with('/') && !request_target.is_empty() {
+            return ResolveResult::Redirect(format!("{path_only}/"));
+        }
+        file_path.push("index.html");
+    }
+
+    // [Security] Canonicalize and verify we're still within site_canon (from PR#18)
+    let real = match fs::canonicalize(&file_path) {
+        Ok(r) => r,
+        Err(_) => return ResolveResult::NotFound,
+    };
+
+    if !real.starts_with(site_canon) || !real.is_file() {
+        return ResolveResult::NotFound;
+    }
+
+    ResolveResult::File(real)
+}
+
+fn hex_val(c: u8) -> Option<u8> {
+    match c {
+        b'0'..=b'9' => Some(c - b'0'),
+        b'a'..=b'f' => Some(c - b'a' + 10),
+        b'A'..=b'F' => Some(c - b'A' + 10),
+        _ => None,
+    }
+}
+
+fn percent_decode_path(input: &str) -> String {
+    let mut decoded = Vec::with_capacity(input.len());
+    let b = input.as_bytes();
+    let mut i = 0;
+    while i < b.len() {
+        if b[i] == b'%' && i + 2 < b.len() {
+            if let (Some(hi), Some(lo)) = (hex_val(b[i + 1]), hex_val(b[i + 2])) {
+                decoded.push(hi << 4 | lo);
+                i += 3;
+                continue;
+            }
+        }
+        decoded.push(b[i]);
+        i += 1;
+    }
+    String::from_utf8_lossy(&decoded).into_owned()
+}
+
 // ── serve ────────────────────────────────────────────────────────────
 
 fn cmd_serve() {
     let site = project_root().join("site");
+    let site_canon = fs::canonicalize(&site).expect(
+        "site/ not found — run `cargo xtask build` first (e.g. `cargo xtask serve` runs build automatically)",
+    );
     let addr = "127.0.0.1:3000";
     let listener = TcpListener::bind(addr).expect("failed to bind port 3000");
 
     // Handle Ctrl+C gracefully so cargo doesn't report an error
     ctrlc_exit();
 
-    println!("\nServing at http://{addr}  (Ctrl+C to stop)");
+    println!("\nServing at http://localhost:3000  (Ctrl+C to stop)");
 
     for stream in listener.incoming() {
         let Ok(mut stream) = stream else { continue };
@@ -313,28 +428,32 @@ fn cmd_serve() {
             .and_then(|line| line.split_whitespace().nth(1))
             .unwrap_or("/");
 
-        let mut file_path = site.join(path.trim_start_matches('/'));
-        if file_path.is_dir() {
-            file_path = file_path.join("index.html");
-        }
-
-        if file_path.is_file() {
-            let body = fs::read(&file_path).unwrap_or_default();
-            let mime = guess_mime(&file_path);
-            let header = format!(
-                "HTTP/1.1 200 OK\r\nContent-Type: {mime}\r\nContent-Length: {}\r\n\r\n",
-                body.len()
-            );
-            let _ = stream.write_all(header.as_bytes());
-            let _ = stream.write_all(&body);
-        } else {
-            let body = b"404 Not Found";
-            let header = format!(
-                "HTTP/1.1 404 Not Found\r\nContent-Length: {}\r\n\r\n",
-                body.len()
-            );
-            let _ = stream.write_all(header.as_bytes());
-            let _ = stream.write_all(body);
+        match resolve_site_file(&site_canon, path) {
+            ResolveResult::File(file_path) => {
+                let body = fs::read(&file_path).unwrap_or_default();
+                let mime = guess_mime(&file_path);
+                let header = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Type: {mime}\r\nContent-Length: {}\r\n\r\n",
+                    body.len()
+                );
+                let _ = stream.write_all(header.as_bytes());
+                let _ = stream.write_all(&body);
+            }
+            ResolveResult::Redirect(new_path) => {
+                let header = format!(
+                    "HTTP/1.1 301 Moved Permanently\r\nLocation: {new_path}\r\nContent-Length: 0\r\n\r\n"
+                );
+                let _ = stream.write_all(header.as_bytes());
+            }
+            ResolveResult::NotFound => {
+                let body = b"404 Not Found";
+                let header = format!(
+                    "HTTP/1.1 404 Not Found\r\nContent-Length: {}\r\n\r\n",
+                    body.len()
+                );
+                let _ = stream.write_all(header.as_bytes());
+                let _ = stream.write_all(body);
+            }
         }
     }
 }
@@ -342,40 +461,10 @@ fn cmd_serve() {
 /// Install a Ctrl+C handler that exits cleanly (code 0) instead of
 /// letting the OS terminate with STATUS_CONTROL_C_EXIT.
 fn ctrlc_exit() {
-    unsafe {
-        libc_set_handler();
-    }
-}
-
-#[cfg(windows)]
-unsafe fn libc_set_handler() {
-    // SetConsoleCtrlHandler via the Windows API
-    extern "system" {
-        fn SetConsoleCtrlHandler(
-            handler: Option<unsafe extern "system" fn(u32) -> i32>,
-            add: i32,
-        ) -> i32;
-    }
-    unsafe extern "system" fn handler(_ctrl_type: u32) -> i32 {
+    ctrlc::set_handler(move || {
         std::process::exit(0);
-    }
-    unsafe {
-        SetConsoleCtrlHandler(Some(handler), 1);
-    }
-}
-
-#[cfg(not(windows))]
-unsafe fn libc_set_handler() {
-    // On Unix, register SIGINT via libc
-    extern "C" {
-        fn signal(sig: i32, handler: extern "C" fn(i32)) -> usize;
-    }
-    extern "C" fn handler(_sig: i32) {
-        std::process::exit(0);
-    }
-    unsafe {
-        signal(2 /* SIGINT */, handler);
-    }
+    })
+    .expect("Error setting Ctrl-C handler");
 }
 
 fn guess_mime(path: &Path) -> &'static str {

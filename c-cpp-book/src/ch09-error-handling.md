@@ -31,7 +31,7 @@ enum Result<T, E> {
 # Rust Option type
 - The Rust ```Option``` type is an ```enum``` with only two variants: ```Some<T>``` and ```None```
     - The idea is that this represents a ```nullable``` type, i.e., it either contains a valid value of that type (```Some<T>```), or has no valid value (```None```)
-    - The ```Option``` type is used in APIs result of an operation either succeeds and returns a valid value or it fails (but the specific error is irrelevant). For example, consider parsing a string for an integer value
+    - The ```Option``` type is used in APIs where the result of an operation either succeeds and returns a valid value or it fails (but the specific error is irrelevant). For example, consider parsing a string for an integer value
 ```rust
 fn main() {
     // Returns Option<usize>
@@ -47,7 +47,7 @@ fn main() {
 - Rust ```Option``` can be processed in various ways
     - ```unwrap()``` panics if the ```Option<T>``` is ```None``` and returns ```T``` otherwise and it is the least preferred approach 
     - ```or()``` can be used to return an alternative value 
-    ```if let``` lets us test for ```Some<T>```
+    - ```if let``` lets us test for ```Some<T>```
 
 > **Production patterns**: See [Safe value extraction with unwrap_or](ch17-2-avoiding-unchecked-indexing.md#safe-value-extraction-with-unwrap_or) and [Functional transforms: map, map_err, find_map](ch17-2-avoiding-unchecked-indexing.md#functional-transforms-map-map_err-find_map) for real-world examples from production Rust code.
 ```rust
@@ -151,7 +151,7 @@ fn main() {
 ----
 # Rust error handling
  - Rust errors can be irrecoverable (fatal) or recoverable. Fatal errors result in a ``panic```
-    - In general, situation that result in ```panics``` should be avoided. ```panics``` are caused by bugs in the program, including exceeding index bounds, calling ```unwrap()``` on an ```Option<None>```, etc.
+    - In general, situations that result in ```panics``` should be avoided. ```panics``` are caused by bugs in the program, including exceeding index bounds, calling ```unwrap()``` on an ```Option<None>```, etc.
     - It is OK to have explicit ```panics``` for conditions that should be impossible. The ```panic!``` or ```assert!``` macros can be used for sanity checks
 ```rust
 fn main() {

@@ -63,7 +63,7 @@ let n: i32 = "42".parse()?;                    // Propagate error with ?
 ### The From/Into Relationship
 
 ```mermaid
-flowchart LR
+flowchart TB
     A["impl From&lt;A&gt; for B"] -->|"auto-generates"| B["impl Into&lt;B&gt; for A"]
     C["Celsius::from(Fahrenheit(212.0))"] ---|"same as"| D["Fahrenheit(212.0).into()"]
     style A fill:#d4edda
@@ -138,7 +138,6 @@ struct Port(u16);
 
 #[derive(Debug)]
 enum PortError {
-    OutOfRange(u16),
     Zero,
 }
 
@@ -149,7 +148,6 @@ impl TryFrom<u16> for Port {
         match value {
             0 => Err(PortError::Zero),
             1..=65535 => Ok(Port(value)),
-            // Note: u16 max is 65535, so this covers all cases
         }
     }
 }
@@ -158,7 +156,6 @@ impl std::fmt::Display for PortError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             PortError::Zero => write!(f, "port cannot be zero"),
-            PortError::OutOfRange(v) => write!(f, "port {v} out of range"),
         }
     }
 }

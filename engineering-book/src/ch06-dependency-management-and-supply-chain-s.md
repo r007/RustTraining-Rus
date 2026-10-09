@@ -267,7 +267,7 @@ Each duplicate adds compile time and binary size.
 
 ### Application: Multi-Crate Dependency Hygiene
 
-The the workspace uses `[workspace.dependencies]` for centralized
+The workspace uses `[workspace.dependencies]` for centralized
 version management — an excellent practice. Combined with
 [`cargo tree --duplicates`](ch07-release-profiles-and-binary-size.md) for size
 analysis, this prevents version drift and reduces binary bloat:
@@ -317,10 +317,10 @@ unknown-git = "deny"
 
 ```mermaid
 flowchart LR
-    PR["Pull Request"] --> AUDIT["cargo audit\nKnown CVEs"]
-    AUDIT --> DENY["cargo deny check\nLicenses + Bans + Sources"]
-    DENY --> OUTDATED["cargo outdated\nWeekly schedule"]
-    OUTDATED --> SEMVER["cargo semver-checks\nLibrary crates only"]
+    PR["Pull Request"] --> AUDIT["cargo audit<br/>Known CVEs"]
+    AUDIT --> DENY["cargo deny check<br/>Licenses + Bans + Sources"]
+    DENY --> OUTDATED["cargo outdated<br/>Weekly schedule"]
+    OUTDATED --> SEMVER["cargo semver-checks<br/>Library crates only"]
     
     AUDIT -->|"Fail"| BLOCK["❌ Block merge"]
     DENY -->|"Fail"| BLOCK

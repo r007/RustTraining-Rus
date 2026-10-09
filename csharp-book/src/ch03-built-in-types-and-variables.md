@@ -12,10 +12,10 @@
 int count = 0;           // Mutable
 count = 5;               // ✅ Works
 
-readonly int maxSize = 100;  // Immutable after initialization
-// maxSize = 200;        // ❌ Compile error
+// readonly fields (class-level only, not for local variables)
+// readonly int maxSize = 100;  // Immutable after initialization
 
-const int BUFFER_SIZE = 1024; // Compile-time constant
+const int BUFFER_SIZE = 1024; // Compile-time constant (works as local or field)
 ```
 
 ### Rust Variable Declaration
@@ -32,8 +32,8 @@ const BUFFER_SIZE: usize = 1024; // Compile-time constant
 
 ### Key Mental Shift for C# Developers
 ```rust
-// Think of 'let' as 'readonly' by default
-let name = "John";       // Like: readonly string name = "John";
+// Think of 'let' as C#'s readonly field semantics applied to all variables
+let name = "John";       // Like a readonly field: once set, cannot change
 let mut age = 30;        // Like: int age = 30;
 
 // Variable shadowing (unique to Rust)

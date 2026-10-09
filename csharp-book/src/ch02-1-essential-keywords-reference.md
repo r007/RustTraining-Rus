@@ -253,8 +253,8 @@ var name = "John"; // Inferred as string
 // const - Compile-time constant
 const int MaxSize = 100;
 
-// readonly - Runtime constant
-readonly DateTime createdAt = DateTime.Now;
+// readonly - Runtime constant (fields only, not local variables)
+// readonly DateTime createdAt = DateTime.Now;
 
 // static - Class-level variable
 static int instanceCount = 0;
