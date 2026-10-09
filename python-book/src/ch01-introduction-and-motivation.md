@@ -1,30 +1,28 @@
-## Speaker Intro and General Approach
+## Об авторе и общий подход
 
-- Speaker intro
-    - Principal Firmware Architect in Microsoft SCHIE (Silicon and Cloud Hardware Infrastructure Engineering) team
-    - Industry veteran with expertise in security, systems programming (firmware, operating systems, hypervisors), CPU and platform architecture, and C++ systems
-    - Started programming in Rust in 2017 (@AWS EC2), and have been in love with the language ever since
-- This course is intended to be as interactive as possible
-    - Assumption: You know Python and its ecosystem
-    - Examples deliberately map Python concepts to Rust equivalents
-    - **Please feel free to ask clarifying questions at any point of time**
+- Об авторе
+    - Главный архитектор прошивок в команде SCHIE (Silicon and Cloud Hardware Infrastructure Engineering) компании Microsoft
+    - Опытный специалист в области безопасности, системного программирования (прошивки, операционные системы, гипервизоры), архитектуры CPU и платформ, а также систем на C++
+    - Начал программировать на Rust в 2017 году (@AWS EC2) и с тех пор влюблён в этот язык
+- Курс задуман максимально интерактивным
+    - Предполагается, что вы знаете Python и его экосистему
+    - Примеры намеренно сопоставляют понятия Python с их аналогами в Rust
+    - **Не стесняйтесь задавать уточняющие вопросы в любой момент**
 
 ---
 
-## The Case for Rust for Python Developers
+## Аргументы в пользу Rust для разработчиков на Python
 
-> **What you'll learn:** Why Python developers are adopting Rust, real-world performance wins (Dropbox, Discord, Pydantic),
-> when Rust is the right choice vs staying with Python, and the core philosophical differences between the two languages.
+> **Что вы узнаете:** почему разработчики на Python переходят на Rust, какие реальные выигрыши в производительности получили компании (Dropbox, Discord, Pydantic), когда Rust — правильный выбор по сравнению с Python и в чём принципиальные философские различия между двумя языками.
 >
-> **Difficulty:** 🟢 Beginner
+> **Сложность:** 🟢 Начальный
 
-### Performance: From Minutes to Milliseconds
+### Производительность: от минут до миллисекунд
 
-Python is famously slow for CPU-bound work. Rust provides C-level performance
-with a high-level feel.
+Python известен медленной работой с задачами, ограниченными процессором. Rust даёт производительность уровня C при высокоуровневом стиле написания кода.
 
 ```python
-# Python — ~2 seconds for 10 million calls
+# Python — ~2 секунды на 10 миллионов вызовов
 import time
 
 def fibonacci(n: int) -> int:
@@ -38,11 +36,11 @@ def fibonacci(n: int) -> int:
 start = time.perf_counter()
 results = [fibonacci(n % 30) for n in range(10_000_000)]
 elapsed = time.perf_counter() - start
-print(f"Elapsed: {elapsed:.2f}s")  # ~2s on typical hardware
+print(f"Прошло: {elapsed:.2f}s")  # ~2 с на типичном железе
 ```
 
 ```rust
-// Rust — ~0.07 seconds for the same 10 million calls
+// Rust — ~0.07 секунды на те же 10 миллионов вызовов
 use std::time::Instant;
 
 fn fibonacci(n: u64) -> u64 {
@@ -61,22 +59,18 @@ fn fibonacci(n: u64) -> u64 {
 fn main() {
     let start = Instant::now();
     let results: Vec<u64> = (0..10_000_000).map(|n| fibonacci(n % 30)).collect();
-    println!("Elapsed: {:.2?}", start.elapsed());  // ~0.07s
+    println!("Прошло: {:.2?}", start.elapsed());  // ~0.07 с
 }
 ```
-> Note: Rust should be run in release mode (`cargo run --release`) for a fair performance comparison.
-> **Why the difference?** Python dispatches every `+` through a dictionary lookup,
-> unboxes integers from heap objects, and checks types at every operation. Rust compiles
-> `fibonacci` directly to a handful of x86 `add`/`mov` instructions — the same code a
-> C compiler would produce.
+> Примечание: для честного сравнения производительности Rust нужно запускать в release-режиме (`cargo run --release`).
+> **В чём разница?** Python при каждом `+` обращается к поиску в словаре, извлекает целые числа из объектов в куче и проверяет типы на каждой операции. Rust компилирует `fibonacci` напрямую в несколько инструкций x86 `add`/`mov` — ровно тот код, который выдал бы компилятор C.
 
-### Memory Safety Without a Garbage Collector
+### Безопасность памяти без сборщика мусора
 
-Python's reference-counting GC has known issues: circular references, unpredictable
-`__del__` timing, and memory fragmentation. Rust eliminates these at compile time.
+У сборщика мусора Python на основе подсчёта ссылок есть известные проблемы: циклические ссылки, непредсказуемое время вызова `__del__` и фрагментация памяти. Rust устраняет их на этапе компиляции.
 
 ```python
-# Python — circular reference that CPython's ref counter can't free
+# Python — циклическая ссылка, которую счётчик ссылок CPython не может освободить
 class Node:
     def __init__(self, value):
         self.value = value
@@ -85,21 +79,21 @@ class Node:
 
     def add_child(self, child):
         self.children.append(child)
-        child.parent = self  # Circular reference!
+        child.parent = self  # Циклическая ссылка!
 
-# These two nodes reference each other — ref count never reaches 0.
-# CPython's cycle detector will *eventually* clean them up,
-# but you can't control when, and it adds GC pause overhead.
+# Эти два узла ссылаются друг на друга — счётчик ссылок никогда не станет 0.
+# Детектор циклов CPython *в конце концов* их очистит,
+# но вы не контролируете, когда это произойдёт, и это добавляет накладные расходы на паузы GC.
 root = Node("root")
 child = Node("child")
 root.add_child(child)
 ```
 
 ```rust
-// Rust — ownership prevents circular references by design
+// Rust — владение по замыслу исключает циклические ссылки
 struct Node {
     value: String,
-    children: Vec<Node>,  // Children are OWNED — no cycles possible
+    children: Vec<Node>,  // Дети ПРИНАДЛЕЖАТ родителю — циклы невозможны
 }
 
 impl Node {
@@ -111,7 +105,7 @@ impl Node {
     }
 
     fn add_child(&mut self, child: Node) {
-        self.children.push(child);  // Ownership transfers here
+        self.children.push(child);  // Владение переходит здесь
     }
 }
 
@@ -119,40 +113,37 @@ fn main() {
     let mut root = Node::new("root");
     let child = Node::new("child");
     root.add_child(child);
-    // When root is dropped, all children are dropped too.
-    // Deterministic, zero overhead, no GC.
+    // Когда root уничтожается, уничтожаются и все дети.
+    // Детерминированно, без накладных расходов, без GC.
 }
 ```
 
-> **Key insight**: In Rust, the child doesn't hold a reference back to the parent.
-> If you truly need cross-references (like a graph), you use explicit mechanisms
-> like `Rc<RefCell<T>>` or indices — making the complexity visible and intentional.
+> **Ключевая мысль**: в Rust потомок не хранит ссылку обратно на родителя. Если действительно нужны перекрёстные ссылки (например, для графа), используются явные механизмы вроде `Rc<RefCell<T>>` или индексов, что делает сложность видимой и осознанной.
 
 ***
 
-## Common Python Pain Points That Rust Addresses
+## Частые проблемы Python, которые решает Rust
 
-### 1. Runtime Type Errors
+### 1. Ошибки типов во время выполнения
 
-The most common Python production bug: passing the wrong type to a function.
-Type hints help, but they aren't enforced.
+Самая распространённая продакшен-ошибка в Python: передача функции значения неправильного типа. Подсказки типов помогают, но они не проверяются.
 
 ```python
-# Python — type hints are suggestions, not rules
+# Python — подсказки типов являются рекомендациями, а не правилами
 def process_user(user_id: int, name: str) -> dict:
     return {"id": user_id, "name": name.upper()}
 
-# These all "work" at the call site — fail at runtime
+# Все эти вызовы «проходят» на месте вызова и падают во время выполнения
 process_user("not-a-number", 42)        # TypeError: int has no .upper()
-process_user(None, "Alice")             # Silently stores None as id — bug hides until downstream code expects int
+process_user(None, "Alice")             # Молча сохраняет None как id — ошибка спрячется, пока последующий код не ожидает int
 
-# Even with mypy, you can still bypass types:
-data = json.loads('{"id": "oops"}')     # Always returns Any
-process_user(data["id"], data["name"])  # mypy can't catch this
+# Даже с mypy типы можно обойти:
+data = json.loads('{"id": "oops"}')     # Всегда возвращает Any
+process_user(data["id"], data["name"])  # mypy это не поймает
 ```
 
 ```rust
-// Rust — the compiler catches all of these before the program runs
+// Rust — компилятор ловит всё это до запуска программы
 fn process_user(user_id: i64, name: &str) -> User {
     User {
         id: user_id,
@@ -160,45 +151,44 @@ fn process_user(user_id: i64, name: &str) -> User {
     }
 }
 
-// process_user("not-a-number", 42);     // ❌ Compile error: expected i64, found &str
-// process_user(None, "Alice");           // ❌ Compile error: expected i64, found Option
-// Extra arguments are always a compile error.
+// process_user("not-a-number", 42);     // ❌ Ошибка компиляции: ожидался i64, найден &str
+// process_user(None, "Alice");           // ❌ Ошибка компиляции: ожидался i64, найден Option
+// Лишние аргументы — всегда ошибка компиляции.
 
-// Deserializing JSON is type-safe too:
+// Десериализация JSON тоже типобезопасна:
 #[derive(Deserialize)]
 struct UserInput {
-    id: i64,     // Must be a number in the JSON
-    name: String, // Must be a string in the JSON
+    id: i64,     // Должно быть числом в JSON
+    name: String, // Должно быть строкой в JSON
 }
-let input: UserInput = serde_json::from_str(json_str)?; // Returns Err if types mismatch
-process_user(input.id, &input.name); // ✅ Guaranteed correct types
+let input: UserInput = serde_json::from_str(json_str)?; // Возвращает Err, если типы не совпадают
+process_user(input.id, &input.name); // ✅ Типы гарантированно корректны
 ```
 
-### 2. None: The Billion Dollar Mistake (Python Edition)
+### 2. None: миллиардная ошибка (издание для Python)
 
-`None` can appear anywhere a value is expected. Python has no compile-time way
-to prevent `AttributeError: 'NoneType' object has no attribute ...`.
+`None` может появиться там, где ожидается значение. В Python нет способа на этапе компиляции предотвратить `AttributeError: 'NoneType' object has no attribute ...`.
 
 ```python
-# Python — None sneaks in everywhere
+# Python — None проникает повсюду
 def find_user(user_id: int) -> dict | None:
     users = {1: {"name": "Alice"}, 2: {"name": "Bob"}}
     return users.get(user_id)
 
-user = find_user(999)         # Returns None
+user = find_user(999)         # Возвращает None
 print(user["name"])           # 💥 TypeError: 'NoneType' object is not subscriptable
 
-# Even with Optional type hint, nothing enforces the check:
+# Даже с подсказкой типа Optional ничто не требует проверки:
 from typing import Optional
 def get_name(user_id: int) -> Optional[str]:
     return None
 
 name: Optional[str] = get_name(1)
-print(name.upper())          # 💥 AttributeError — mypy warns, runtime doesn't care
+print(name.upper())          # 💥 AttributeError — mypy предупреждает, а во время выполнения это никого не волнует
 ```
 
 ```rust
-// Rust — None is impossible unless explicitly handled
+// Rust — None невозможен, пока вы его явно не обработаете
 fn find_user(user_id: i64) -> Option<User> {
     let users = HashMap::from([
         (1, User { name: "Alice".into() }),
@@ -207,29 +197,27 @@ fn find_user(user_id: i64) -> Option<User> {
     users.get(&user_id).cloned()
 }
 
-let user = find_user(999);  // Returns None variant of Option<User>
-// println!("{}", user.name);  // ❌ Compile error: Option<User> has no field `name`
+let user = find_user(999);  // Возвращает вариант None типа Option<User>
+// println!("{}", user.name);  // ❌ Ошибка компиляции: у Option<User> нет поля `name`
 
-// You MUST handle the None case:
+// Вариант None ОБЯЗАТЕЛЬНО нужно обработать:
 match find_user(999) {
     Some(user) => println!("{}", user.name),
-    None => println!("User not found"),
+    None => println!("Пользователь не найден"),
 }
 
-// Or use combinators:
+// Или используйте комбинаторы:
 let name = find_user(999)
     .map(|u| u.name)
     .unwrap_or_else(|| "Unknown".to_string());
 ```
 
-### 3. The GIL: Python's Concurrency Ceiling
+### 3. GIL: потолок конкурентности Python
 
-Python's Global Interpreter Lock means threads don't run Python code in parallel.
-`threading` is only useful for I/O-bound work; CPU-bound work requires `multiprocessing`
-(with its serialization overhead) or C extensions.
+Глобальная блокировка интерпретатора (GIL) в Python означает, что потоки не выполняют код Python параллельно. `threading` полезен только для задач, ограниченных вводом-выводом; задачи, ограниченные процессором, требуют `multiprocessing` (с накладными расходами на сериализацию) или C-расширений.
 
 ```python
-# Python — threads DON'T speed up CPU work because of the GIL
+# Python — потоки НЕ ускоряют работу с процессором из-за GIL
 import threading
 import time
 
@@ -246,16 +234,16 @@ for t in threads:
 for t in threads:
     t.join()
 elapsed = time.perf_counter() - start
-print(f"4 threads: {elapsed:.2f}s")  # About the SAME as 1 thread! GIL prevents parallelism.
+print(f"4 потока: {elapsed:.2f}s")  # Примерно ТАКОЕ ЖЕ время, как у 1 потока! GIL не даёт параллелизму работать.
 
-# multiprocessing "works" but serializes data between processes:
+# multiprocessing «работает», но сериализует данные между процессами:
 from multiprocessing import Pool
 with Pool(4) as p:
-    results = p.map(cpu_work, [10_000_000] * 4)  # ~4x faster, but pickle overhead
+    results = p.map(cpu_work, [10_000_000] * 4)  # ~в 4 раза быстрее, но с накладными расходами на pickle
 ```
 
 ```rust
-// Rust — true parallelism, no GIL, no serialization overhead
+// Rust — настоящий параллелизм, без GIL и без накладных расходов на сериализацию
 use std::thread;
 
 fn cpu_work(n: u64) -> u64 {
@@ -272,31 +260,30 @@ fn main() {
         .map(|h| h.join().unwrap())
         .collect();
 
-    println!("4 threads: {:.2?}", start.elapsed());  // ~4x faster than single thread
+    println!("4 потока: {:.2?}", start.elapsed());  // ~в 4 раза быстрее одного потока
 }
 ```
 
-> **With Rayon** (Rust's parallel iterator library), parallelism is even simpler:
+> **С Rayon** (библиотекой параллельных итераторов для Rust) параллелизм становится ещё проще:
 > ```rust
 > use rayon::prelude::*;
 > let results: Vec<u64> = inputs.par_iter().map(|&n| cpu_work(n)).collect();
 > ```
 
-### 4. Deployment and Distribution Pain
+### 4. Боль развёртывания и распространения
 
-Python deployment is notoriously difficult: venvs, system Python conflicts,
-`pip install` failures, C extension wheels, Docker images with full Python runtime.
+Развёртывание Python известно своей сложностью: venv, конфликты с системным Python, сбои `pip install`, колёса (wheels) C-расширений, Docker-образы с полным рантаймом Python.
 
 ```python
-# Python deployment checklist:
-# 1. Which Python version? 3.9? 3.10? 3.11? 3.12?
-# 2. Virtual environment: venv, conda, poetry, pipenv?
-# 3. C extensions: need compiler? manylinux wheels?
-# 4. System dependencies: libssl, libffi, etc.?
-# 5. Docker: full python:3.12 image is 1.0 GB
-# 6. Startup time: 200-500ms for import-heavy apps
+# Чек-лист развёртывания Python:
+# 1. Какая версия Python? 3.9? 3.10? 3.11? 3.12?
+# 2. Виртуальное окружение: venv, conda, poetry, pipenv?
+# 3. C-расширения: нужен компилятор? manylinux-колёса?
+# 4. Системные зависимости: libssl, libffi и т. д.?
+# 5. Docker: полный образ python:3.12 весит 1,0 ГБ
+# 6. Время запуска: 200–500 мс для приложений с большим количеством импортов
 
-# Docker image: ~1 GB
+# Docker-образ: ~1 ГБ
 # FROM python:3.12-slim
 # COPY requirements.txt .
 # RUN pip install -r requirements.txt
@@ -305,112 +292,112 @@ Python deployment is notoriously difficult: venvs, system Python conflicts,
 ```
 
 ```rust
-// Rust deployment: single static binary, no runtime needed
-// cargo build --release → one binary, ~5-20 MB
-// Copy it anywhere — no Python, no venv, no dependencies
+// Развёртывание Rust: один статический бинарник, рантайм не нужен
+// cargo build --release → один бинарник, ~5–20 МБ
+// Копируйте куда угодно — ни Python, ни venv, ни зависимостей
 
-// Docker image: ~5 MB (from scratch or distroless)
+// Docker-образ: ~5 МБ (from scratch или distroless)
 // FROM scratch
 // COPY target/release/my_app /my_app
 // CMD ["/my_app"]
 
-// Startup time: <1ms
-// Cross-compile: cargo build --target x86_64-unknown-linux-musl
+// Время запуска: <1 мс
+// Кросс-компиляция: cargo build --target x86_64-unknown-linux-musl
 ```
 
 ***
 
-## When to Choose Rust Over Python
+## Когда выбирать Rust вместо Python
 
-### Choose Rust When:
-- **Performance is critical**: Data pipelines, real-time processing, compute-heavy services
-- **Correctness matters**: Financial systems, safety-critical code, protocol implementations
-- **Deployment simplicity**: Single binary, no runtime dependencies
-- **Low-level control**: Hardware interaction, OS integration, embedded systems
-- **True concurrency**: CPU-bound parallelism without GIL workarounds
-- **Memory efficiency**: Reduce cloud costs for memory-intensive services
-- **Long-running services**: Where predictable latency matters (no GC pauses)
+### Выбирайте Rust, когда:
+- **Производительность критична**: конвейеры данных, обработка в реальном времени, вычислительно тяжёлые сервисы
+- **Корректность важна**: финансовые системы, код, критичный к безопасности, реализации протоколов
+- **Простота развёртывания**: один бинарник, без зависимостей рантайма
+- **Низкоуровневый контроль**: взаимодействие с железом, интеграция с ОС, встраиваемые системы
+- **Настоящая конкурентность**: параллелизм для задач, ограниченных процессором, без обходных путей вокруг GIL
+- **Эффективность памяти**: снижение облачных расходов для сервисов, которые много используют память
+- **Долгоработающие сервисы**: где важна предсказуемая задержка (без пауз GC)
 
-### Stay with Python When:
-- **Rapid prototyping**: Exploratory data analysis, scripts, one-off tools
-- **ML/AI workflows**: PyTorch, TensorFlow, scikit-learn ecosystem
-- **Glue code**: Connecting APIs, data transformation scripts
-- **Team expertise**: When Rust learning curve doesn't justify benefits
-- **Time to market**: When development speed trumps execution speed
-- **Interactive work**: Jupyter notebooks, REPL-driven development
-- **Scripting**: Automation, sys-admin tasks, quick utilities
+### Оставайтесь на Python, когда:
+- **Быстрое прототипирование**: исследовательский анализ данных, скрипты, разовые инструменты
+- **Рабочие процессы ML/AI**: экосистема PyTorch, TensorFlow, scikit-learn
+- **Клеящий код**: подключение API, скрипты преобразования данных
+- **Экспертиза команды**: когда кривая обучения Rust не окупается выгодами
+- **Время выхода на рынок**: когда скорость разработки важнее скорости выполнения
+- **Интерактивная работа**: блокноты Jupyter, разработка через REPL
+- **Скрипты**: автоматизация, задачи системного администрирования, быстрые утилиты
 
-### Consider Both (Hybrid Approach with PyO3):
-- **Compute-heavy code in Rust**: Called from Python via PyO3/maturin
-- **Business logic and orchestration in Python**: Familiar, productive
-- **Gradual migration**: Identify hotspots, replace with Rust extensions
-- **Best of both**: Python's ecosystem + Rust's performance
+### Рассмотрите оба варианта (гибридный подход с PyO3):
+- **Вычислительно тяжёлый код на Rust**: вызывается из Python через PyO3/maturin
+- **Бизнес-логика и оркестрация на Python**: привычно и продуктивно
+- **Постепенная миграция**: найти узкие места и заменить их расширениями на Rust
+- **Лучшее из двух миров**: экосистема Python + производительность Rust
 
 ***
 
-## Real-World Impact: Why Companies Choose Rust
+## Практический эффект: почему компании выбирают Rust
 
-### Dropbox: Storage Infrastructure
-- **Before (Python)**: High CPU usage, memory overhead in sync engine
-- **After (Rust)**: 10x performance improvement, 50% memory reduction
-- **Result**: Millions saved in infrastructure costs
+### Dropbox: инфраструктура хранения
+- **До (Python)**: высокая загрузка CPU, избыточное потребление памяти в движке синхронизации
+- **После (Rust)**: прирост производительности в 10 раз, снижение потребления памяти на 50%
+- **Результат**: миллионы долларов экономии на инфраструктуре
 
-### Discord: Voice/Video Backend
-- **Before (Python → Go)**: GC pauses causing audio drops
-- **After (Rust)**: Consistent low-latency performance
-- **Result**: Better user experience, reduced server costs
+### Discord: бэкенд голоса и видео
+- **До (Python → Go)**: паузы GC приводили к обрывам звука
+- **После (Rust)**: стабильно низкая задержка
+- **Результат**: лучше пользовательский опыт и ниже расходы на серверы
 
-### Cloudflare: Edge Workers
-- **Why Rust**: WebAssembly compilation, predictable performance at edge
-- **Result**: Workers run with microsecond cold starts
+### Cloudflare: edge-воркеры
+- **Почему Rust**: компиляция в WebAssembly, предсказуемая производительность на периферии сети
+- **Результат**: воркеры запускаются с холодным стартом в микросекундах
 
 ### Pydantic V2
-- **Before**: Pure Python validation — slow for large payloads
-- **After**: Rust core (via PyO3) — **5–50x faster** validation
-- **Result**: Same Python API, dramatically faster execution
+- **До**: валидация на чистом Python — медленно для больших объёмов данных
+- **После**: ядро на Rust (через PyO3) — валидация **в 5–50 раз быстрее**
+- **Результат**: тот же API на Python, значительно более быстрое выполнение
 
-### Why This Matters for Python Developers:
-1. **Complementary skills**: Rust and Python solve different problems
-2. **PyO3 bridge**: Write Rust extensions callable from Python
-3. **Performance understanding**: Learn why Python is slow and how to fix hotspots
-4. **Career growth**: Systems programming expertise increasingly valuable
-5. **Cloud costs**: 10x faster code = significantly lower infrastructure spend
+### Почему это важно для разработчиков на Python:
+1. **Взаимодополняющие навыки**: Rust и Python решают разные задачи
+2. **Мост PyO3**: пишите расширения на Rust, которые можно вызывать из Python
+3. **Понимание производительности**: вы узнаете, почему Python медленный и как исправлять узкие места
+4. **Карьерный рост**: экспертиза в системном программировании становится всё ценнее
+5. **Облачные расходы**: код в 10 раз быстрее = значительно меньше расходов на инфраструктуру
 
 ***
 
-## Language Philosophy Comparison
+## Сравнение языковой философии
 
-### Python Philosophy
-- **Readability counts**: Clean syntax, "one obvious way to do it"
-- **Batteries included**: Extensive standard library, rapid prototyping
-- **Duck typing**: "If it walks like a duck and quacks like a duck..."
-- **Developer velocity**: Optimize for writing speed, not execution speed
-- **Dynamic everything**: Modify classes at runtime, monkey-patching, metaclasses
+### Философия Python
+- **Читаемость важна**: чистый синтаксис, «один очевидный способ сделать это»
+- **Всё в комплекте**: обширная стандартная библиотека, быстрое прототипирование
+- **Утиная типизация**: «Если это ходит как утка и крякает как утка...»
+- **Скорость разработки**: оптимизация под скорость написания кода, а не скорость выполнения
+- **Всё динамически**: изменение классов во время выполнения, monkey-patching, метаклассы
 
-### Rust Philosophy
-- **Performance without sacrifice**: Zero-cost abstractions, no runtime overhead
-- **Correctness first**: If it compiles, entire categories of bugs are impossible
-- **Explicit over implicit**: No hidden behavior, no implicit conversions
-- **Ownership**: Resources have exactly one owner — memory, files, sockets
-- **Fearless concurrency**: The type system prevents data races at compile time
+### Философия Rust
+- **Производительность без компромиссов**: абстракции с нулевой стоимостью, без накладных расходов рантайма
+- **Корректность прежде всего**: если код компилируется, целые классы ошибок становятся невозможными
+- **Явное лучше неявного**: никакого скрытого поведения и неявных преобразований
+- **Владение**: у ресурсов ровно один владелец: память, файлы, сокеты
+- **Конкурентность без страха**: система типов предотвращает гонки данных на этапе компиляции
 
 ```mermaid
 graph LR
     subgraph PY["🐍 Python"]
         direction TB
-        PY_CODE["Your Code"] --> PY_INTERP["Interpreter — CPython VM"]
-        PY_INTERP --> PY_GC["Garbage Collector — ref count + GC"]
-        PY_GC --> PY_GIL["GIL — no true parallelism"]
-        PY_GIL --> PY_OS["OS / Hardware"]
+        PY_CODE["Ваш код"] --> PY_INTERP["Интерпретатор — виртуальная машина CPython"]
+        PY_INTERP --> PY_GC["Сборщик мусора — подсчёт ссылок + GC"]
+        PY_GC --> PY_GIL["GIL — нет настоящего параллелизма"]
+        PY_GIL --> PY_OS["ОС / Железо"]
     end
 
     PY ~~~ RS
     subgraph RS["🦀 Rust"]
         direction TB
-        RS_CODE["Your Code"] --> RS_NONE["No runtime overhead"]
-        RS_NONE --> RS_OWN["Ownership — compile-time, zero-cost"]
-        RS_OWN --> RS_THR["Native threads — true parallelism"]
-        RS_THR --> RS_OS["OS / Hardware"]
+        RS_CODE["Ваш код"] --> RS_NONE["Нет накладных расходов рантайма"]
+        RS_NONE --> RS_OWN["Владение — на этапе компиляции, без затрат"]
+        RS_OWN --> RS_THR["Нативные потоки — настоящий параллелизм"]
+        RS_THR --> RS_OS["ОС / Железо"]
     end
 
     style PY_INTERP fill:#fff3e0,color:#000,stroke:#e65100
@@ -423,48 +410,47 @@ graph LR
 
 ***
 
-## Quick Reference: Rust vs Python
+## Краткая справка: Rust против Python
 
-| **Concept** | **Python** | **Rust** | **Key Difference** |
-|-------------|-----------|----------|-------------------|
-| Typing | Dynamic (`duck typing`) | Static (compile-time) | Errors caught before runtime |
-| Memory | Garbage collected (ref counting + cycle GC) | Ownership system | Zero-cost, deterministic cleanup |
-| None/null | `None` anywhere | `Option<T>` | Compile-time None safety |
-| Error handling | `raise`/`try`/`except` | `Result<T, E>` | Explicit, no hidden control flow |
-| Mutability | Everything mutable | Immutable by default | Opt-in to mutation |
-| Speed | Interpreted (~10–100x slower) | Compiled (C/C++ speed) | Orders of magnitude faster |
-| Concurrency | GIL limits threads | No GIL, `Send`/`Sync` traits | True parallelism by default |
-| Dependencies | `pip install` / `poetry add` | `cargo add` | Built-in dependency management |
-| Build system | setuptools/poetry/hatch | Cargo | Single unified tool |
-| Packaging | `pyproject.toml` | `Cargo.toml` | Similar declarative config |
-| REPL | `python` interactive | No REPL (use tests/`cargo run`) | Compile-first workflow |
-| Type hints | Optional, not enforced | Required, compiler-enforced | Types are not decorative |
+| **Концепция** | **Python** | **Rust** | **Ключевое отличие** |
+|---------------|-----------|----------|---------------------|
+| Типизация | Динамическая (`duck typing`) | Статическая (на этапе компиляции) | Ошибки обнаруживаются до выполнения |
+| Память | Сборка мусора (подсчёт ссылок + GC для циклов) | Система владения | Без накладных расходов, детерминированная очистка |
+| None/null | `None` где угодно | `Option<T>` | Безопасность None на этапе компиляции |
+| Обработка ошибок | `raise`/`try`/`except` | `Result<T, E>` | Явно, без скрытого потока управления |
+| Изменяемость | Всё изменяемо | Неизменяемость по умолчанию | Изменение нужно включать явно |
+| Скорость | Интерпретируемый (~в 10–100 раз медленнее) | Компилируемый (скорость C/C++) | На порядки быстрее |
+| Конкурентность | GIL ограничивает потоки | Нет GIL, трейты `Send`/`Sync` | Настоящий параллелизм по умолчанию |
+| Зависимости | `pip install` / `poetry add` | `cargo add` | Управление зависимостями встроено |
+| Система сборки | setuptools/poetry/hatch | Cargo | Один единый инструмент |
+| Упаковка | `pyproject.toml` | `Cargo.toml` | Похожая декларативная конфигурация |
+| REPL | Интерактивный `python` | Нет REPL (используйте тесты или `cargo run`) | Процесс, ориентированный на компиляцию |
+| Подсказки типов | Необязательные, не проверяются | Обязательные, проверяются компилятором | Типы — не украшение |
 
 ---
 
-## Exercises
+## Упражнения
 
 <details>
-<summary><strong>🏋️ Exercise: Mental Model Check</strong> (click to expand)</summary>
+<summary><strong>🏋️ Упражнение: проверка ментальной модели</strong> (нажмите, чтобы раскрыть)</summary>
 
-**Challenge**: For each Python snippet, predict what Rust would require differently. Don't write code — just describe the constraint.
+**Задание**: для каждого фрагмента на Python предскажите, что в Rust потребуется иначе. Код писать не нужно, просто опишите ограничение.
 
-1. `x = [1, 2, 3]; y = x; x.append(4)` — What happens in Rust?
-2. `data = None; print(data.upper())` — How does Rust prevent this?
-3. `import threading; shared = []; threading.Thread(target=shared.append, args=(1,)).start()` — What does Rust demand?
+1. `x = [1, 2, 3]; y = x; x.append(4)` — что произойдёт в Rust?
+2. `data = None; print(data.upper())` — как Rust этому помешает?
+3. `import threading; shared = []; threading.Thread(target=shared.append, args=(1,)).start()` — что требует Rust?
 
 <details>
-<summary>🔑 Solution</summary>
+<summary>🔑 Решение</summary>
 
-1. **Ownership move**: `let y = x;` moves `x` — `x.push(4)` is a compile error. You'd need `let y = x.clone();` or borrow with `let y = &x;`.
-2. **No null**: `data` can't be `None` unless it's `Option<String>`. You must `match` or use `.unwrap()` / `if let` — no surprise `NoneType` errors.
-3. **Send + Sync**: The compiler requires `shared` to be wrapped in `Arc<Mutex<Vec<i32>>>`. Forgetting the lock = compile error, not a race condition.
+1. **Перемещение владения**: `let y = x;` перемещает `x`, поэтому `x.push(4)` — ошибка компиляции. Понадобилось бы `let y = x.clone();` или заимствование через `let y = &x;`.
+2. **Нет null**: `data` не может быть `None`, если только это не `Option<String>`. Нужно использовать `match`, `.unwrap()` или `if let`, и неожиданных ошибок `NoneType` не будет.
+3. **Send + Sync**: компилятор требует обернуть `shared` в `Arc<Mutex<Vec<i32>>>`. Забытая блокировка — это ошибка компиляции, а не гонка данных.
 
-**Key takeaway**: Rust shifts runtime failures to compile-time errors. The "friction" you feel is the compiler catching real bugs.
+**Главный вывод**: Rust переносит ошибки времени выполнения в ошибки времени компиляции. «Трение», которое вы чувствуете, — это компилятор, который ловит настоящие баги.
 
 </details>
 </details>
 
 ***
-
 

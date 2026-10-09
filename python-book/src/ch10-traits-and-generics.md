@@ -1,19 +1,16 @@
-## Traits vs Duck Typing
+## Трейты и утиная типизация
 
-> **What you'll learn:** Traits as explicit contracts (vs Python duck typing), `Protocol` (PEP 544) ≈ Trait,
-> generic type bounds with `where` clauses, trait objects (`dyn Trait`) vs static dispatch, and common std traits.
+> **Что вы узнаете:** трейты как явные контракты (в отличие от утиной типизации Python), `Protocol` (PEP 544) ≈ трейт, ограничения обобщений через предложения `where`, трейт-объекты (`dyn Trait`) в сравнении со статической диспетчеризацией и распространённые трейты стандартной библиотеки.
 >
-> **Difficulty:** 🟡 Intermediate
+> **Сложность:** 🟡 Средний
 
-This is where Rust's type system really shines for Python developers. Python's
-"duck typing" says: "if it walks like a duck and quacks like a duck, it's a duck."
-Rust's traits say: "I'll tell you exactly which duck behaviors I need, at compile time."
+Именно здесь система типов Rust по-настоящему раскрывается для разработчиков на Python. Утиная типизация Python говорит: «если это ходит как утка и крякает как утка, значит, это утка». Трейты Rust говорят: «я точно скажу, какое поведение утки мне нужно, и это будет проверено на этапе компиляции».
 
-### Python Duck Typing
+### Утиная типизация в Python
 ```python
-# Python — duck typing: anything with the right methods works
+# Python — утиная типизация: подходит всё, у чего есть нужные методы
 def total_area(shapes):
-    """Works with anything that has an .area() method."""
+    """Работает с любым объектом, у которого есть метод .area()."""
     return sum(shape.area() for shape in shapes)
 
 class Circle:
@@ -24,23 +21,23 @@ class Rectangle:
     def __init__(self, w, h): self.w, self.h = w, h
     def area(self): return self.w * self.h
 
-# Works at runtime — no inheritance needed!
+# Работает во время выполнения, наследование не нужно!
 shapes = [Circle(5), Rectangle(3, 4)]
 print(total_area(shapes))  # 90.54
 
-# But what if something doesn't have .area()?
+# А что, если у объекта нет .area()?
 class Dog:
-    def bark(self): return "Woof!"
+    def bark(self): return "Гав!"
 
 total_area([Dog()])  # 💥 AttributeError: 'Dog' has no attribute 'area'
-# Error happens at RUNTIME, not at definition time
+# Ошибка возникает во ВРЕМЯ ВЫПОЛНЕНИЯ, а не при определении
 ```
 
-### Rust Traits — Explicit Duck Typing
+### Трейты Rust: явная утиная типизация
 ```rust
-// Rust — traits make the "duck" contract explicit
+// Rust — трейты делают контракт «утки» явным
 trait HasArea {
-    fn area(&self) -> f64;      // Any type that implements this trait has .area()
+    fn area(&self) -> f64;      // Любой тип, реализующий этот трейт, имеет .area()
 }
 
 struct Circle { radius: f64 }
@@ -58,32 +55,30 @@ impl HasArea for Rectangle {
     }
 }
 
-// The trait constraint is explicit — compiler checks at compile time
+// Ограничение трейтом явное, компилятор проверяет его на этапе компиляции
 fn total_area(shapes: &[&dyn HasArea]) -> f64 {
     shapes.iter().map(|s| s.area()).sum()
 }
 
-// Using it:
+// Использование:
 let shapes: Vec<&dyn HasArea> = vec![&Circle { radius: 5.0 }, &Rectangle { width: 3.0, height: 4.0 }];
 println!("{}", total_area(&shapes));  // 90.54
 
 // struct Dog;
-// total_area(&[&Dog {}]);  // ❌ Compile error: Dog doesn't implement HasArea
+// total_area(&[&Dog {}]);  // ❌ Ошибка компиляции: Dog не реализует HasArea
 ```
 
-> **Key insight**: Python's duck typing defers errors to runtime. Rust's traits catch
-> them at compile time. Same flexibility, earlier error detection.
+> **Ключевая мысль**: утиная типизация Python откладывает ошибки до времени выполнения. Трейты Rust ловят их на этапе компиляции. Гибкость та же, а ошибки обнаруживаются раньше.
 
 ***
 
-## Protocols (PEP 544) vs Traits
+## Протоколы (PEP 544) и трейты
 
-Python 3.8 introduced `Protocol` (PEP 544) for structural subtyping — it's the
-closest Python concept to Rust traits.
+Python 3.8 ввёл `Protocol` (PEP 544) для структурной типизации: это ближайшее к трейтам Rust понятие в Python.
 
-### Python Protocol
+### Protocol в Python
 ```python
-# Python — Protocol (structural typing, like Rust traits)
+# Python — Protocol (структурная типизация, как трейты Rust)
 from typing import Protocol, runtime_checkable
 
 @runtime_checkable
@@ -107,16 +102,16 @@ def print_all(items: list[Printable]) -> None:
     for item in items:
         print(item.to_string())
 
-# Works because User and Product both have to_string()
+# Работает, потому что у User и Product есть to_string()
 print_all([User("Alice"), Product("Widget", 9.99)])
 
-# BUT: mypy checks this, Python runtime does NOT enforce it
-# print_all([42])  # mypy warns, but Python runs it and crashes
+# НО: mypy это проверяет, а среда выполнения Python — НЕТ
+# print_all([42])  # mypy предупредит, но Python запустит это и упадёт
 ```
 
-### Rust Trait (Equivalent, but enforced!)
+### Трейт Rust (аналог, но с принуждением!)
 ```rust
-// Rust — traits are enforced at compile time
+// Rust — трейты проверяются на этапе компиляции
 trait Printable {
     fn to_string(&self) -> String;
 }
@@ -142,28 +137,28 @@ fn print_all(items: &[&dyn Printable]) {
     }
 }
 
-// print_all(&[&42i32]);  // ❌ Compile error: i32 doesn't implement Printable
+// print_all(&[&42i32]);  // ❌ Ошибка компиляции: i32 не реализует Printable
 ```
 
-### Comparison Table
+### Сравнительная таблица
 
-| Feature | Python Protocol | Rust Trait |
-|---------|-----------------|------------|
-| Structural typing | ✅ (implicit) | ❌ (explicit `impl`) |
-| Checked at | Runtime (or mypy) | Compile time (always) |
-| Default implementations | ❌ | ✅ |
-| Can add to foreign types | ❌ | ✅ (within limits) |
-| Multiple protocols | ✅ | ✅ (multiple traits) |
-| Associated types | ❌ | ✅ |
-| Generic constraints | ✅ (with `TypeVar`) | ✅ (trait bounds) |
+| Свойство | Protocol в Python | Трейт Rust |
+|----------|-------------------|------------|
+| Структурная типизация | ✅ (неявно) | ❌ (нужен явный `impl`) |
+| Когда проверяется | Во время выполнения (или mypy) | На этапе компиляции (всегда) |
+| Реализации по умолчанию | ❌ | ✅ |
+| Можно добавить к чужим типам | ❌ | ✅ (в определённых пределах) |
+| Несколько протоколов | ✅ | ✅ (несколько трейтов) |
+| Ассоциированные типы | ❌ | ✅ |
+| Ограничения обобщений | ✅ (с `TypeVar`) | ✅ (ограничения трейтов) |
 
 ***
 
-## Generic Constraints
+## Ограничения обобщений
 
-### Python Generics
+### Обобщения в Python
 ```python
-# Python — TypeVar for generic functions
+# Python — TypeVar для обобщённых функций
 from typing import TypeVar, Sequence
 
 T = TypeVar('T')
@@ -171,7 +166,7 @@ T = TypeVar('T')
 def first(items: Sequence[T]) -> T | None:
     return items[0] if items else None
 
-# Bounded TypeVar
+# Ограниченный TypeVar
 from typing import SupportsFloat
 T = TypeVar('T', bound=SupportsFloat)
 
@@ -179,77 +174,76 @@ def average(items: Sequence[T]) -> float:
     return sum(float(x) for x in items) / len(items)
 ```
 
-### Rust Generics with Trait Bounds
+### Обобщения Rust с ограничениями трейтов
 ```rust
-// Rust — generics with trait bounds
+// Rust — обобщения с ограничениями трейтов
 fn first<T>(items: &[T]) -> Option<&T> {
     items.first()
 }
 
-// With trait bounds — "T must implement these traits"
+// С ограничениями трейтов — «T должен реализовывать эти трейты»
 fn average<T>(items: &[T]) -> f64
 where
-    T: Into<f64> + Copy,   // T must convert to f64 and be copyable
+    T: Into<f64> + Copy,   // T должен преобразовываться в f64 и быть копируемым
 {
     let sum: f64 = items.iter().map(|&x| x.into()).sum();
     sum / items.len() as f64
 }
 
-// Multiple bounds — "T must implement Display AND Debug AND Clone"
+// Несколько ограничений — «T должен реализовывать Display, Debug и Clone»
 fn log_and_clone<T: std::fmt::Display + std::fmt::Debug + Clone>(item: &T) -> T {
     println!("Display: {}", item);
     println!("Debug: {:?}", item);
     item.clone()
 }
 
-// Shorthand with impl Trait (for simple cases)
+// Краткая запись с impl Trait (для простых случаев)
 fn print_it(item: &impl std::fmt::Display) {
     println!("{}", item);
 }
 ```
 
-### Generics Quick Reference
+### Краткая справка по обобщениям
 
-| Python | Rust | Notes |
-|--------|------|-------|
-| `TypeVar('T')` | `<T>` | Unbounded generic |
-| `TypeVar('T', bound=X)` | `<T: X>` | Bounded generic |
-| `Union[int, str]` | `enum` or trait object | Rust has no union types |
-| `Sequence[T]` | `&[T]` (slice) | Borrowed sequence |
-| `Callable[[A], R]` | `Fn(A) -> R` | Function trait |
-| `Optional[T]` | `Option<T>` | Built into the language |
+| Python | Rust | Примечания |
+|--------|------|------------|
+| `TypeVar('T')` | `<T>` | Обобщённый тип без ограничений |
+| `TypeVar('T', bound=X)` | `<T: X>` | Обобщённый тип с ограничением |
+| `Union[int, str]` | `enum` или трейт-объект | В Rust нет объединений типов |
+| `Sequence[T]` | `&[T]` (срез) | Заимствованная последовательность |
+| `Callable[[A], R]` | `Fn(A) -> R` | Трейт функции |
+| `Optional[T]` | `Option<T>` | Встроено в язык |
 
 ***
 
-## Common Standard Library Traits
+## Распространённые трейты стандартной библиотеки
 
-These are Rust's version of Python's "dunder methods" — they define how types
-behave in common situations.
+Это аналоги «магических методов» Python в Rust: они определяют, как типы ведут себя в типичных ситуациях.
 
-### Display and Debug (Printing)
+### Display и Debug (вывод)
 ```rust
 use std::fmt;
 
-// Debug — like __repr__ (auto-derivable)
+// Debug — как __repr__ (можно получить через derive)
 #[derive(Debug)]
 struct Point { x: f64, y: f64 }
-// Now you can: println!("{:?}", point);
+// Теперь можно: println!("{:?}", point);
 
-// Display — like __str__ (must implement manually)
+// Display — как __str__ (реализуется вручную)
 impl fmt::Display for Point {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "({}, {})", self.x, self.y)
     }
 }
-// Now you can: println!("{}", point);
+// Теперь можно: println!("{}", point);
 ```
 
-### Comparison Traits
+### Трейты сравнения
 ```rust
-// PartialEq — like __eq__
-// Eq — total equality (f64 is PartialEq but not Eq because NaN != NaN)
-// PartialOrd — like __lt__, __le__, etc.
-// Ord — total ordering
+// PartialEq — как __eq__
+// Eq — полное равенство (f64 реализует PartialEq, но не Eq, потому что NaN != NaN)
+// PartialOrd — как __lt__, __le__ и т. д.
+// Ord — полный порядок
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
 struct Student {
@@ -257,68 +251,68 @@ struct Student {
     grade: i32,
 }
 
-// Now students can be: compared, sorted, used as HashMap keys, cloned
+// Теперь студентов можно сравнивать, сортировать, использовать как ключи HashMap и клонировать
 let mut students = vec![
     Student { name: "Charlie".into(), grade: 85 },
     Student { name: "Alice".into(), grade: 92 },
 ];
-students.sort();  // Uses Ord — sorts by name then grade (struct field order)
+students.sort();  // Использует Ord: сортирует по имени, затем по оценке (порядок полей структуры)
 ```
 
-### Iterator Trait
+### Трейт Iterator
 ```rust
-// Implementing Iterator — like Python's __iter__/__next__
+// Реализация Iterator — как __iter__/__next__ в Python
 struct Countdown { value: i32 }
 
 impl Iterator for Countdown {
-    type Item = i32;       // What the iterator yields
+    type Item = i32;       // Что выдаёт итератор
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.value > 0 {
             self.value -= 1;
             Some(self.value + 1)
         } else {
-            None             // Iteration complete
+            None             // Итерация завершена
         }
     }
 }
 
-// Usage:
+// Использование:
 for n in (Countdown { value: 5 }) {
     println!("{n}");  // 5, 4, 3, 2, 1
 }
 ```
 
-### Common Traits at a Glance
+### Общие трейты в одном взгляде
 
-| Rust Trait | Python Equivalent | Purpose |
-|-----------|-------------------|---------|
-| `Display` | `__str__` | Human-readable string |
-| `Debug` | `__repr__` | Debug string (derivable) |
-| `Clone` | `copy.deepcopy` | Deep copy |
-| `Copy` | (int/float auto-copy) | Implicit copy for simple types |
-| `PartialEq` / `Eq` | `__eq__` | Equality comparison |
-| `PartialOrd` / `Ord` | `__lt__` etc. | Ordering |
-| `Hash` | `__hash__` | Hashable (for dict keys) |
-| `Default` | Default `__init__` | Default values |
-| `From` / `Into` | `__init__` overloads | Type conversions |
-| `Iterator` | `__iter__` / `__next__` | Iteration |
-| `Drop` | `__del__` / `__exit__` | Cleanup |
-| `Add`, `Sub`, `Mul` | `__add__`, `__sub__`, `__mul__` | Operator overloading |
-| `Index` | `__getitem__` | Indexing with `[]` |
-| `Deref` | (no equivalent) | Smart pointer dereferencing |
-| `Send` / `Sync` | (no equivalent) | Thread safety markers |
+| Трейт Rust | Аналог в Python | Назначение |
+|------------|-----------------|------------|
+| `Display` | `__str__` | Человекочитаемая строка |
+| `Debug` | `__repr__` | Отладочная строка (можно получить через derive) |
+| `Clone` | `copy.deepcopy` | Глубокая копия |
+| `Copy` | (автокопирование int/float) | Неявное копирование простых типов |
+| `PartialEq` / `Eq` | `__eq__` | Сравнение на равенство |
+| `PartialOrd` / `Ord` | `__lt__` и др. | Упорядочивание |
+| `Hash` | `__hash__` | Хешируемость (для ключей dict) |
+| `Default` | Значения по умолчанию в `__init__` | Значения по умолчанию |
+| `From` / `Into` | Перегрузки `__init__` | Преобразования типов |
+| `Iterator` | `__iter__` / `__next__` | Итерация |
+| `Drop` | `__del__` / `__exit__` | Очистка |
+| `Add`, `Sub`, `Mul` | `__add__`, `__sub__`, `__mul__` | Перегрузка операторов |
+| `Index` | `__getitem__` | Индексация через `[]` |
+| `Deref` | (аналога нет) | Разыменование умных указателей |
+| `Send` / `Sync` | (аналога нет) | Маркеры потокобезопасности |
 
 ```mermaid
 flowchart TB
-    subgraph Static ["Static Dispatch (impl Trait)"]
-        G["fn notify(item: &impl Summary)"] --> M1["Compiled: notify_Article()"]
-        G --> M2["Compiled: notify_Tweet()"]
-        M1 --> O1["Inlined, zero-cost"]
-        M2 --> O2["Inlined, zero-cost"]
+    subgraph Static ["Статическая диспетчеризация (impl Trait)"]
+        G["fn notify(item: &impl Summary)"] --> M1["Скомпилировано: notify_Article()"]
+        G --> M2["Скомпилировано: notify_Tweet()"]
+        M1 --> O1["Встроено, без затрат"]
+        M2 --> O2["Встроено, без затрат"]
     end
-    subgraph Dynamic ["Dynamic Dispatch (dyn Trait)"]
-        D["fn notify(item: &dyn Summary)"] --> VT["vtable lookup"]
+    subgraph Dynamic ["Динамическая диспетчеризация (dyn Trait)"]
+        D["fn notify(item: &dyn Summary)"] --> VT["Поиск в таблице виртуальных методов (vtable)"]
         VT --> I1["Article::summarize()"]
         VT --> I2["Tweet::summarize()"]
     end
@@ -327,16 +321,16 @@ flowchart TB
     style Dynamic fill:#fff3cd
 ```
 
-> **Python equivalent**: Python *always* uses dynamic dispatch (`getattr` at runtime). Rust defaults to static dispatch (monomorphization — the compiler generates specialized code for each concrete type). Use `dyn Trait` only when you need runtime polymorphism.
+> **Аналог в Python**: Python *всегда* использует динамическую диспетчеризацию (`getattr` во время выполнения). Rust по умолчанию использует статическую диспетчеризацию (мономорфизацию: компилятор генерирует специализированный код для каждого конкретного типа). `dyn Trait` используйте только тогда, когда нужен полиморфизм во время выполнения.
 >
-> 📌 **See also**: [Ch. 11 — From/Into Traits](ch11-from-and-into-traits.md) covers the conversion traits (`From`, `Into`, `TryFrom`) in depth.
+> 📌 **См. также**: [Гл. 11 — Трейты From и Into](ch11-from-and-into-traits.md) подробно описывает трейты преобразования (`From`, `Into`, `TryFrom`).
 
-### Associated Types
+### Ассоциированные типы
 
-Rust traits can define *associated types* — type placeholders that each implementor fills in. Python has no equivalent:
+Трейты Rust могут определять *ассоциированные типы*: заполнители типов, которые заполняет каждая реализация. У Python нет аналога:
 
 ```rust
-// Iterator defines an associated type 'Item'
+// Iterator определяет ассоциированный тип 'Item'
 trait Iterator {
     type Item;
     fn next(&mut self) -> Option<Self::Item>;
@@ -345,7 +339,7 @@ trait Iterator {
 struct Countdown { remaining: u32 }
 
 impl Iterator for Countdown {
-    type Item = u32;  // This iterator yields u32 values
+    type Item = u32;  // Этот итератор выдаёт значения u32
     fn next(&mut self) -> Option<u32> {
         if self.remaining > 0 {
             self.remaining -= 1;
@@ -357,11 +351,11 @@ impl Iterator for Countdown {
 }
 ```
 
-In Python, `__iter__` / `__next__` return `Any` — there's no way to declare "this iterator yields `int`" and have it enforced (type hints with `Iterator[int]` are advisory only).
+В Python `__iter__` / `__next__` возвращают `Any`: нельзя объявить «этот итератор выдаёт `int`» и получить принудительную проверку (подсказки типов `Iterator[int]` носят лишь рекомендательный характер).
 
-### Operator Overloading: `__add__` → `impl Add`
+### Перегрузка операторов: `__add__` → `impl Add`
 
-Python uses magic methods (`__add__`, `__mul__`). Rust uses trait implementations — same idea, but type-checked at compile time:
+Python использует магические методы (`__add__`, `__mul__`). Rust использует реализации трейтов: та же идея, но с проверкой типов на этапе компиляции:
 
 ```python
 # Python
@@ -369,7 +363,7 @@ class Vec2:
     def __init__(self, x, y):
         self.x, self.y = x, y
     def __add__(self, other):
-        return Vec2(self.x + other.x, self.y + other.y)  # No type checking on 'other'
+        return Vec2(self.x + other.x, self.y + other.y)  # Нет проверки типа 'other'
 ```
 
 ```rust
@@ -379,7 +373,7 @@ use std::ops::Add;
 struct Vec2 { x: f64, y: f64 }
 
 impl Add for Vec2 {
-    type Output = Vec2;  // Associated type: what does + return?
+    type Output = Vec2;  // Ассоциированный тип: что возвращает +?
     fn add(self, rhs: Vec2) -> Vec2 {
         Vec2 { x: self.x + rhs.x, y: self.y + rhs.y }
     }
@@ -387,22 +381,22 @@ impl Add for Vec2 {
 
 let a = Vec2 { x: 1.0, y: 2.0 };
 let b = Vec2 { x: 3.0, y: 4.0 };
-let c = a + b;  // Type-safe: only Vec2 + Vec2 is allowed
+let c = a + b;  // Безопасно по типам: допускается только Vec2 + Vec2
 ```
 
-Key difference: Python's `__add__` accepts *any* `other` at runtime (you check types manually or get a `TypeError`). Rust's `Add` trait enforces the operand types at compile time — `Vec2 + i32` is a compile error unless you explicitly `impl Add<i32> for Vec2`.
+Ключевое отличие: `__add__` в Python принимает *любой* `other` во время выполнения (типы приходится проверять вручную или получить `TypeError`). Трейт `Add` в Rust проверяет типы операндов на этапе компиляции: `Vec2 + i32` — ошибка компиляции, если вы явно не напишете `impl Add<i32> for Vec2`.
 
 ---
 
-## Exercises
+## Упражнения
 
 <details>
-<summary><strong>🏋️ Exercise: Generic Summary Trait</strong> (click to expand)</summary>
+<summary><strong>🏋️ Упражнение: обобщённый трейт Summary</strong> (нажмите, чтобы раскрыть)</summary>
 
-**Challenge**: Define a trait `Summary` with a method `fn summarize(&self) -> String`. Implement it for two structs: `Article { title: String, body: String }` and `Tweet { username: String, content: String }`. Then write a function `fn notify(item: &impl Summary)` that prints the summary.
+**Задание**: определите трейт `Summary` с методом `fn summarize(&self) -> String`. Реализуйте его для двух структур: `Article { title: String, body: String }` и `Tweet { username: String, content: String }`. Затем напишите функцию `fn notify(item: &impl Summary)`, которая выводит сводку.
 
 <details>
-<summary>🔑 Solution</summary>
+<summary>🔑 Решение</summary>
 
 ```rust
 trait Summary {
@@ -442,11 +436,10 @@ fn main() {
 }
 ```
 
-**Key takeaway**: `&impl Summary` is the Rust equivalent of Python's `Protocol` with a `summarize` method. But Rust checks it at compile time — passing a type that doesn't implement `Summary` is a compile error, not a runtime `AttributeError`.
+**Ключевой вывод**: `&impl Summary` — это аналог `Protocol` из Python с методом `summarize`. Но Rust проверяет это на этапе компиляции: передача типа, который не реализует `Summary`, — ошибка компиляции, а не `AttributeError` во время выполнения.
 
 </details>
 </details>
 
 ***
-
 

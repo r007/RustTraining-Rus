@@ -1,52 +1,51 @@
-## Rust Closures vs Python Lambdas
+## Замыкания Rust и лямбды Python
 
-> **What you'll learn:** Multi-line closures (not just one-expression lambdas), `Fn`/`FnMut`/`FnOnce` capture semantics,
-> iterator chains vs list comprehensions, `map`/`filter`/`fold`, and `macro_rules!` basics.
+> **Что вы узнаете:** многострочные замыкания (а не только однострочные лямбды), семантику захвата `Fn`/`FnMut`/`FnOnce`, цепочки итераторов в сравнении со списочными включениями, `map`/`filter`/`fold` и основы `macro_rules!`.
 >
-> **Difficulty:** 🟡 Intermediate
+> **Сложность:** 🟡 Средний
 
-### Python Closures and Lambdas
+### Замыкания и лямбды в Python
 ```python
-# Python — lambdas are one-expression anonymous functions
+# Python — лямбды это анонимные функции из одного выражения
 double = lambda x: x * 2
 result = double(5)  # 10
 
-# Full closures capture variables from enclosing scope:
+# Полноценные замыкания захватывают переменные из окружающей области видимости:
 def make_adder(n):
     def adder(x):
-        return x + n    # Captures `n` from outer scope
+        return x + n    # Захватывает `n` из внешней области видимости
     return adder
 
 add_5 = make_adder(5)
 print(add_5(10))  # 15
 
-# Higher-order functions:
+# Функции высшего порядка:
 numbers = [1, 2, 3, 4, 5]
 doubled = list(map(lambda x: x * 2, numbers))
 evens = list(filter(lambda x: x % 2 == 0, numbers))
 ```
 
-### Rust Closures
+### Замыкания в Rust
 ```rust
-// Rust — closures use |args| body syntax
+// Rust — замыкания используют синтаксис |аргументы| тело
 let double = |x: i32| x * 2;
 let result = double(5);  // 10
 
-// Closures capture variables from enclosing scope:
+// Замыкания захватывают переменные из окружающей области видимости:
 fn make_adder(n: i32) -> impl Fn(i32) -> i32 {
-    move |x| x + n    // `move` transfers ownership of `n` into the closure
+    move |x| x + n    // `move` передаёт владение `n` внутрь замыкания
 }
 
 let add_5 = make_adder(5);
 println!("{}", add_5(10));  // 15
 
-// Higher-order functions with iterators:
+// Функции высшего порядка с итераторами:
 let numbers = vec![1, 2, 3, 4, 5];
 let doubled: Vec<i32> = numbers.iter().map(|x| x * 2).collect();
 let evens: Vec<i32> = numbers.iter().filter(|&&x| x % 2 == 0).copied().collect();
 ```
 
-### Closure Syntax Comparison
+### Сравнение синтаксиса замыканий
 ```text
 Python:                              Rust:
 ─────────                            ─────
@@ -54,78 +53,78 @@ lambda x: x * 2                      |x| x * 2
 lambda x, y: x + y                   |x, y| x + y
 lambda: 42                           || 42
 
-# Multi-line
+# Многострочное
 def f(x):                            |x| {
     y = x * 2                            let y = x * 2;
     return y + 1                         y + 1
                                       }
 ```
 
-### Closure Capture — How Rust Differs
+### Захват в замыканиях: чем отличается Rust
 ```python
-# Python — closures capture by reference (late binding!)
+# Python — замыкания захватывают по ссылке (позднее связывание!)
 funcs = [lambda: i for i in range(3)]
-print([f() for f in funcs])  # [2, 2, 2] — surprise! All captured the same `i`
+print([f() for f in funcs])  # [2, 2, 2] — сюрприз! Все захватили один и тот же `i`
 
-# Fix with default arg trick:
+# Исправление через трюк со значением по умолчанию:
 funcs = [lambda i=i: i for i in range(3)]
 print([f() for f in funcs])  # [0, 1, 2]
 ```
 
 ```rust
-// Rust — closures capture correctly (no late-binding gotcha)
+// Rust — замыкания захватывают корректно (ловушки позднего связывания нет)
 let funcs: Vec<Box<dyn Fn() -> i32>> = (0..3)
     .map(|i| Box::new(move || i) as Box<dyn Fn() -> i32>)
     .collect();
 
 let results: Vec<i32> = funcs.iter().map(|f| f()).collect();
-println!("{:?}", results);  // [0, 1, 2] — correct!
+println!("{:?}", results);  // [0, 1, 2] — правильно!
 
-// `move` captures a COPY of `i` for each closure — no late-binding surprise.
+// `move` захватывает КОПИЮ `i` для каждого замыкания, никаких сюрпризов позднего связывания.
 ```
 
-### Three Closure Traits
+### Три трейта замыканий
 ```rust
-// Rust closures implement one or more of these traits:
+// Замыкания Rust реализуют один или несколько из этих трейтов:
 
-// Fn — can be called multiple times, doesn't mutate captures (most common)
+// Fn — можно вызывать много раз, не изменяет захваченное (самый распространённый)
 fn apply(f: impl Fn(i32) -> i32, x: i32) -> i32 { f(x) }
 
-// FnMut — can be called multiple times, MAY mutate captures
+// FnMut — можно вызывать много раз, МОЖЕТ изменять захваченное
 fn apply_mut(mut f: impl FnMut(i32) -> i32, x: i32) -> i32 { f(x) }
 
-// FnOnce — can only be called ONCE (consumes captures)
+// FnOnce — можно вызвать ТОЛЬКО ОДИН раз (потребляет захваченное)
 fn apply_once(f: impl FnOnce() -> String) -> String { f() }
 
-// Python has no equivalent — closures are always Fn-like.
-// In Rust, the compiler automatically determines which trait to use.
+// В Python аналога нет: замыкания всегда ведут себя как Fn.
+// В Rust компилятор сам определяет, какой трейт использовать.
 ```
 
 ***
 
-## Iterators vs Generators
+## Итераторы и генераторы
 
-### Python Generators
+### Генераторы в Python
 ```python
-# Python — generators with yield
+# Python — генераторы с yield
 def fibonacci():
     a, b = 0, 1
     while True:
         yield a
         a, b = b, a + b
 
-# Lazy — values computed on demand
+# Ленивые: значения вычисляются по требованию
 fib = fibonacci()
 first_10 = [next(fib) for _ in range(10)]
 
-# Generator expressions — like lazy list comprehensions
-squares = (x ** 2 for x in range(1000000))  # No memory allocation
+# Генераторные выражения — как ленивые списочные включения
+squares = (x ** 2 for x in range(1000000))  # Без выделения памяти
 first_5 = [next(squares) for _ in range(5)]
 ```
 
-### Rust Iterators
+### Итераторы Rust
 ```rust
-// Rust — Iterator trait (similar concept, different syntax)
+// Rust — трейт Iterator (похожая концепция, другой синтаксис)
 struct Fibonacci {
     a: u64,
     b: u64,
@@ -148,22 +147,22 @@ impl Iterator for Fibonacci {
     }
 }
 
-// Lazy — values computed on demand (just like Python generators)
+// Ленивые: значения вычисляются по требованию (как генераторы Python)
 let first_10: Vec<u64> = Fibonacci::new().take(10).collect();
 
-// Iterator chains — like generator expressions
+// Цепочки итераторов — как генераторные выражения
 let squares: Vec<u64> = (0..1_000_000u64).map(|x| x * x).take(5).collect();
 ```
 
 ***
 
-## Comprehensions vs Iterator Chains
+## Списочные включения и цепочки итераторов
 
-This section maps Python's comprehension syntax to Rust's iterator chains.
+Этот раздел сопоставляет синтаксис списочных включений Python с цепочками итераторов Rust.
 
-### List Comprehension → map/filter/collect
+### Списочные включения → map/filter/collect
 ```python
-# Python comprehensions:
+# Списочные включения в Python:
 squares = [x ** 2 for x in range(10)]
 evens = [x for x in range(20) if x % 2 == 0]
 names = [user.name for user in users if user.active]
@@ -173,7 +172,7 @@ flat = [item for sublist in nested for item in sublist]
 
 ```mermaid
 flowchart LR
-    A["Source<br/>[1,2,3,4,5]"] -->|".iter()"| B["Iterator"]
+    A["Источник<br/>[1,2,3,4,5]"] -->|".iter()"| B["Итератор"]
     B -->|".filter(x: x%2==0)"| C["[2, 4]"]
     C -->|".map(x: x*x)"| D["[4, 16]"]
     D -->|".collect()"| E["Vec&lt;i32&gt;<br/>[4, 16]"]
@@ -181,10 +180,10 @@ flowchart LR
     style E fill:#d4edda
 ```
 
-> **Key insight**: Rust iterators are lazy — nothing happens until `.collect()`. Python's generators work similarly, but list comprehensions evaluate eagerly.
+> **Ключевая мысль**: итераторы Rust ленивые: ничего не происходит до `.collect()`. Генераторы Python работают похоже, но списочные включения вычисляются сразу (энергично).
 
 ```rust
-// Rust iterator chains:
+// Цепочки итераторов Rust:
 let squares: Vec<i32> = (0..10).map(|x| x * x).collect();
 let evens: Vec<i32> = (0..20).filter(|x| x % 2 == 0).collect();
 let names: Vec<&str> = users.iter()
@@ -199,7 +198,7 @@ let flat: Vec<i32> = nested.iter()
     .collect();
 ```
 
-### Dict Comprehension → collect into HashMap
+### Словарное включение → collect в HashMap
 ```python
 # Python
 word_lengths = {word: len(word) for word in words}
@@ -216,7 +215,7 @@ let inverted: HashMap<&V, &K> = mapping.iter()
     .collect();
 ```
 
-### Set Comprehension → collect into HashSet
+### Включение множества → collect в HashSet
 ```python
 # Python
 unique_lengths = {len(word) for word in words}
@@ -229,64 +228,62 @@ let unique_lengths: HashSet<usize> = words.iter()
     .collect();
 ```
 
-### Common Iterator Methods
+### Частые методы итераторов
 
-| Python | Rust | Notes |
-|--------|------|-------|
-| `map(f, iter)` | `.map(f)` | Transform each element |
-| `filter(f, iter)` | `.filter(f)` | Keep matching elements |
-| `sum(iter)` | `.sum()` | Sum all elements |
-| `min(iter)` / `max(iter)` | `.min()` / `.max()` | Returns `Option` |
-| `any(f(x) for x in iter)` | `.any(f)` | True if any match |
-| `all(f(x) for x in iter)` | `.all(f)` | True if all match |
-| `enumerate(iter)` | `.enumerate()` | Index + value |
-| `zip(a, b)` | `a.zip(b)` | Pair elements |
-| `len(list)` | `.count()` (consumes!) or `.len()` | Count elements |
-| `list(reversed(x))` | `.rev()` | Reverse iteration |
-| `itertools.chain(a, b)` | `a.chain(b)` | Concatenate iterators |
-| `next(iter)` | `.next()` | Get next element |
-| `next(iter, default)` | `.next().unwrap_or(default)` | With default |
-| `list(iter)` | `.collect::<Vec<_>>()` | Materialize into collection |
-| `sorted(iter)` | Collect, then `.sort()` | No lazy sorted iterator |
-| `functools.reduce(f, iter)` | `.fold(init, f)` or `.reduce(f)` | Accumulate |
+| Python | Rust | Примечания |
+|--------|------|------------|
+| `map(f, iter)` | `.map(f)` | Преобразует каждый элемент |
+| `filter(f, iter)` | `.filter(f)` | Оставляет подходящие элементы |
+| `sum(iter)` | `.sum()` | Суммирует все элементы |
+| `min(iter)` / `max(iter)` | `.min()` / `.max()` | Возвращает `Option` |
+| `any(f(x) for x in iter)` | `.any(f)` | True, если хотя бы один подходит |
+| `all(f(x) for x in iter)` | `.all(f)` | True, если подходят все |
+| `enumerate(iter)` | `.enumerate()` | Индекс и значение |
+| `zip(a, b)` | `a.zip(b)` | Попарное объединение элементов |
+| `len(list)` | `.count()` (потребляет итератор!) или `.len()` | Подсчёт элементов |
+| `list(reversed(x))` | `.rev()` | Обратный обход |
+| `itertools.chain(a, b)` | `a.chain(b)` | Соединение итераторов |
+| `next(iter)` | `.next()` | Получить следующий элемент |
+| `next(iter, default)` | `.next().unwrap_or(default)` | С значением по умолчанию |
+| `list(iter)` | `.collect::<Vec<_>>()` | Материализация в коллекцию |
+| `sorted(iter)` | Собрать, затем `.sort()` | Ленивого итератора сортировки нет |
+| `functools.reduce(f, iter)` | `.fold(init, f)` или `.reduce(f)` | Накопление |
 
-### Key Differences
+### Ключевые различия
 ```text
-Python iterators:                     Rust iterators:
+Итераторы Python:                     Итераторы Rust:
 ─────────────────                     ──────────────
-- Lazy by default (generators)       - Lazy by default (all iterator chains)
-- yield creates generators            - impl Iterator { fn next() }
-- StopIteration to end               - None to end
-- Can be consumed once               - Can be consumed once
-- No type safety                      - Fully type-safe
-- Slightly slower (interpreter)       - Zero-cost (compiled away)
+- Ленивые по умолчанию (генераторы)   - Ленивые по умолчанию (все цепочки итераторов)
+- yield создаёт генераторы            - impl Iterator { fn next() }
+- StopIteration для завершения        - None для завершения
+- Потребляются один раз               - Потребляются один раз
+- Нет типовой безопасности            - Полностью типобезопасны
+- Немного медленнее (интерпретатор)   - Без накладных расходов (компилируется)
 ```
 
 ***
 
-
 <!-- ch12a: Macros -->
-## Why Macros Exist in Rust
+## Зачем нужны макросы в Rust
 
-Python has no macro system — it uses decorators, metaclasses, and runtime
-introspection for metaprogramming. Rust uses macros for compile-time code generation.
+В Python нет системы макросов: для метапрограммирования используются декораторы, метаклассы и интроспекция во время выполнения. Rust использует макросы для генерации кода на этапе компиляции.
 
-### Python Metaprogramming vs Rust Macros
+### Метапрограммирование в Python и макросы Rust
 ```python
-# Python — decorators and metaclasses for metaprogramming
+# Python — декораторы и метаклассы для метапрограммирования
 from dataclasses import dataclass
 from functools import wraps
 
-@dataclass              # Generates __init__, __repr__, __eq__ at import time
+@dataclass              # Генерирует __init__, __repr__, __eq__ во время импорта
 class Point:
     x: float
     y: float
 
-# Custom decorator
+# Собственный декоратор
 def log_calls(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
-        print(f"Calling {func.__name__}")
+        print(f"Вызов {func.__name__}")
         return func(*args, **kwargs)
     return wrapper
 
@@ -296,18 +293,18 @@ def process(data):
 ```
 
 ```rust
-// Rust — derive macros and declarative macros for code generation
-#[derive(Debug, Clone, PartialEq)]  // Generates Debug, Clone, PartialEq impls at COMPILE time
+// Rust — производные макросы и декларативные макросы для генерации кода
+#[derive(Debug, Clone, PartialEq)]  // Генерирует реализации Debug, Clone, PartialEq на этапе КОМПИЛЯЦИИ
 struct Point {
     x: f64,
     y: f64,
 }
 
-// Declarative macro (like a template)
+// Декларативный макрос (как шаблон)
 macro_rules! log_call {
     ($func_name:expr, $body:expr) => {
         {
-            println!("Calling {}", $func_name);
+            println!("Вызов {}", $func_name);
             $body
         }
     };
@@ -318,30 +315,30 @@ fn process(data: &str) -> String {
 }
 ```
 
-### Common Built-in Macros
+### Частые встроенные макросы
 ```rust
-// These macros are used everywhere in Rust:
+// Эти макросы используются повсюду в Rust:
 
-println!("Hello, {}!", name);           // Print with formatting
-format!("Value: {}", x);               // Create formatted String
-vec![1, 2, 3];                          // Create a Vec
-assert_eq!(2 + 2, 4);                  // Test assertion
-assert!(value > 0, "must be positive"); // Boolean assertion
-dbg!(expression);                       // Debug print: prints expression AND value
-todo!();                                // Placeholder — compiles but panics if reached
-unimplemented!();                       // Mark code as unimplemented
-panic!("something went wrong");         // Crash with message (like raise RuntimeError)
+println!("Hello, {}!", name);           // Вывод с форматированием
+format!("Value: {}", x);               // Создание форматированной String
+vec![1, 2, 3];                          // Создание Vec
+assert_eq!(2 + 2, 4);                  // Проверка равенства в тесте
+assert!(value > 0, "должно быть положительным"); // Проверка логического условия
+dbg!(expression);                       // Отладочный вывод: печатает выражение И его значение
+todo!();                                // Заглушка: компилируется, но паникует при вызове
+unimplemented!();                       // Отметить код как нереализованный
+panic!("something went wrong");         // Аварийное завершение с сообщением (как raise RuntimeError)
 
-// Why are these macros instead of functions?
-// - println! accepts variable arguments (Rust functions can't)
-// - vec! generates code for any type and size
-// - assert_eq! knows the SOURCE CODE of what you compared
-// - dbg! knows the FILE NAME and LINE NUMBER
+// Почему это макросы, а не функции?
+// - println! принимает переменное число аргументов (функции Rust не могут)
+// - vec! генерирует код для любого типа и размера
+// - assert_eq! знает ИСХОДНЫЙ КОД того, что сравнивалось
+// - dbg! знает ИМЯ ФАЙЛА и НОМЕР СТРОКИ
 ```
 
-## Writing a Simple Macro with macro_rules!
+## Пишем простой макрос с помощью macro_rules!
 ```rust
-// Python dict() equivalent
+// Аналог dict() в Python
 // Python: d = dict(a=1, b=2)
 // Rust:   let d = hashmap!{ "a" => 1, "b" => 2 };
 
@@ -362,9 +359,9 @@ let scores = hashmap! {
 };
 ```
 
-## Derive Macros — Auto-Implementing Traits
+## Производные макросы: автоматическая реализация трейтов
 ```rust
-// #[derive(...)] is the Rust equivalent of Python's @dataclass decorator
+// #[derive(...)] — это аналог декоратора @dataclass в Python
 
 // Python:
 // @dataclass(frozen=True, order=True)
@@ -379,42 +376,42 @@ struct Student {
     grade: i32,
 }
 
-// Common derive macros:
-// Debug         → {:?} formatting (like __repr__)
-// Clone         → .clone() deep copy
-// Copy          → implicit copy (only for simple types)
-// PartialEq, Eq → == comparison (like __eq__)
-// PartialOrd, Ord → <, >, sorting (like __lt__ etc.)
-// Hash          → usable as HashMap key (like __hash__)
-// Default       → MyType::default() (like __init__ with no args)
+// Частые производные макросы:
+// Debug         → форматирование {:?} (как __repr__)
+// Clone         → .clone(), глубокая копия
+// Copy          → неявное копирование (только для простых типов)
+// PartialEq, Eq → сравнение == (как __eq__)
+// PartialOrd, Ord → <, >, сортировка (как __lt__ и др.)
+// Hash          → можно использовать как ключ HashMap (как __hash__)
+// Default       → MyType::default() (как __init__ без аргументов)
 
-// Crate-provided derive macros:
-// Serialize, Deserialize (serde) → JSON/YAML/TOML serialization
-//                                  (like Python's json.dumps/loads but type-safe)
+// Производные макросы из крейтов:
+// Serialize, Deserialize (serde) → сериализация в JSON/YAML/TOML
+//                                  (как json.dumps/loads в Python, но с проверкой типов)
 ```
 
-### Python Decorator vs Rust Derive
+### Декоратор Python и производный макрос Rust
 
-| Python Decorator | Rust Derive | Purpose |
-|-----------------|-------------|---------|
-| `@dataclass` | `#[derive(Debug, Clone, PartialEq)]` | Data class |
-| `@dataclass(frozen=True)` | Immutable by default | Immutability |
-| `@dataclass(order=True)` | `#[derive(Ord, PartialOrd)]` | Comparison/sorting |
-| `@total_ordering` | `#[derive(PartialOrd, Ord)]` | Full ordering |
-| JSON `json.dumps(obj.__dict__)` | `#[derive(Serialize)]` | Serialization |
-| JSON `MyClass(**json.loads(s))` | `#[derive(Deserialize)]` | Deserialization |
+| Декоратор Python | Производный макрос Rust | Назначение |
+|------------------|-------------------------|------------|
+| `@dataclass` | `#[derive(Debug, Clone, PartialEq)]` | Класс данных |
+| `@dataclass(frozen=True)` | Неизменяемость по умолчанию | Неизменяемость |
+| `@dataclass(order=True)` | `#[derive(Ord, PartialOrd)]` | Сравнение и сортировка |
+| `@total_ordering` | `#[derive(PartialOrd, Ord)]` | Полный порядок |
+| JSON `json.dumps(obj.__dict__)` | `#[derive(Serialize)]` | Сериализация |
+| JSON `MyClass(**json.loads(s))` | `#[derive(Deserialize)]` | Десериализация |
 
 ---
 
-## Exercises
+## Упражнения
 
 <details>
-<summary><strong>🏋️ Exercise: Derive and Custom Debug</strong> (click to expand)</summary>
+<summary><strong>🏋️ Упражнение: derive и собственный Debug</strong> (нажмите, чтобы раскрыть)</summary>
 
-**Challenge**: Create a `User` struct with fields `name: String`, `email: String`, and `password_hash: String`. Derive `Clone` and `PartialEq`, but implement `Debug` manually so it prints the name and email but redacts the password (shows `"***"` instead).
+**Задание**: создайте структуру `User` с полями `name: String`, `email: String` и `password_hash: String`. Реализуйте `Clone` и `PartialEq` через derive, а `Debug` напишите вручную так, чтобы он выводил имя и email, а пароль скрывал (вместо него показывал `"***"`).
 
 <details>
-<summary>🔑 Solution</summary>
+<summary>🔑 Решение</summary>
 
 ```rust
 use std::fmt;
@@ -447,7 +444,7 @@ fn main() {
 }
 ```
 
-**Key takeaway**: Unlike Python's `__repr__`, Rust lets you derive `Debug` for free — but you can override it for sensitive fields. This is safer than Python where `print(user)` might accidentally leak secrets.
+**Ключевой вывод**: в отличие от `__repr__` в Python, Rust позволяет получить `Debug` через derive бесплатно, но его можно переопределить для чувствительных полей. Это безопаснее, чем в Python, где `print(user)` может случайно раскрыть секреты.
 
 </details>
 </details>

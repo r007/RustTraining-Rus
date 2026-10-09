@@ -1,16 +1,15 @@
-## Idiomatic Rust for Python Developers
+## Идиоматичный Rust для разработчиков на Python
 
-> **What you'll learn:** Top 10 habits to build, common pitfalls with fixes, a structured 3-month learning path,
-> the complete Python→Rust "Rosetta Stone" reference table, and recommended learning resources.
+> **Что вы узнаете:** десять привычек, которые стоит выработать, частые ошибки и их исправления, структурированный трёхмесячный план обучения, полную справочную таблицу «Розеттский камень» Python → Rust и рекомендуемые ресурсы для изучения.
 >
-> **Difficulty:** 🟡 Intermediate
+> **Сложность:** 🟡 Средний
 
 ```mermaid
 flowchart LR
-    A["🟢 Week 1-2<br/>Foundations<br/>'Why won't this compile?'"] --> B["🟡 Week 3-4<br/>Core Concepts<br/>'Oh, it's protecting me'"] 
-    B --> C["🟡 Month 2<br/>Intermediate<br/>'I see why this matters'"]
-    C --> D["🔴 Month 3+<br/>Advanced<br/>'Caught a bug at compile time!'"]
-    D --> E["🏆 Month 6<br/>Fluent<br/>'Better programmer everywhere'"]
+    A["🟢 Недели 1–2<br/>Основы<br/>«Почему это не компилируется?»"] --> B["🟡 Недели 3–4<br/>Ключевые концепции<br/>«А, оно меня защищает»"]
+    B --> C["🟡 Месяц 2<br/>Средний уровень<br/>«Теперь вижу, зачем это нужно»"]
+    C --> D["🔴 Месяц 3+<br/>Продвинутый уровень<br/>«Поймал баг на этапе компиляции!»"]
+    D --> E["🏆 Месяц 6<br/>Свободное владение<br/>«Стал лучшим программистом везде»"]
     style A fill:#d4edda
     style B fill:#fff3cd
     style C fill:#fff3cd
@@ -18,203 +17,193 @@ flowchart LR
     style E fill:#c3e6cb,stroke:#28a745
 ```
 
-### Top 10 Habits to Build
+### Десять привычек, которые стоит выработать
 
-1. **Use `match` on enums instead of `if isinstance()`**
+1. **Используйте `match` для перечислений вместо `if isinstance()`**
    ```python
    # Python                              # Rust
    if isinstance(shape, Circle): ...     match shape { Shape::Circle(r) => ... }
    ```
 
-2. **Let the compiler guide you** — Read error messages carefully. Rust's
-   compiler is the best in any language. It tells you what's wrong AND how to fix it.
+2. **Доверяйте компилятору.** Внимательно читайте сообщения об ошибках. Компилятор Rust — лучший среди всех языков. Он говорит, что не так, И как это исправить.
 
-3. **Prefer `&str` over `String` in function parameters** — Accept the most
-   general type. `&str` works with both `String` and string literals.
+3. **Предпочитайте `&str` вместо `String` в параметрах функций.** Принимайте наиболее общий тип. `&str` работает и с `String`, и с строковыми литералами.
 
-4. **Use iterators instead of index loops** — Iterator chains are more idiomatic
-   and often faster than `for i in 0..vec.len()`.
+4. **Используйте итераторы вместо циклов по индексу.** Цепочки итераторов идиоматичнее и часто быстрее, чем `for i in 0..vec.len()`.
 
-5. **Embrace `Option` and `Result`** — Don't `.unwrap()` everything. Use `?`,
-   `map`, `and_then`, `unwrap_or_else`.
+5. **Используйте `Option` и `Result` в полной мере.** Не вызывайте `.unwrap()` везде. Используйте `?`, `map`, `and_then`, `unwrap_or_else`.
 
-6. **Derive traits liberally** — `#[derive(Debug, Clone, PartialEq)]` should be
-   on most structs. It's free and makes testing easier.
+6. **Щедро используйте derive для трейтов.** `#[derive(Debug, Clone, PartialEq)]` должен стоять на большинстве структур. Это бесплатно и упрощает тестирование.
 
-7. **Use `cargo clippy` religiously** — It catches hundreds of style and correctness
-   issues. Treat it like `ruff` for Rust.
+7. **Регулярно запускайте `cargo clippy`.** Он находит сотни проблем со стилем и корректностью. Относитесь к нему как к `ruff` для Rust.
 
-8. **Don't fight the borrow checker** — If you're fighting it, you're probably
-   structuring data wrong. Refactor to make ownership clear.
+8. **Не боритесь с borrow checker.** Если вы с ним воюете, скорее всего, данные структурированы неправильно. Переделайте структуру, чтобы владение стало понятным.
 
-9. **Use enums for state machines** — Instead of string flags or booleans, use
-   enums. The compiler ensures you handle every state.
+9. **Используйте перечисления для конечных автоматов.** Вместо строковых флагов или булевых значений используйте перечисления. Компилятор следит, чтобы обрабатывалось каждое состояние.
 
-10. **Clone first, optimize later** — When learning, use `.clone()` freely to
-    avoid ownership complexity. Optimize only when profiling shows a need.
+10. **Сначала клонируйте, потом оптимизируйте.** На этапе изучения свободно используйте `.clone()`, чтобы не разбираться со сложностью владения. Оптимизируйте, только когда профилирование покажет необходимость.
 
-### Common Mistakes from Python Developers
+### Частые ошибки разработчиков на Python
 
-| Mistake | Why | Fix |
-|---------|-----|-----|
-| `.unwrap()` everywhere | Panics at runtime | Use `?` or `match` |
-| String instead of &str | Unnecessary allocation | Use `&str` for params |
-| `for i in 0..vec.len()` | Not idiomatic | `for item in &vec` |
-| Ignoring clippy warnings | Miss easy improvements | `cargo clippy` |
-| Too many `.clone()` calls | Performance overhead | Refactor ownership |
-| Giant main() function | Hard to test | Extract into lib.rs |
-| Not using `#[derive()]` | Re-inventing the wheel | Derive common traits |
-| Panicking on errors | Not recoverable | Return `Result<T, E>` |
+| Ошибка | Почему плохо | Исправление |
+|--------|--------------|-------------|
+| `.unwrap()` везде | Паника во время выполнения | Используйте `?` или `match` |
+| `String` вместо `&str` | Лишнее выделение памяти | Используйте `&str` в параметрах |
+| `for i in 0..vec.len()` | Не идиоматично | `for item in &vec` |
+| Игнорирование предупреждений clippy | Упускаете простые улучшения | `cargo clippy` |
+| Слишком много вызовов `.clone()` | Накладные расходы | Пересмотрите владение |
+| Огромная функция main() | Трудно тестировать | Вынесите код в lib.rs |
+| Не используете `#[derive()]` | Изобретаете велосипед | Derive для общих трейтов |
+| Паника при ошибках | Не восстанавливается | Возвращайте `Result<T, E>` |
 
 ***
 
-## Performance Comparison
+## Сравнение производительности
 
-### Benchmark: Common Operations
+### Бенчмарк: частые операции
 ```text
-Operation              Python 3.12    Rust (release)    Speedup
+Операция               Python 3.12    Rust (release)    Ускорение
 ─────────────────────  ────────────   ──────────────    ─────────
-Fibonacci(40)          ~25s           ~0.3s             ~80x
-Sort 10M integers      ~5.2s          ~0.6s             ~9x
-JSON parse 100MB       ~8.5s          ~0.4s             ~21x
-Regex 1M matches       ~3.1s          ~0.3s             ~10x
-HTTP server (req/s)    ~5,000         ~150,000          ~30x
-SHA-256 1GB file       ~12s           ~1.2s             ~10x
-CSV parse 1M rows      ~4.5s          ~0.2s             ~22x
-String concatenation   ~2.1s          ~0.05s            ~42x
+Фибоначчи(40)          ~25s           ~0.3s             ~80x
+Сортировка 10 млн целых ~5.2s         ~0.6s             ~9x
+Разбор JSON 100 МБ     ~8.5s          ~0.4s             ~21x
+Регулярные выражения: 1 млн совпадений ~3.1s  ~0.3s    ~10x
+HTTP-сервер (запросов/с) ~5,000       ~150,000          ~30x
+SHA-256 для файла 1 ГБ ~12s           ~1.2s             ~10x
+Разбор CSV: 1 млн строк ~4.5s         ~0.2s             ~22x
+Конкатенация строк     ~2.1s          ~0.05s            ~42x
 ```
 
-> **Note**: Python with C extensions (NumPy, etc.) dramatically narrows the gap
-> for numerical work. These benchmarks compare pure Python vs pure Rust.
+> **Примечание**: Python с C-расширениями (NumPy и др.) заметно сокращает разрыв в численных расчётах. Эти бенчмарки сравнивают чистый Python с чистым Rust.
 
-### Memory Usage
+### Использование памяти
 ```text
 Python:                                 Rust:
 ─────────                               ─────
-- Object header: 28 bytes/object       - No object header
-- int: 28 bytes (even for 0)           - i32: 4 bytes, i64: 8 bytes
-- str "hello": 54 bytes                - &str "hello": 16 bytes (ptr + len)
-- list of 1000 ints: ~36 KB            - Vec<i32>: ~4 KB
-  (8 KB pointers + 28 KB int objects)
-- dict of 100 items: ~5.5 KB           - HashMap of 100: ~2.4 KB
+- Заголовок объекта: 28 байт/объект    - Заголовка объекта нет
+- int: 28 байт (даже для 0)            - i32: 4 байта, i64: 8 байт
+- str "hello": 54 байта                - &str "hello": 16 байт (указатель + длина)
+- список из 1000 int: ~36 КБ           - Vec<i32>: ~4 КБ
+  (8 КБ указатели + 28 КБ объекты int)
+- dict из 100 элементов: ~5,5 КБ       - HashMap из 100 элементов: ~2,4 КБ
 
-Total for typical application:
-- Python: 50-200 MB baseline           - Rust: 1-5 MB baseline
+Итого для типичного приложения:
+- Python: базово 50–200 МБ             - Rust: базово 1–5 МБ
 ```
 
 ***
 
-## Common Pitfalls and Solutions
+## Частые ошибки и их решения
 
-### Pitfall 1: "The Borrow Checker Won't Let Me"
+### Ловушка 1: «Borrow checker не даёт»
 ```rust
-// Problem: trying to iterate and modify
+// Проблема: попытка одновременно итерировать и менять коллекцию
 let mut items = vec![1, 2, 3, 4, 5];
 // for item in &items {
-//     if *item > 3 { items.push(*item * 2); }  // ❌ Can't borrow mut while borrowed
+//     if *item > 3 { items.push(*item * 2); }  // ❌ Нельзя взять изменяемую ссылку, пока есть заимствование
 // }
 
-// Solution 1: collect changes, apply after
+// Решение 1: собрать изменения и применить их после
 let additions: Vec<i32> = items.iter()
     .filter(|&&x| x > 3)
     .map(|&x| x * 2)
     .collect();
 items.extend(additions);
 
-// Solution 2: use retain/extend
+// Решение 2: используйте retain/extend
 items.retain(|&x| x <= 3);
 ```
 
-### Pitfall 2: "Too Many String Types"
+### Ловушка 2: «Слишком много строковых типов»
 ```rust
-// When in doubt:
-// - &str for function parameters
-// - String for struct fields and return values
-// - &str literals ("hello") work everywhere &str is expected
+// Если сомневаетесь:
+// - &str для параметров функций
+// - String для полей структур и возвращаемых значений
+// - литералы &str ("hello") работают везде, где ожидается &str
 
-fn process(input: &str) -> String {    // Accept &str, return String
+fn process(input: &str) -> String {    // Принимаем &str, возвращаем String
     format!("Processed: {}", input)
 }
 ```
 
-### Pitfall 3: "I Miss Python's Simplicity"
+### Ловушка 3: «Мне не хватает простоты Python»
 ```rust
-// Python one-liner:
+// Однострочник на Python:
 // result = [x**2 for x in data if x > 0]
 
-// Rust equivalent:
+// Эквивалент на Rust:
 let result: Vec<i32> = data.iter()
     .filter(|&&x| x > 0)
     .map(|&x| x * x)
     .collect();
 
-// It's more verbose, but:
-// - Type-safe at compile time
-// - 10-100x faster
-// - No runtime type errors possible
-// - Explicit about memory allocation (.collect())
+// Он многословнее, зато:
+// - типобезопасен на этапе компиляции
+// - в 10–100 раз быстрее
+// - ошибки типов во время выполнения невозможны
+// - явно видно выделение памяти (.collect())
 ```
 
-### Pitfall 4: "Where's My REPL?"
+### Ловушка 4: «А где мой REPL?»
 ```rust
-// Rust has no REPL. Instead:
-// 1. Use `cargo test` as your REPL — write small tests to try things
-// 2. Use Rust Playground (play.rust-lang.org) for quick experiments
-// 3. Use `dbg!()` macro for quick debug output
-// 4. Use `cargo watch -x test` for auto-running tests on save
+// В Rust нет REPL. Вместо этого:
+// 1. Используйте `cargo test` как REPL: пишите небольшие тесты, чтобы что-то проверить
+// 2. Используйте Rust Playground (play.rust-lang.org) для быстрых экспериментов
+// 3. Используйте макрос `dbg!()` для быстрого отладочного вывода
+// 4. Используйте `cargo watch -x test`, чтобы тесты запускались при сохранении
 
 #[test]
 fn playground() {
-    // Use this as your "REPL" — run with `cargo test playground`
+    // Используйте это как свой «REPL»: запускайте через `cargo test playground`
     let result = "hello world"
         .split_whitespace()
         .map(|w| w.to_uppercase())
         .collect::<Vec<_>>();
-    dbg!(&result);  // Prints: [src/main.rs:5] &result = ["HELLO", "WORLD"]
+    dbg!(&result);  // Выводит: [src/main.rs:5] &result = ["HELLO", "WORLD"]
 }
 ```
 
 ***
 
-## Learning Path and Resources
+## Путь обучения и ресурсы
 
-### Week 1-2: Foundations
-- [ ] Install Rust, set up VS Code with rust-analyzer
-- [ ] Complete chapters 1-4 of this guide (types, control flow)
-- [ ] Write 5 small programs converting Python scripts to Rust
-- [ ] Get comfortable with `cargo build`, `cargo test`, `cargo clippy`
+### Недели 1–2: основы
+- [ ] Установите Rust и настройте VS Code с rust-analyzer
+- [ ] Пройдите главы 1–4 этого руководства (типы, управление потоком)
+- [ ] Напишите 5 небольших программ, переписав скрипты Python на Rust
+- [ ] Освойтесь с `cargo build`, `cargo test`, `cargo clippy`
 
-### Week 3-4: Core Concepts
-- [ ] Complete chapters 5-8 (structs, enums, ownership, modules)
-- [ ] Rewrite a Python data processing script in Rust
-- [ ] Practice with `Option<T>` and `Result<T, E>` until natural
-- [ ] Read compiler error messages carefully — they're teaching you
+### Недели 3–4: ключевые концепции
+- [ ] Пройдите главы 5–8 (структуры, перечисления, владение, модули)
+- [ ] Перепишите на Rust скрипт обработки данных на Python
+- [ ] Практикуйтесь с `Option<T>` и `Result<T, E>`, пока это не станет естественным
+- [ ] Внимательно читайте сообщения компилятора: они вас учат
 
-### Month 2: Intermediate
-- [ ] Complete chapters 9-12 (error handling, traits, iterators)
-- [ ] Build a CLI tool with `clap` and `serde`
-- [ ] Write a PyO3 extension for a Python project hotspot
-- [ ] Practice iterator chains until they feel like comprehensions
+### Месяц 2: средний уровень
+- [ ] Пройдите главы 9–12 (обработка ошибок, трейты, итераторы)
+- [ ] Создайте CLI-утилиту с `clap` и `serde`
+- [ ] Напишите расширение PyO3 для узкого места в проекте на Python
+- [ ] Практикуйтесь с цепочками итераторов, пока они не станут похожи на списочные включения
 
-### Month 3: Advanced
-- [ ] Complete chapters 13-16 (concurrency, unsafe, testing)
-- [ ] Build a web service with `axum` and `tokio`
-- [ ] Contribute to an open-source Rust project
-- [ ] Read "Programming Rust" (O'Reilly) for deeper understanding
+### Месяц 3: продвинутый уровень
+- [ ] Пройдите главы 13–16 (конкурентность, unsafe, тестирование)
+- [ ] Создайте веб-сервис с `axum` и `tokio`
+- [ ] Внесите вклад в проект Rust с открытым исходным кодом
+- [ ] Прочитайте «Programming Rust» (O'Reilly), чтобы глубже понять язык
 
-### Recommended Resources
-- **The Rust Book**: https://doc.rust-lang.org/book/ (official, excellent)
-- **Rust by Example**: https://doc.rust-lang.org/rust-by-example/ (learn by doing)
-- **Rustlings**: https://github.com/rust-lang/rustlings (exercises)
-- **Rust Playground**: https://play.rust-lang.org/ (online compiler)
-- **This Week in Rust**: https://this-week-in-rust.org/ (newsletter)
-- **PyO3 Guide**: https://pyo3.rs/ (Python ↔ Rust bridge)
+### Рекомендуемые ресурсы
+- **The Rust Book**: https://doc.rust-lang.org/book/ (официальная книга, отличная)
+- **Rust by Example**: https://doc.rust-lang.org/rust-by-example/ (учитесь на практике)
+- **Rustlings**: https://github.com/rust-lang/rustlings (упражнения)
+- **Rust Playground**: https://play.rust-lang.org/ (онлайн-компилятор)
+- **This Week in Rust**: https://this-week-in-rust.org/ (рассылка)
+- **PyO3 Guide**: https://pyo3.rs/ (мост Python ↔ Rust)
 - **Comprehensive Rust** (Google): https://google.github.io/comprehensive-rust/
 
-### Python → Rust Rosetta Stone
+### Шпаргалка Python → Rust
 
-| Python | Rust | Chapter |
-|--------|------|---------|
+| Python | Rust | Глава |
+|--------|------|-------|
 | `list` | `Vec<T>` | 5 |
 | `dict` | `HashMap<K,V>` | 5 |
 | `set` | `HashSet<T>` | 5 |
@@ -225,12 +214,12 @@ fn playground() {
 | `None` | `Option<T>` | 6 |
 | `raise`/`try`/`except` | `Result<T,E>` + `?` | 9 |
 | `Protocol` (PEP 544) | `trait` | 10 |
-| `TypeVar` | Generics `<T>` | 10 |
-| `__dunder__` methods | Traits (Display, Add, etc.) | 10 |
+| `TypeVar` | Обобщения `<T>` | 10 |
+| `__dunder__` методы | Трейты (Display, Add и др.) | 10 |
 | `lambda` | `\|args\| body` | 12 |
-| generator `yield` | `impl Iterator` | 12 |
-| list comprehension | `.map().filter().collect()` | 12 |
-| `@decorator` | Higher-order fn or macro | 12a, 15 |
+| генератор `yield` | `impl Iterator` | 12 |
+| списочное включение | `.map().filter().collect()` | 12 |
+| `@decorator` | Функция высшего порядка или макрос | 12a, 15 |
 | `asyncio` | `tokio` | 13 |
 | `threading` | `std::thread` | 13 |
 | `multiprocessing` | `rayon` | 13 |
@@ -239,48 +228,48 @@ fn playground() {
 | `pip install` | `cargo add` | 8 |
 | `requirements.txt` | `Cargo.lock` | 8 |
 | `pyproject.toml` | `Cargo.toml` | 8 |
-| `with` (context mgr) | Scope-based `Drop` | 15 |
+| `with` (контекстный менеджер) | Освобождение по области видимости (`Drop`) | 15 |
 | `json.dumps/loads` | `serde_json` | 15 |
 
 ***
 
-## Final Thoughts for Python Developers
+## Заключительные мысли для разработчиков на Python
 
 ```rust
-What you'll miss from Python:
-- REPL and interactive exploration
-- Rapid prototyping speed
-- Rich ML/AI ecosystem (PyTorch, etc.)
-- "Just works" dynamic typing
-- pip install and immediate use
+Чего вам будет не хватать из Python:
+- REPL и интерактивного исследования
+- Скорости быстрого прототипирования
+- Богатой экосистемы ML/AI (PyTorch и др.)
+- Динамической типизации, которая «просто работает»
+- pip install и мгновенного использования
 
-What you'll gain from Rust:
-- "If it compiles, it works" confidence
-- 10-100x performance improvement
-- No more runtime type errors
-- No more None/null crashes
-- True parallelism (no GIL!)
-- Single binary deployment
-- Predictable memory usage
-- The best compiler error messages in any language
+Что вы получите от Rust:
+- Уверенность «если компилируется, значит, работает»
+- Прирост производительности в 10–100 раз
+- Больше никаких ошибок типов во время выполнения
+- Больше никаких падений из-за None/null
+- Настоящий параллелизм (без GIL!)
+- Развёртывание одним бинарником
+- Предсказуемое потребление памяти
+- Лучшие сообщения об ошибках компилятора среди всех языков
 
-The journey:
-Week 1:   "Why does the compiler hate me?"
-Week 2:   "Oh, it's actually protecting me from bugs"
-Month 1:  "I see why this matters"
-Month 2:  "I caught a bug at compile time that would've been a production incident"
-Month 3:  "I don't want to go back to untyped code"
-Month 6:  "Rust has made me a better programmer in every language"
+Путь:
+Неделя 1:   «Почему компилятор меня ненавидит?»
+Неделя 2:   «А, он на самом деле защищает меня от багов»
+Месяц 1:    «Теперь вижу, зачем это нужно»
+Месяц 2:    «Поймал баг на этапе компиляции, который стал бы инцидентом в продакшене»
+Месяц 3:    «Не хочу возвращаться к коду без типов»
+Месяц 6:    «Rust сделал меня лучшим программистом на любом языке»
 ```
 
 ---
 
-## Exercises
+## Упражнения
 
 <details>
-<summary><strong>🏋️ Exercise: Code Review Checklist</strong> (click to expand)</summary>
+<summary><strong>🏋️ Упражнение: чек-лист код-ревью</strong> (нажмите, чтобы раскрыть)</summary>
 
-**Challenge**: Review this Rust code (written by a Python developer) and identify 5 idiomatic improvements:
+**Задание**: проверьте этот код на Rust (его написал разработчик на Python) и найдите 5 идиоматичных улучшений:
 
 ```rust
 fn get_name(names: Vec<String>, index: i32) -> String {
@@ -300,16 +289,16 @@ fn main() {
 ```
 
 <details>
-<summary>🔑 Solution</summary>
+<summary>🔑 Решение</summary>
 
-Five improvements:
+Пять улучшений:
 
 ```rust
-// 1. Take &[String] not Vec<String> (don't take ownership of the whole vec)
-// 2. Use usize for index (not i32 — indices are always non-negative)
-// 3. Return Option<&str> instead of empty string (use the type system!)
-// 4. Use .get() instead of bounds-checking manually
-// 5. Don't clone() in main — pass a reference
+// 1. Принимайте &[String], а не Vec<String> (не забирайте владение всем вектором)
+// 2. Используйте usize для индекса (не i32: индексы всегда неотрицательны)
+// 3. Возвращайте Option<&str> вместо пустой строки (используйте систему типов!)
+// 4. Используйте .get() вместо ручной проверки границ
+// 5. Не вызывайте clone() в main: передавайте ссылку
 
 fn get_name(names: &[String], index: usize) -> Option<&str> {
     names.get(index).map(|s| s.as_str())
@@ -319,16 +308,16 @@ fn main() {
     let names = vec!["Alice".to_string(), "Bob".to_string()];
     match get_name(&names, 0) {
         Some(name) => println!("{name}"),
-        None => println!("Not found"),
+        None => println!("Не найдено"),
     }
 }
 ```
 
-**Key takeaway**: Python habits that hurt in Rust: cloning everything (use borrows), using sentinel values like `""` (use `Option`), taking ownership when borrowing suffices, and using signed integers for indices.
+**Ключевой вывод**: привычки Python, которые мешают в Rust: клонирование всего (используйте заимствования), значения-заглушки вроде `""` (используйте `Option`), забирание владения там, где достаточно заимствования, и знаковые целые для индексов.
 
 </details>
 </details>
 
 ***
 
-*End of Rust for Python Programmers Training Guide*
+*Конец учебного руководства «Rust для программистов на Python»*

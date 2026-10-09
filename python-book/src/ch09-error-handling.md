@@ -1,48 +1,45 @@
-## Exceptions vs Result
+## Исключения и Result
 
-> **What you'll learn:** `Result<T, E>` vs `try`/`except`, the `?` operator for concise error propagation,
-> custom error types with `thiserror`, `anyhow` for applications, and why explicit errors prevent hidden bugs.
+> **Что вы узнаете:** `Result<T, E>` в сравнении с `try`/`except`, оператор `?` для краткой передачи ошибок, собственные типы ошибок с `thiserror`, `anyhow` для приложений и то, почему явные ошибки предотвращают скрытые баги.
 >
-> **Difficulty:** 🟡 Intermediate
+> **Сложность:** 🟡 Средний
 
-This is one of the biggest mindset changes for Python developers. Python uses exceptions
-for error handling — errors can be thrown from anywhere and caught anywhere (or not at all).
-Rust uses `Result<T, E>` — errors are values that must be explicitly handled.
+Для разработчиков на Python это одна из самых больших смен мышления. Python использует исключения: ошибку можно выбросить откуда угодно и перехватить где угодно (или не перехватывать вовсе). Rust использует `Result<T, E>`: ошибки — это значения, которые нужно явно обработать.
 
-### Python Exception Handling
+### Обработка исключений в Python
 ```python
-# Python — exceptions can be thrown from anywhere
+# Python — исключения могут быть выброшены откуда угодно
 import json
 
 def load_config(path: str) -> dict:
     try:
         with open(path) as f:
-            data = json.load(f)     # Can raise JSONDecodeError
+            data = json.load(f)     # Может выбросить JSONDecodeError
             if "version" not in data:
-                raise ValueError("Missing version field")
+                raise ValueError("Отсутствует поле version")
             return data
     except FileNotFoundError:
-        print(f"Config file not found: {path}")
+        print(f"Файл конфигурации не найден: {path}")
         return {}
     except json.JSONDecodeError as e:
-        print(f"Invalid JSON: {e}")
+        print(f"Некорректный JSON: {e}")
         return {}
-    # What other exceptions can this throw?
+    # Какие ещё исключения может выбросить эта функция?
     # IOError? PermissionError? UnicodeDecodeError?
-    # You can't tell from the function signature!
+    # По сигнатуре функции этого не понять!
 ```
 
-### Rust Result-Based Error Handling
+### Обработка ошибок через Result в Rust
 ```rust
-// Rust — errors are return values, visible in the function signature
+// Rust — ошибки являются возвращаемыми значениями, видимыми в сигнатуре функции
 use std::fs;
 use serde_json::Value;
 
 fn load_config(path: &str) -> Result<Value, ConfigError> {
-    let contents = fs::read_to_string(path)    // Returns Result
+    let contents = fs::read_to_string(path)    // Возвращает Result
         .map_err(|e| ConfigError::FileError(e.to_string()))?;
 
-    let data: Value = serde_json::from_str(&contents)  // Returns Result
+    let data: Value = serde_json::from_str(&contents)  // Возвращает Result
         .map_err(|e| ConfigError::ParseError(e.to_string()))?;
 
     if data.get("version").is_none() {
@@ -60,123 +57,122 @@ enum ConfigError {
 }
 ```
 
-### Key Differences
+### Ключевые различия
 
 ```text
 Python:                                 Rust:
 ─────────                               ─────
-- Errors are exceptions (thrown)        - Errors are values (returned)
-- Hidden control flow (stack unwinding) - Explicit control flow (? operator)
-- Can't tell what errors from signature- MUST see errors in return type
-- Uncaught exceptions crash at runtime - Unhandled Results produce compile warnings (always handle them)
-- try/except is optional               - Handling Result is required
-- Broad except catches everything      - match arms are exhaustive
+- Ошибки — это исключения (выбрасываются)   - Ошибки — это значения (возвращаются)
+- Скрытый поток управления (раскрутка стека) - Явный поток управления (оператор ?)
+- По сигнатуре не понять, какие ошибки      - Ошибки ОБЯЗАНЫ быть видны в типе возврата
+- Необработанные исключения роняют программу в рантайме - Необработанные Result дают предупреждения компилятора (их всегда нужно обрабатывать)
+- try/except необязательны                 - Обработка Result обязательна
+- Широкий except ловит всё                 - Ветки match исчерпывающие
 ```
 
-### The Two Result Variants
+### Два варианта Result
 ```rust
-// Result<T, E> has exactly two variants:
+// У Result<T, E> ровно два варианта:
 enum Result<T, E> {
-    Ok(T),    // Success — contains the value (like Python's return value)
-    Err(E),   // Failure — contains the error (like Python's raised exception)
+    Ok(T),    // Успех — содержит значение (как return в Python)
+    Err(E),   // Неудача — содержит ошибку (как выброшенное исключение в Python)
 }
 
-// Using Result:
+// Использование Result:
 fn divide(a: f64, b: f64) -> Result<f64, String> {
     if b == 0.0 {
-        Err("Division by zero".to_string())  // Like: raise ValueError("...")
+        Err("Деление на ноль".to_string())  // Как: raise ValueError("...")
     } else {
-        Ok(a / b)                             // Like: return a / b
+        Ok(a / b)                             // Как: return a / b
     }
 }
 
-// Handling Result — like try/except but explicit
+// Обработка Result — как try/except, только явная
 match divide(10.0, 0.0) {
-    Ok(result) => println!("Result: {result}"),
-    Err(msg) => println!("Error: {msg}"),
+    Ok(result) => println!("Результат: {result}"),
+    Err(msg) => println!("Ошибка: {msg}"),
 }
 ```
 
 ***
 
-## The ? Operator
+## Оператор ?
 
-The `?` operator is Rust's equivalent of letting exceptions propagate up the call stack,
-but it's visible and explicit.
+Оператор `?` — это аналог в Rust того, что исключения всплывают вверх по стеку вызовов, только он виден и явен.
 
-### Python — Implicit Propagation
+### Python: неявное распространение
 ```python
-# Python — exceptions propagate silently up the call stack
+# Python — исключения тихо всплывают вверх по стеку вызовов
 def read_username() -> str:
-    with open("config.txt") as f:      # FileNotFoundError propagates
-        return f.readline().strip()    # IOError propagates
+    with open("config.txt") as f:      # FileNotFoundError всплывает
+        return f.readline().strip()    # IOError всплывает
 
 def greet():
-    name = read_username()             # If this throws, greet() also throws
-    print(f"Hello, {name}!")           # This is skipped on error
+    name = read_username()             # Если здесь выброшено исключение, greet() тоже его выбросит
+    print(f"Привет, {name}!")          # При ошибке эта строка пропускается
 
-# The error propagation is INVISIBLE — you have to read the implementation
-# to know what exceptions might escape.
+# Распространение ошибок НЕВИДИМО — чтобы узнать, какие исключения могут выйти наружу,
+# нужно читать реализацию.
 ```
 
-### Rust — Explicit Propagation with ?
+### Rust: явное распространение с помощью ?
 ```rust
-// Rust — ? propagates errors, but it's visible in the code AND the signature
+// Rust — ? передаёт ошибки дальше, и это видно и в коде, и в сигнатуре
 use std::fs;
 use std::io;
 
 fn read_username() -> Result<String, io::Error> {
-    let contents = fs::read_to_string("config.txt")?;  // ? = propagate on Err
+    let contents = fs::read_to_string("config.txt")?;  // ? = передать дальше при Err
     Ok(contents.lines().next().unwrap_or("").to_string())
 }
 
 fn greet() -> Result<(), io::Error> {
-    let name = read_username()?;       // ? = if Err, return Err immediately
-    println!("Hello, {name}!");        // Only reached on Ok
+    let name = read_username()?;       // ? = если Err, сразу вернуть Err
+    println!("Привет, {name}!");        // Достигается только при Ok
     Ok(())
 }
 
-// The ? says: "if this is Err, return it from THIS function immediately."
-// It's like Python's exception propagation, but:
-// 1. It's visible (you see the ?)
-// 2. It's in the return type (Result<..., io::Error>)
-// 3. The compiler ensures you handle it somewhere
+// ? означает: «если здесь Err, немедленно вернуть его ИЗ ЭТОЙ функции».
+// Это похоже на распространение исключений в Python, но:
+// 1. Это видно (вы видите ?)
+// 2. Это есть в типе возврата (Result<..., io::Error>)
+// 3. Компилятор следит, чтобы ошибка была обработана где-то
 ```
 
-### Chaining with ?
+### Цепочки с ?
 ```python
-# Python — multiple operations that might fail
+# Python — несколько операций, которые могут завершиться ошибкой
 def process_file(path: str) -> dict:
-    with open(path) as f:                    # Might fail
-        text = f.read()                       # Might fail
-    data = json.loads(text)                   # Might fail
-    validate(data)                            # Might fail
-    return transform(data)                    # Might fail
-    # Any of these can throw — and the exception type varies!
+    with open(path) as f:                    # Может завершиться ошибкой
+        text = f.read()                       # Может завершиться ошибкой
+    data = json.loads(text)                   # Может завершиться ошибкой
+    validate(data)                            # Может завершиться ошибкой
+    return transform(data)                    # Может завершиться ошибкой
+    # Любая из них может выбросить исключение, и тип исключения у каждой свой!
 ```
 
 ```rust
-// Rust — same chain, but explicit
+// Rust — та же цепочка, но явная
 fn process_file(path: &str) -> Result<Data, AppError> {
-    let text = fs::read_to_string(path)?;     // ? propagates io::Error
-    let data: Value = serde_json::from_str(&text)?;  // ? propagates serde error
-    let validated = validate(&data)?;          // ? propagates validation error
-    let result = transform(&validated)?;       // ? propagates transform error
+    let text = fs::read_to_string(path)?;     // ? передаёт io::Error дальше
+    let data: Value = serde_json::from_str(&text)?;  // ? передаёт ошибку serde дальше
+    let validated = validate(&data)?;          // ? передаёт ошибку валидации дальше
+    let result = transform(&validated)?;       // ? передаёт ошибку преобразования дальше
     Ok(result)
 }
-// Every ? is a potential early return — and they're all visible!
+// Каждый ? — это потенциальный досрочный возврат, и все они видны!
 ```
 
 ```mermaid
 flowchart TD
-    A["read_to_string(path)?"] -->|Ok| B["serde_json::from_str?"] 
-    A -->|Err| X["Return Err(io::Error)"]
+    A["read_to_string(path)?"] -->|Ok| B["serde_json::from_str?"]
+    A -->|Err| X["Возврат Err(io::Error)"]
     B -->|Ok| C["validate(&data)?"]
-    B -->|Err| Y["Return Err(serde::Error)"]
+    B -->|Err| Y["Возврат Err(serde::Error)"]
     C -->|Ok| D["transform(&validated)?"]
-    C -->|Err| Z["Return Err(ValidationError)"]
+    C -->|Err| Z["Возврат Err(ValidationError)"]
     D -->|Ok| E["Ok(result) ✅"]
-    D -->|Err| W["Return Err(TransformError)"]
+    D -->|Err| W["Возврат Err(TransformError)"]
     style E fill:#d4edda,stroke:#28a745
     style X fill:#f8d7da,stroke:#dc3545
     style Y fill:#f8d7da,stroke:#dc3545
@@ -184,22 +180,22 @@ flowchart TD
     style W fill:#f8d7da,stroke:#dc3545
 ```
 
-> Each `?` is an exit point — unlike Python's try/except where you can't see which line might throw without reading the docs.
+> Каждый `?` — это точка выхода. В отличие от try/except в Python, где без чтения документации не видно, какая строка может выбросить исключение.
 >
-> 📌 **See also**: [Ch. 15 — Migration Patterns](ch15-migration-patterns.md) covers translating Python try/except patterns to Rust in real codebases.
+> 📌 **См. также**: [Гл. 15 — Паттерны миграции](ch15-migration-patterns.md) рассказывает о переводе паттернов try/except из Python на Rust в реальных проектах.
 
 ***
 
-## Custom Error Types with thiserror
+## Собственные типы ошибок с thiserror
 
 ```mermaid
 graph TD
-    AE["AppError (enum)"] --> NF["NotFound<br/>{ entity, id }"]
+    AE["AppError (перечисление)"] --> NF["NotFound<br/>{ entity, id }"]
     AE --> VE["Validation<br/>{ field, message }"]
     AE --> IO["Io(std::io::Error)<br/>#[from]"]
     AE --> JSON["Json(serde_json::Error)<br/>#[from]"]
-    IO2["std::io::Error"] -->|"auto-convert via From"| IO
-    JSON2["serde_json::Error"] -->|"auto-convert via From"| JSON
+    IO2["std::io::Error"] -->|"автопреобразование через From"| IO
+    JSON2["serde_json::Error"] -->|"автопреобразование через From"| JSON
     style AE fill:#d4edda,stroke:#28a745
     style NF fill:#fff3cd
     style VE fill:#fff3cd
@@ -209,11 +205,11 @@ graph TD
     style JSON2 fill:#f8d7da
 ```
 
-> The `#[from]` attribute auto-generates `impl From<io::Error> for AppError`, so `?` converts library errors into your app errors automatically.
+> Атрибут `#[from]` автоматически генерирует `impl From<io::Error> for AppError`, поэтому `?` сам превращает ошибки библиотек в ошибки вашего приложения.
 
-### Python Custom Exceptions
+### Собственные исключения в Python
 ```python
-# Python — custom exception classes
+# Python — собственные классы исключений
 class AppError(Exception):
     pass
 
@@ -221,98 +217,98 @@ class NotFoundError(AppError):
     def __init__(self, entity: str, id: int):
         self.entity = entity
         self.id = id
-        super().__init__(f"{entity} with id {id} not found")
+        super().__init__(f"{entity} с id {id} не найден")
 
 class ValidationError(AppError):
     def __init__(self, field: str, message: str):
         self.field = field
-        super().__init__(f"Validation error on {field}: {message}")
+        super().__init__(f"Ошибка валидации поля {field}: {message}")
 
-# Usage:
+# Использование:
 def find_user(user_id: int) -> dict:
     if user_id not in users:
-        raise NotFoundError("User", user_id)
+        raise NotFoundError("Пользователь", user_id)
     return users[user_id]
 ```
 
-### Rust Custom Errors with thiserror
+### Собственные ошибки в Rust с thiserror
 ```rust
-// Rust — error enums with thiserror (most popular approach)
+// Rust — перечисления ошибок с thiserror (самый популярный подход)
 // Cargo.toml: thiserror = "2"
 
 use thiserror::Error;
 
 #[derive(Debug, Error)]
 enum AppError {
-    #[error("{entity} with id {id} not found")]
+    #[error("{entity} с id {id} не найден")]
     NotFound { entity: String, id: i64 },
 
-    #[error("Validation error on {field}: {message}")]
+    #[error("Ошибка валидации поля {field}: {message}")]
     Validation { field: String, message: String },
 
-    #[error("IO error: {0}")]
-    Io(#[from] std::io::Error),        // Auto-convert from io::Error
+    #[error("Ошибка ввода-вывода: {0}")]
+    Io(#[from] std::io::Error),        // Автопреобразование из io::Error
 
-    #[error("JSON error: {0}")]
-    Json(#[from] serde_json::Error),   // Auto-convert from serde error
+    #[error("Ошибка JSON: {0}")]
+    Json(#[from] serde_json::Error),   // Автопреобразование из ошибки serde
 }
 
-// Usage:
+// Использование:
 fn find_user(user_id: i64) -> Result<User, AppError> {
     users.get(&user_id)
         .cloned()
         .ok_or(AppError::NotFound {
-            entity: "User".to_string(),
+            entity: "Пользователь".to_string(),
             id: user_id,
         })
 }
 
-// The #[from] attribute means ? auto-converts io::Error → AppError::Io
+// Атрибут #[from] означает, что ? автоматически преобразует io::Error в AppError::Io
 fn load_users(path: &str) -> Result<Vec<User>, AppError> {
-    let data = fs::read_to_string(path)?;  // io::Error → AppError::Io automatically
+    let data = fs::read_to_string(path)?;  // io::Error → AppError::Io автоматически
     let users: Vec<User> = serde_json::from_str(&data)?;  // → AppError::Json
     Ok(users)
 }
 ```
 
-### Error Handling Quick Reference
+### Краткая справка по обработке ошибок
 
-| Python | Rust | Notes |
-|--------|------|-------|
-| `raise ValueError("msg")` | `return Err(AppError::Validation {...})` | Explicit return |
-| `try: ... except:` | `match result { Ok(v) => ..., Err(e) => ... }` | Exhaustive |
-| `except ValueError as e:` | `Err(AppError::Validation { .. }) =>` | Pattern match |
-| `raise ... from e` | `#[from]` attribute or `.map_err()` | Error chaining |
-| `finally:` | `Drop` trait (automatic) | Deterministic cleanup |
-| `with open(...):` | Scope-based drop (automatic) | RAII pattern |
-| Exception propagates silently | `?` propagates visibly | Always in return type |
-| `isinstance(e, ValueError)` | `matches!(e, AppError::Validation {..})` | Type checking |
+| Python | Rust | Примечания |
+|--------|------|------------|
+| `raise ValueError("msg")` | `return Err(AppError::Validation {...})` | Явный возврат |
+| `try: ... except:` | `match result { Ok(v) => ..., Err(e) => ... }` | Исчерпывающе |
+| `except ValueError as e:` | `Err(AppError::Validation { .. }) =>` | Сопоставление с образцом |
+| `raise ... from e` | Атрибут `#[from]` или `.map_err()` | Цепочка ошибок |
+| `finally:` | Трейт `Drop` (автоматически) | Детерминированная очистка |
+| `with open(...):` | Освобождение по области видимости (автоматически) | Паттерн RAII |
+| Исключение распространяется молча | `?` распространяет явно | Всегда в типе возврата |
+| `isinstance(e, ValueError)` | `matches!(e, AppError::Validation {..})` | Проверка типа |
 
 ---
 
-## Exercises
+## Упражнения
 
 <details>
-<summary><strong>🏋️ Exercise: Parse Config Value</strong> (click to expand)</summary>
+<summary><strong>🏋️ Упражнение: разбор значения конфигурации</strong> (нажмите, чтобы раскрыть)</summary>
 
-**Challenge**: Write a function `parse_port(s: &str) -> Result<u16, String>` that:
-1. Rejects empty strings with error `"empty input"`
-2. Parses the string to `u16`, mapping the parse error to `"invalid number: {original_error}"`
-3. Rejects ports below 1024 with `"port {n} is privileged"`
+**Задание**: напишите функцию `parse_port(s: &str) -> Result<u16, String>`, которая:
+1. Отклоняет пустые строки с ошибкой `"пустой ввод"`
+2. Разбирает строку в `u16`, преобразуя ошибку разбора в `"некорректное число: {исходная_ошибка}"`
+3. Отклоняет порты ниже 1024 с ошибкой `"порт {n} привилегированный"`
 
-Call it with `""`, `"hello"`, `"80"`, and `"8080"` and print the results.
+Вызовите её с `""`, `"hello"`, `"80"` и `"8080"` и выведите результаты.
 
 <details>
-<summary>🔑 Solution</summary>
+<summary>🔑 Решение</summary>
 
 ```rust
 fn parse_port(s: &str) -> Result<u16, String> {
     if s.is_empty() {
-        return Err("empty input".to_string());
+        return Err("пустой ввод".to_string());
     }
-    let port: u16 = s.parse().map_err(|e| format!("invalid number: {e}"))?;
+    let port: u16 = s.parse().map_err(|e| format!("некорректное число: {e}"))?;
     if port < 1024 {
-        return Err(format!("port {port} is privileged"));
+        return Err(format!("порт {port} привилегированный"));
     }
     Ok(port)
 }
@@ -327,11 +323,10 @@ fn main() {
 }
 ```
 
-**Key takeaway**: `?` with `.map_err()` is Rust's replacement for `try/except ValueError as e: raise ConfigError(...) from e`. Every error path is visible in the return type.
+**Ключевой вывод**: `?` вместе с `.map_err()` — это аналог в Rust конструкции `try/except ValueError as e: raise ConfigError(...) from e`. Каждый путь ошибки виден в типе возврата.
 
 </details>
 </details>
 
 ***
-
 

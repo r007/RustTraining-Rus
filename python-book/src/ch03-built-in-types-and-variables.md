@@ -1,54 +1,53 @@
-## Variables and Mutability
+## Переменные и изменяемость
 
-> **What you'll learn:** Immutable-by-default variables, explicit `mut`, primitive numeric types vs Python's arbitrary-precision `int`,
-> `String` vs `&str` (the hardest early concept), string formatting, and Rust's required type annotations.
+> **Что вы узнаете:** переменные, неизменяемые по умолчанию, явный `mut`, примитивные числовые типы в сравнении с `int` произвольной точности в Python, `String` и `&str` (самая трудная концепция на раннем этапе), форматирование строк и обязательные аннотации типов в Rust.
 >
-> **Difficulty:** 🟢 Beginner
+> **Сложность:** 🟢 Начальный
 
-### Python Variable Declaration
+### Объявление переменных в Python
 ```python
-# Python — everything is mutable, dynamically typed
-count = 0          # Mutable, type inferred as int
-count = 5          # ✅ Works
-count = "hello"    # ✅ Works — type can change! (dynamic typing)
+# Python — всё изменяемо, типизация динамическая
+count = 0          # Изменяемая, тип выводится как int
+count = 5          # ✅ Работает
+count = "hello"    # ✅ Работает — тип может меняться! (динамическая типизация)
 
-# "Constants" are just convention:
-MAX_SIZE = 1024    # Nothing prevents MAX_SIZE = 999 later
+# «Константы» — это только соглашение:
+MAX_SIZE = 1024    # Ничто не мешает потом написать MAX_SIZE = 999
 ```
 
-### Rust Variable Declaration
+### Объявление переменных в Rust
 ```rust
-// Rust — immutable by default, statically typed
-let count = 0;           // Immutable, type inferred as i32
-// count = 5;            // ❌ Compile error: cannot assign twice to immutable variable
-// count = "hello";      // ❌ Compile error: expected integer, found &str
+// Rust — по умолчанию неизменяемые, статически типизированные
+let count = 0;           // Неизменяемая, тип выводится как i32
+// count = 5;            // ❌ Ошибка компиляции: нельзя дважды присвоить значение неизменяемой переменной
+// count = "hello";      // ❌ Ошибка компиляции: ожидалось целое число, найден &str
 
-let mut count = 0;       // Explicitly mutable
-count = 5;               // ✅ Works
-// count = "hello";      // ❌ Still can't change type
+let mut count = 0;       // Явно изменяемая
+count = 5;               // ✅ Работает
+// count = "hello";      // ❌ Тип по-прежнему нельзя менять
 
-const MAX_SIZE: usize = 1024; // True constant — enforced by compiler
+const MAX_SIZE: usize = 1024; // Настоящая константа — гарантируется компилятором
 ```
 
-### Key Mental Shift for Python Developers
+### Ключевой сдвиг мышления для разработчиков на Python
 ```rust
-// Python: variables are labels that point to objects
-// Rust: variables are named storage locations that OWN their values
+// Python: переменные — это метки, которые указывают на объекты
+// Rust: переменные — это именованные места хранения, которые ВЛАДЕЮТ своими значениями
 
-// Variable shadowing — unique to Rust, very useful
+// Затенение (shadowing) — характерно для Rust, очень полезно
 let input = "42";              // &str
-let input = input.parse::<i32>().unwrap();  // Now it's i32 — new variable, same name
-let input = input * 2;         // Now it's 84 — another new variable
+let input = input.parse::<i32>().unwrap();  // Теперь i32 — новая переменная с тем же именем
+let input = input * 2;         // Теперь 84 — ещё одна новая переменная
 
-// In Python, you'd just reassign and lose the old type:
+// В Python вы бы просто переприсвоили значение и потеряли старый тип:
 # input = "42"
-# input = int(input)   # Same name, different type — Python allows this too
-# But in Rust, each `let` creates a genuinely new binding. The old one is gone.
+# input = int(input)   # То же имя, другой тип — Python тоже это позволяет
+# Но в Rust каждый `let` создаёт действительно новую привязку. Старая исчезает.
 ```
 
-### Practical Example: Counter
+### Практический пример: счётчик
 ```python
-# Python version
+# Версия на Python
 class Counter:
     def __init__(self):
         self.value = 0
@@ -65,7 +64,7 @@ print(c.get_value())  # 1
 ```
 
 ```rust
-// Rust version
+// Версия на Rust
 struct Counter {
     value: i64,
 }
@@ -75,170 +74,167 @@ impl Counter {
         Counter { value: 0 }
     }
 
-    fn increment(&mut self) {     // &mut self = I will modify this
+    fn increment(&mut self) {     // &mut self — этот метод будет изменять объект
         self.value += 1;
     }
 
-    fn get_value(&self) -> i64 {  // &self = I only read this
+    fn get_value(&self) -> i64 {  // &self — этот метод только читает
         self.value
     }
 }
 
 fn main() {
-    let mut c = Counter::new();   // Must be `mut` to call increment()
+    let mut c = Counter::new();   // Нужен `mut`, чтобы вызвать increment()
     c.increment();
     println!("{}", c.get_value()); // 1
 }
 ```
 
-> **Key difference**: In Rust, `&mut self` in the method signature tells you (and the
-> compiler) that `increment` modifies the counter. In Python, any method can mutate
-> anything — you have to read the code to know.
+> **Ключевое отличие**: в Rust `&mut self` в сигнатуре метода сообщает и вам, и компилятору, что `increment` изменяет счётчик. В Python любой метод может изменить что угодно, и чтобы это понять, нужно читать код.
 
 ***
 
-## Primitive Types Comparison
+## Сравнение примитивных типов
 
 ```mermaid
 flowchart LR
-    subgraph Python ["Python Types"]
-        PI["int<br/>(arbitrary precision)"]
-        PF["float<br/>(64-bit only)"]
+    subgraph Python ["Типы Python"]
+        PI["int<br/>(произвольная точность)"]
+        PF["float<br/>(только 64 бита)"]
         PB["bool"]
         PS["str<br/>(Unicode)"]
     end
-    subgraph Rust ["Rust Types"]
+    subgraph Rust ["Типы Rust"]
         RI["i8 / i16 / i32 / i64 / i128<br/>u8 / u16 / u32 / u64 / u128"]
         RF["f32 / f64"]
         RB["bool"]
         RS["String / &str"]
     end
-    PI -->|"fixed-size"| RI
-    PF -->|"choose precision"| RF
-    PB -->|"same"| RB
-    PS -->|"owned vs borrowed"| RS
+    PI -->|"фиксированный размер"| RI
+    PF -->|"выбор точности"| RF
+    PB -->|"то же"| RB
+    PS -->|"владение или заимствование"| RS
     style Python fill:#ffeeba
     style Rust fill:#d4edda
 ```
 
-### Numeric Types
+### Числовые типы
 
-| Python | Rust | Notes |
-|--------|------|-------|
-| `int` (arbitrary precision) | `i8`, `i16`, `i32`, `i64`, `i128`, `isize` | Rust integers have fixed size |
-| `int` (unsigned: no separate type) | `u8`, `u16`, `u32`, `u64`, `u128`, `usize` | Explicit unsigned types |
-| `float` (64-bit IEEE 754) | `f32`, `f64` | Python only has 64-bit float |
-| `bool` | `bool` | Same concept |
-| `complex` | No built-in (use `num` crate) | Rare in systems code |
+| Python | Rust | Примечания |
+|--------|------|------------|
+| `int` (произвольная точность) | `i8`, `i16`, `i32`, `i64`, `i128`, `isize` | Целые числа в Rust имеют фиксированный размер |
+| `int` (беззнаковые: отдельного типа нет) | `u8`, `u16`, `u32`, `u64`, `u128`, `usize` | Беззнаковые типы указываются явно |
+| `float` (64-бит, IEEE 754) | `f32`, `f64` | В Python есть только 64-битный float |
+| `bool` | `bool` | Та же концепция |
+| `complex` | Нет встроенного (используйте крейт `num`) | Редко встречается в системном коде |
 
 ```python
-# Python — one integer type, arbitrary precision
-x = 42                     # int — can grow to any size
-big = 2 ** 1000            # Still works — thousands of digits
-y = 3.14                   # float — always 64-bit
+# Python — один целочисленный тип, произвольная точность
+x = 42                     # int — может расти до любого размера
+big = 2 ** 1000            # По-прежнему работает — тысячи цифр
+y = 3.14                   # float — всегда 64-битный
 ```
 
 ```rust
-// Rust — explicit sizes, overflow is a compile/runtime error
-let x: i32 = 42;           // 32-bit signed integer
-let y: f64 = 3.14;         // 64-bit float (Python's float equivalent)
-let big: i128 = 2_i128.pow(100); // 128-bit max — no arbitrary precision
-// For arbitrary precision: use the `num-bigint` crate
+// Rust — явные размеры, переполнение — ошибка компиляции или выполнения
+let x: i32 = 42;           // 32-битное знаковое целое
+let y: f64 = 3.14;         // 64-битное число с плавающей точкой (аналог float в Python)
+let big: i128 = 2_i128.pow(100); // Максимум 128 бит — произвольной точности нет
+// Для произвольной точности используйте крейт `num-bigint`
 
-// Underscores for readability (like Python's 1_000_000):
-let million = 1_000_000;   // Same syntax as Python!
+// Подчёркивания для читаемости (как 1_000_000 в Python):
+let million = 1_000_000;   // Тот же синтаксис, что и в Python!
 
-// Type suffix syntax:
+// Синтаксис суффиксов типа:
 let a = 42u8;              // u8
 let b = 3.14f32;           // f32
 ```
 
-### Size Types (Important!)
+### Типы размера (важно!)
 
 ```rust
-// usize and isize — pointer-sized integers, used for indexing
-let length: usize = vec![1, 2, 3].len();  // .len() returns usize
-let index: usize = 0;                     // Array indices are always usize
+// usize и isize — целые размером с указатель, используются для индексации
+let length: usize = vec![1, 2, 3].len();  // .len() возвращает usize
+let index: usize = 0;                     // Индексы массивов всегда usize
 
-// In Python, len() returns int and indices are int — no distinction.
-// In Rust, mixing i32 and usize requires explicit conversion:
+// В Python len() возвращает int, и индексы тоже int — различий нет.
+// В Rust смешивание i32 и usize требует явного преобразования:
 let i: i32 = 5;
-// let item = vec[i];    // ❌ Error: expected usize, found i32
-let item = vec[i as usize]; // ✅ Explicit conversion
+// let item = vec[i];    // ❌ Ошибка: ожидался usize, найден i32
+let item = vec[i as usize]; // ✅ Явное преобразование
 ```
 
-### Type Inference
+### Вывод типов
 
 ```rust
-// Rust infers types but they're FIXED — not dynamic
-let x = 42;          // Compiler infers i32 (default integer type)
-let y = 3.14;        // Compiler infers f64 (default float type)
-let s = "hello";     // Compiler infers &str (string slice)
-let v = vec![1, 2];  // Compiler infers Vec<i32>
+// Rust выводит типы, но они ФИКСИРОВАННЫЕ — не динамические
+let x = 42;          // Компилятор выводит i32 (целый тип по умолчанию)
+let y = 3.14;        // Компилятор выводит f64 (вещественный тип по умолчанию)
+let s = "hello";     // Компилятор выводит &str (срез строки)
+let v = vec![1, 2];  // Компилятор выводит Vec<i32>
 
-// You can always be explicit:
+// Можно всегда указать тип явно:
 let x: i64 = 42;
 let y: f32 = 3.14;
 
-// Unlike Python, the type can NEVER change after inference:
+// В отличие от Python, тип НИКОГДА не меняется после вывода:
 let x = 42;
-// x = "hello";      // ❌ Error: expected integer, found &str
+// x = "hello";      // ❌ Ошибка: ожидалось целое число, найден &str
 ```
 
 ***
 
-## String Types: String vs &str
+## Строковые типы: String и &str
 
-This is one of the biggest surprises for Python developers. Rust has **two** main
-string types where Python has one.
+Это один из самых больших сюрпризов для разработчиков на Python. В Rust есть **два** основных строковых типа там, где в Python один.
 
-### Python String Handling
+### Работа со строками в Python
 ```python
-# Python — one string type, immutable, reference counted
-name = "Alice"          # str — immutable, heap allocated
-greeting = f"Hello, {name}!"  # f-string formatting
-chars = list(name)      # Convert to list of characters
-upper = name.upper()    # Returns new string (immutable)
+# Python — один строковый тип, неизменяемый, с подсчётом ссылок
+name = "Alice"          # str — неизменяемый, размещается в куче
+greeting = f"Hello, {name}!"  # Форматирование через f-строку
+chars = list(name)      # Преобразование в список символов
+upper = name.upper()    # Возвращает новую строку (строки неизменяемы)
 ```
 
-### Rust String Types
+### Строковые типы Rust
 ```rust
-// Rust has TWO string types:
+// В Rust ДВА строковых типа:
 
-// 1. &str (string slice) — borrowed, immutable, like a "view" into string data
-let name: &str = "Alice";           // Points to string data in the binary
-                                     // Closest to Python's str, but it's a REFERENCE
+// 1. &str (срез строки) — заимствованный, неизменяемый, «вид» на данные строки
+let name: &str = "Alice";           // Указывает на данные строки в бинарнике
+                                     // Ближе всего к str в Python, но это ССЫЛКА
 
-// 2. String (owned string) — heap-allocated, growable, owned
-let mut greeting = String::from("Hello, ");  // Owned, can be modified
+// 2. String (строка-владелец) — в куче, растёт, принадлежит владельцу
+let mut greeting = String::from("Hello, ");  // Владеющая строка, её можно изменять
 greeting.push_str(name);
 greeting.push('!');
-// greeting is now "Hello, Alice!"
+// greeting теперь "Hello, Alice!"
 ```
 
-### When to Use Which?
+### Когда что использовать?
 
 ```rust
-// Think of it like this:
-// &str  = "I'm looking at a string someone else owns"  (read-only view)
-// String = "I own this string and can modify it"        (owned data)
+// Думайте так:
+// &str   = «Я смотрю на строку, которой владеет кто-то другой» (вид только для чтения)
+// String = «Я владею этой строкой и могу её менять» (владеющие данные)
 
-// Function parameters: prefer &str (accepts both types)
-fn greet(name: &str) -> String {          // accepts &str AND &String
-    format!("Hello, {}!", name)           // format! creates a new String
+// Параметры функций: лучше &str (принимает оба типа)
+fn greet(name: &str) -> String {          // принимает и &str, и &String
+    format!("Hello, {}!", name)           // format! создаёт новый String
 }
 
-let s1 = "world";                         // &str literal
+let s1 = "world";                         // литерал &str
 let s2 = String::from("Rust");            // String
 
-greet(s1);      // ✅ &str works directly
-greet(&s2);     // ✅ &String auto-converts to &str (Deref coercion)
+greet(s1);      // ✅ &str работает напрямую
+greet(&s2);     // ✅ &String автоматически преобразуется в &str (Deref coercion)
 ```
 
-### Practical Examples
+### Практические примеры
 
 ```python
-# Python string operations
+# Строковые операции в Python
 name = "alice"
 upper = name.upper()               # "ALICE"
 contains = "lic" in name           # True
@@ -249,174 +245,172 @@ replaced = name.replace("a", "A") # "Alice"
 ```
 
 ```rust
-// Rust equivalents
+// Аналоги в Rust
 let name = "alice";
-let upper = name.to_uppercase();           // String — new allocation
+let upper = name.to_uppercase();           // String — новое выделение памяти
 let contains = name.contains("lic");       // bool
 let parts: Vec<&str> = "a,b,c".split(',').collect();  // Vec<&str>
 let joined = ["a", "b", "c"].join("-");    // String
-let stripped = "  hello  ".trim();         // &str — no allocation!
+let stripped = "  hello  ".trim();         // &str — без выделения памяти!
 let replaced = name.replace("a", "A");     // String
 
-// Key insight: some operations return &str (no allocation), others return String.
-// .trim() returns a slice of the original — efficient!
-// .to_uppercase() must create a new String — allocation required.
+// Ключевая мысль: одни операции возвращают &str (без выделения памяти), другие — String.
+// .trim() возвращает срез исходной строки — это эффективно!
+// .to_uppercase() должен создать новый String — нужно выделение памяти.
 ```
 
-### Python Developers: Think of it This Way
+### Разработчикам на Python: думайте так
 
 ```text
-Python str     ≈ Rust &str     (you usually read strings)
-Python str     ≈ Rust String   (when you need to own/modify)
+Python str     ≈ Rust &str     (вы в основном читаете строки)
+Python str     ≈ Rust String   (когда нужно владеть или изменять)
 
-Rule of thumb:
-- Function parameters → use &str (most flexible)
-- Struct fields       → use String (struct owns its data)
-- Return values       → use String (caller needs to own it)
-- String literals     → automatically &str
+Правило большого пальца:
+- Параметры функций        → используйте &str (самый гибкий вариант)
+- Поля структур            → используйте String (структура владеет своими данными)
+- Возвращаемые значения    → используйте String (вызывающий код должен владеть ими)
+- Строковые литералы       → автоматически &str
 ```
 
 ***
 
-## Printing and String Formatting
+## Вывод и форматирование строк
 
-### Basic Output
+### Базовый вывод
 ```python
 # Python
 print("Hello, World!")
-print("Name:", name, "Age:", age)    # Space-separated
-print(f"Name: {name}, Age: {age}")   # f-string
+print("Имя:", name, "Возраст:", age)    # Через пробел
+print(f"Имя: {name}, Возраст: {age}")   # f-строка
 ```
 
 ```rust
 // Rust
 println!("Hello, World!");
-println!("Name: {} Age: {}", name, age);    // Positional {}
-println!("Name: {name}, Age: {age}");       // Inline variables (Rust 1.58+, like f-strings!)
+println!("Имя: {} Возраст: {}", name, age);    // Позиционные {}
+println!("Имя: {name}, Возраст: {age}");       // Встроенные переменные (Rust 1.58+, как f-строки!)
 ```
 
-### Format Specifiers
+### Спецификаторы формата
 ```python
-# Python formatting
-print(f"{3.14159:.2f}")          # "3.14" — 2 decimal places
-print(f"{42:05d}")               # "00042" — zero-padded
-print(f"{255:#x}")               # "0xff" — hex
-print(f"{42:>10}")               # "        42" — right-aligned
-print(f"{'left':<10}|")          # "left      |" — left-aligned
+# Форматирование в Python
+print(f"{3.14159:.2f}")          # "3.14" — 2 знака после запятой
+print(f"{42:05d}")               # "00042" — дополнение нулями
+print(f"{255:#x}")               # "0xff" — шестнадцатеричный вид
+print(f"{42:>10}")               # "        42" — выравнивание по правому краю
+print(f"{'left':<10}|")          # "left      |" — выравнивание по левому краю
 ```
 
 ```rust
-// Rust formatting (very similar to Python!)
-println!("{:.2}", 3.14159);         // "3.14" — 2 decimal places
-println!("{:05}", 42);              // "00042" — zero-padded
-println!("{:#x}", 255);             // "0xff" — hex
-println!("{:>10}", 42);             // "        42" — right-aligned
-println!("{:<10}|", "left");        // "left      |" — left-aligned
+// Форматирование в Rust (очень похоже на Python!)
+println!("{:.2}", 3.14159);         // "3.14" — 2 знака после запятой
+println!("{:05}", 42);              // "00042" — дополнение нулями
+println!("{:#x}", 255);             // "0xff" — шестнадцатеричный вид
+println!("{:>10}", 42);             // "        42" — выравнивание по правому краю
+println!("{:<10}|", "left");        // "left      |" — выравнивание по левому краю
 ```
 
-### Debug Printing
+### Отладочный вывод
 ```python
-# Python — repr() and pprint
+# Python — repr() и pprint
 print(repr([1, 2, 3]))             # "[1, 2, 3]"
 from pprint import pprint
-pprint({"key": [1, 2, 3]})         # Pretty-printed
+pprint({"key": [1, 2, 3]})         # Красивый вывод
 ```
 
 ```rust
-// Rust — {:?} and {:#?}
-println!("{:?}", vec![1, 2, 3]);       // "[1, 2, 3]" — Debug format
-println!("{:#?}", vec![1, 2, 3]);      // Pretty-printed Debug format
+// Rust — {:?} и {:#?}
+println!("{:?}", vec![1, 2, 3]);       // "[1, 2, 3]" — формат Debug
+println!("{:#?}", vec![1, 2, 3]);      // Красивый формат Debug
 
-// To make your types printable, derive Debug:
+// Чтобы типы можно было вывести, добавьте derive Debug:
 #[derive(Debug)]
 struct Point { x: f64, y: f64 }
 
 let p = Point { x: 1.0, y: 2.0 };
 println!("{:?}", p);                   // "Point { x: 1.0, y: 2.0 }"
-println!("{p:?}");                     // Same, with inline syntax
+println!("{p:?}");                     // То же самое, но со встроенным синтаксисом
 ```
 
-### Quick Reference
+### Краткая справка
 
-| Python | Rust | Notes |
-|--------|------|-------|
-| `print(x)` | `println!("{}", x)` or `println!("{x}")` | Display format |
-| `print(repr(x))` | `println!("{:?}", x)` | Debug format |
-| `f"Hello {name}"` | `format!("Hello {name}")` | Returns String |
-| `print(x, end="")` | `print!("{x}")` | No newline (`print!` vs `println!`) |
-| `print(x, file=sys.stderr)` | `eprintln!("{x}")` | Print to stderr |
-| `sys.stdout.write(s)` | `print!("{s}")` | No newline |
+| Python | Rust | Примечания |
+|--------|------|------------|
+| `print(x)` | `println!("{}", x)` или `println!("{x}")` | Формат Display |
+| `print(repr(x))` | `println!("{:?}", x)` | Формат Debug |
+| `f"Hello {name}"` | `format!("Hello {name}")` | Возвращает String |
+| `print(x, end="")` | `print!("{x}")` | Без перевода строки (`print!` и `println!`) |
+| `print(x, file=sys.stderr)` | `eprintln!("{x}")` | Вывод в stderr |
+| `sys.stdout.write(s)` | `print!("{s}")` | Без перевода строки |
 
 ***
 
-## Type Annotations: Optional vs Required
+## Аннотации типов: необязательные и обязательные
 
-### Python Type Hints (Optional, Not Enforced)
+### Подсказки типов в Python (необязательные, не проверяются)
 ```python
-# Python — type hints are documentation, not enforcement
+# Python — подсказки типов служат документацией, а не принудительной проверкой
 def add(a: int, b: int) -> int:
     return a + b
 
 add(1, 2)         # ✅
-add("a", "b")     # ✅ Python doesn't care — returns "ab"
-add(1, "2")       # ✅ Until it crashes at runtime: TypeError
+add("a", "b")     # ✅ Python не возражает — возвращает "ab"
+add(1, "2")       # ✅ Пока не упадёт во время выполнения: TypeError
 
-# Union types, Optional
+# Union-типы, Optional
 def find(key: str) -> int | None:
     ...
 
-# Generic types
+# Обобщённые типы
 def first(items: list[int]) -> int | None:
     return items[0] if items else None
 
-# Type aliases
+# Псевдонимы типов
 UserId = int
 Mapping = dict[str, list[int]]
 ```
 
-### Rust Type Declarations (Required, Compiler-Enforced)
+### Объявления типов в Rust (обязательные, проверяются компилятором)
 ```rust
-// Rust — types are enforced. Always. No exceptions.
+// Rust — типы проверяются всегда, без исключений.
 fn add(a: i32, b: i32) -> i32 {
     a + b
 }
 
 add(1, 2);         // ✅
-// add("a", "b");  // ❌ Compile error: expected i32, found &str
+// add("a", "b");  // ❌ Ошибка компиляции: ожидался i32, найден &str
 
-// Optional values use Option<T>
+// Необязательные значения используют Option<T>
 fn find(key: &str) -> Option<i32> {
-    // Returns Some(value) or None
+    // Возвращает Some(value) или None
     Some(42)
 }
 
-// Generic types
+// Обобщённые типы
 fn first(items: &[i32]) -> Option<i32> {
     items.first().copied()
 }
 
-// Type aliases
+// Псевдонимы типов
 type UserId = i64;
 type Mapping = HashMap<String, Vec<i32>>;
 ```
 
-> **Key insight**: In Python, type hints help your IDE and mypy but don't affect runtime.
-> In Rust, types ARE the program — the compiler uses them to guarantee memory safety,
-> prevent data races, and eliminate null pointer errors.
+> **Ключевая мысль**: в Python подсказки типов помогают вашей IDE и mypy, но на выполнение программы не влияют. В Rust типы — это и есть программа: компилятор использует их, чтобы гарантировать безопасность памяти, предотвратить гонки данных и исключить ошибки нулевых указателей.
 >
-> 📌 **See also**: [Ch. 6 — Enums and Pattern Matching](ch06-enums-and-pattern-matching.md) shows how Rust's type system replaces Python's `Union` types and `isinstance()` checks.
+> 📌 **См. также**: [Гл. 6 — Перечисления и сопоставление с образцом](ch06-enums-and-pattern-matching.md) показывает, как система типов Rust заменяет `Union`-типы Python и проверки `isinstance()`.
 
 ---
 
-## Exercises
+## Упражнения
 
 <details>
-<summary><strong>🏋️ Exercise: Temperature Converter</strong> (click to expand)</summary>
+<summary><strong>🏋️ Упражнение: конвертер температуры</strong> (нажмите, чтобы раскрыть)</summary>
 
-**Challenge**: Write a function `celsius_to_fahrenheit(c: f64) -> f64` and a function `classify(temp_f: f64) -> &'static str` that returns "cold", "mild", or "hot" based on thresholds. Print the result for 0, 20, and 35 degrees Celsius. Use string formatting.
+**Задание**: напишите функцию `celsius_to_fahrenheit(c: f64) -> f64` и функцию `classify(temp_f: f64) -> &'static str`, которая по пороговым значениям возвращает `"холодно"`, `"умеренно"` или `"жарко"`. Выведите результат для 0, 20 и 35 градусов Цельсия. Используйте форматирование строк.
 
 <details>
-<summary>🔑 Solution</summary>
+<summary>🔑 Решение</summary>
 
 ```rust
 fn celsius_to_fahrenheit(c: f64) -> f64 {
@@ -424,9 +418,9 @@ fn celsius_to_fahrenheit(c: f64) -> f64 {
 }
 
 fn classify(temp_f: f64) -> &'static str {
-    if temp_f < 50.0 { "cold" }
-    else if temp_f < 77.0 { "mild" }
-    else { "hot" }
+    if temp_f < 50.0 { "холодно" }
+    else if temp_f < 77.0 { "умеренно" }
+    else { "жарко" }
 }
 
 fn main() {
@@ -437,11 +431,10 @@ fn main() {
 }
 ```
 
-**Key takeaway**: Rust requires explicit `f64` (no implicit int→float), `for` iterates over arrays directly (no `range()`), and `if/else` blocks are expressions.
+**Ключевой вывод**: Rust требует явного `f64` (нет неявного преобразования int → float), `for` перебирает массивы напрямую (без `range()`), а блоки `if/else` — это выражения.
 
 </details>
 </details>
 
 ***
-
 

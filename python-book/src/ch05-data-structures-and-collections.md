@@ -1,22 +1,21 @@
-## Tuples and Destructuring
+## Кортежи и деструктуризация
 
-> **What you'll learn:** Rust tuples vs Python tuples, arrays and slices, structs (Rust's replacement for classes),
-> `Vec<T>` vs `list`, `HashMap<K,V>` vs `dict`, and the newtype pattern for domain modeling.
+> **Что вы узнаете:** кортежи Rust и Python, массивы и срезы, структуры (замена классам в Rust), `Vec<T>` и `list`, `HashMap<K,V>` и `dict`, а также паттерн newtype для моделирования предметной области.
 >
-> **Difficulty:** 🟢 Beginner
+> **Сложность:** 🟢 Начальный
 
-### Python Tuples
+### Кортежи в Python
 ```python
-# Python — tuples are immutable sequences
+# Python — кортежи это неизменяемые последовательности
 point = (3.0, 4.0)
-x, y = point                    # Unpacking
+x, y = point                    # Распаковка
 print(f"x={x}, y={y}")
 
-# Tuples can hold mixed types
+# Кортежи могут содержать значения разных типов
 record = ("Alice", 30, True)
 name, age, active = record
 
-# Named tuples for clarity
+# Именованные кортежи для ясности
 from typing import NamedTuple
 
 class Point(NamedTuple):
@@ -24,104 +23,104 @@ class Point(NamedTuple):
     y: float
 
 p = Point(3.0, 4.0)
-print(p.x)                      # Named access
+print(p.x)                      # Доступ по имени
 ```
 
-### Rust Tuples
+### Кортежи в Rust
 ```rust
-// Rust — tuples are fixed-size, typed, can hold mixed types
+// Rust — кортежи фиксированного размера, с типами, могут содержать значения разных типов
 let point: (f64, f64) = (3.0, 4.0);
-let (x, y) = point;              // Destructuring (same as Python unpacking)
+let (x, y) = point;              // Деструктуризация (то же, что распаковка в Python)
 println!("x={x}, y={y}");
 
-// Mixed types
+// Значения разных типов
 let record: (&str, i32, bool) = ("Alice", 30, true);
 let (name, age, active) = record;
 
-// Access by index (unlike Python, uses .0 .1 .2 syntax)
+// Доступ по индексу (в отличие от Python, используется синтаксис .0 .1 .2)
 let first = record.0;            // "Alice"
 let second = record.1;           // 30
 
 // Python: record[0]
-// Rust:   record.0      ← dot-index, not bracket-index
+// Rust:   record.0      ← индекс через точку, а не квадратные скобки
 ```
 
-### When to Use Tuples vs Structs
+### Когда использовать кортежи, а когда структуры
 ```rust
-// Tuples: quick grouping, function returns, temporary values
+// Кортежи: быстрая группировка, возврат из функций, временные значения
 fn min_max(data: &[i32]) -> (i32, i32) {
     (*data.iter().min().unwrap(), *data.iter().max().unwrap())
 }
 let (lo, hi) = min_max(&[3, 1, 4, 1, 5]);
 
-// Structs: named fields, clear intent, methods
+// Структуры: именованные поля, понятный смысл, методы
 struct Point { x: f64, y: f64 }
 
-// Rule of thumb:
-// - 2-3 same-type fields → tuple is fine
-// - Named fields needed  → use struct
-// - Methods needed       → use struct
-// (Same guidance as Python: tuple vs namedtuple vs dataclass)
+// Эмпирическое правило:
+// - 2–3 поля одного типа → кортеж подойдёт
+// - Нужны именованные поля → используйте структуру
+// - Нужны методы → используйте структуру
+// (Те же рекомендации, что и в Python: tuple vs namedtuple vs dataclass)
 ```
 
 ***
 
-## Arrays and Slices
+## Массивы и срезы
 
-### Python Lists vs Rust Arrays
+### Списки Python и массивы Rust
 ```python
-# Python — lists are dynamic, heterogeneous
-numbers = [1, 2, 3, 4, 5]       # Can grow, shrink, hold mixed types
+# Python — списки динамические, гетерогенные
+numbers = [1, 2, 3, 4, 5]       # Могут расти, уменьшаться, содержать значения разных типов
 numbers.append(6)
-mixed = [1, "two", 3.0]         # Mixed types allowed
+mixed = [1, "two", 3.0]         # Смешанные типы допустимы
 ```
 
 ```rust
-// Rust has TWO fixed-size vs dynamic concepts:
+// В Rust есть ДВА понятия: фиксированный размер и динамический размер
 
-// 1. Array — fixed size, stack-allocated (no Python equivalent)
-let numbers: [i32; 5] = [1, 2, 3, 4, 5]; // Size is part of the type!
-// numbers.push(6);  // ❌ Arrays can't grow
+// 1. Массив — фиксированный размер, размещается на стеке (аналога в Python нет)
+let numbers: [i32; 5] = [1, 2, 3, 4, 5]; // Размер входит в тип!
+// numbers.push(6);  // ❌ Массивы не могут расти
 
-// Initialize all elements to same value:
+// Инициализация всех элементов одним значением:
 let zeros = [0; 10];            // [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 
-// 2. Slice — a view into an array or Vec (like Python slicing, but borrowed)
-let slice: &[i32] = &numbers[1..4]; // [2, 3, 4] — a reference, not a copy!
+// 2. Срез — представление участка массива или Vec (как срезы в Python, но заимствованный)
+let slice: &[i32] = &numbers[1..4]; // [2, 3, 4] — ссылка, а не копия!
 
-// Python: numbers[1:4] creates a NEW list (copy)
-// Rust:   &numbers[1..4] creates a VIEW (no copy, no allocation)
+// Python: numbers[1:4] создаёт НОВЫЙ список (копию)
+// Rust:   &numbers[1..4] создаёт ПРЕДСТАВЛЕНИЕ (без копирования и выделения памяти)
 ```
 
-### Practical Comparison
+### Практическое сравнение
 ```python
-# Python slicing — creates copies
+# Срезы в Python создают копии
 data = [10, 20, 30, 40, 50]
-first_three = data[:3]          # New list: [10, 20, 30]
-last_two = data[-2:]            # New list: [40, 50]
-reversed_data = data[::-1]      # New list: [50, 40, 30, 20, 10]
+first_three = data[:3]          # Новый список: [10, 20, 30]
+last_two = data[-2:]            # Новый список: [40, 50]
+reversed_data = data[::-1]      # Новый список: [50, 40, 30, 20, 10]
 ```
 
 ```rust
-// Rust slicing — creates views (references)
+// Срезы в Rust создают представления (ссылки)
 let data = [10, 20, 30, 40, 50];
-let first_three = &data[..3];         // &[i32], view: [10, 20, 30]
-let last_two = &data[3..];            // &[i32], view: [40, 50]
+let first_three = &data[..3];         // &[i32], представление: [10, 20, 30]
+let last_two = &data[3..];            // &[i32], представление: [40, 50]
 
-// No negative indexing — use .len()
-let last_two = &data[data.len()-2..]; // &[i32], view: [40, 50]
+// Отрицательных индексов нет — используйте .len()
+let last_two = &data[data.len()-2..]; // &[i32], представление: [40, 50]
 
-// Reverse: use an iterator
+// Разворот: используйте итератор
 let reversed: Vec<i32> = data.iter().rev().copied().collect();
 ```
 
 ***
 
-## Structs vs Classes
+## Структуры и классы
 
-### Python Classes
+### Классы в Python
 ```python
-# Python — class with __init__, methods, properties
+# Python — класс с __init__, методами и свойствами
 from dataclasses import dataclass
 
 @dataclass
@@ -146,9 +145,9 @@ print(r.area())         # 50.0
 print(r)                # Rectangle(10.0 x 5.0)
 ```
 
-### Rust Structs
+### Структуры в Rust
 ```rust
-// Rust — struct + impl blocks (no inheritance!)
+// Rust — struct + блоки impl (без наследования!)
 #[derive(Debug, Clone)]
 struct Rectangle {
     width: f64,
@@ -156,9 +155,9 @@ struct Rectangle {
 }
 
 impl Rectangle {
-    // "Constructor" — associated function (no self)
+    // «Конструктор» — ассоциированная функция (без self)
     fn new(width: f64, height: f64) -> Self {
-        Rectangle { width, height }   // Field shorthand when names match
+        Rectangle { width, height }   // Сокращённая запись полей, когда имена совпадают
     }
 
     fn area(&self) -> f64 {
@@ -174,7 +173,7 @@ impl Rectangle {
     }
 }
 
-// Display trait = Python's __str__
+// Трейт Display — аналог __str__ в Python
 impl std::fmt::Display for Rectangle {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Rectangle({} x {})", self.width, self.height)
@@ -190,43 +189,43 @@ fn main() {
 
 ```mermaid
 flowchart LR
-    subgraph Python ["Python Object (Heap)"]
-        PH["PyObject Header<br/>(refcount + type ptr)"] --> PW["width: float obj"]
-        PH --> PHT["height: float obj"]
+    subgraph Python ["Объект Python (куча)"]
+        PH["Заголовок PyObject<br/>(refcount + указатель на тип)"] --> PW["width: объект float"]
+        PH --> PHT["height: объект float"]
         PH --> PD["__dict__"]
     end
     Python ~~~ Rust
-    subgraph Rust ["Rust Struct (Stack)"]
-        RW["width: f64<br/>(8 bytes)"] --- RH["height: f64<br/>(8 bytes)"]
+    subgraph Rust ["Структура Rust (стек)"]
+        RW["width: f64<br/>(8 байт)"] --- RH["height: f64<br/>(8 байт)"]
     end
     style Python fill:#ffeeba
     style Rust fill:#d4edda
 ```
 
-> **Memory insight**: A Python `Rectangle` object has a 56-byte header + separate heap-allocated float objects. A Rust `Rectangle` is exactly 16 bytes on the stack — no indirection, no GC pressure.
+> **Наблюдение о памяти**: объект Python `Rectangle` имеет 56-байтовый заголовок плюс отдельные объекты float в куче. Структура Rust `Rectangle` занимает ровно 16 байт на стеке: без косвенных обращений и без нагрузки на GC.
 >
-> 📌 **See also**: [Ch. 10 — Traits and Generics](ch10-traits-and-generics.md) covers implementing traits like `Display`, `Debug`, and operator overloading for your structs.
+> 📌 **См. также**: [Гл. 10 — Трейты и обобщения](ch10-traits-and-generics.md) рассказывает о реализации трейтов вроде `Display`, `Debug` и перегрузки операторов для ваших структур.
 
-### Key Mapping: Python Dunder Methods → Rust Traits
+### Соответствие: магические методы Python → трейты Rust
 
-| Python | Rust | Purpose |
-|--------|------|---------|
-| `__str__` | `impl Display` | Human-readable string |
-| `__repr__` | `#[derive(Debug)]` | Debug representation |
-| `__eq__` | `#[derive(PartialEq)]` | Equality comparison |
-| `__hash__` | `#[derive(Hash)]` | Hashable (for dict keys / HashSet) |
-| `__lt__`, `__le__`, etc. | `#[derive(PartialOrd, Ord)]` | Ordering |
-| `__add__` | `impl Add` | `+` operator |
-| `__iter__` | `impl Iterator` | Iteration |
-| `__len__` | `.len()` method | Length |
-| `__enter__`/`__exit__` | RAII + `impl Drop` | Automatic cleanup; no direct equivalent of context manager's two-phase protocol |
-| `__init__` | `fn new()` (convention) | Constructor |
-| `__getitem__` | `impl Index` | Indexing with `[]` |
-| `__contains__` | `.contains()` method | `in` operator |
+| Python | Rust | Назначение |
+|--------|------|------------|
+| `__str__` | `impl Display` | Человекочитаемая строка |
+| `__repr__` | `#[derive(Debug)]` | Отладочное представление |
+| `__eq__` | `#[derive(PartialEq)]` | Сравнение на равенство |
+| `__hash__` | `#[derive(Hash)]` | Хешируемость (для ключей dict и HashSet) |
+| `__lt__`, `__le__` и т. д. | `#[derive(PartialOrd, Ord)]` | Упорядочивание |
+| `__add__` | `impl Add` | Оператор `+` |
+| `__iter__` | `impl Iterator` | Итерация |
+| `__len__` | метод `.len()` | Длина |
+| `__enter__`/`__exit__` | RAII + `impl Drop` | Автоматическая очистка; прямого аналога двухфазного протокола менеджера контекста нет |
+| `__init__` | `fn new()` (соглашение) | Конструктор |
+| `__getitem__` | `impl Index` | Индексация через `[]` |
+| `__contains__` | метод `.contains()` | Оператор `in` |
 
-### No Inheritance — Composition Instead
+### Нет наследования: вместо него композиция
 ```python
-# Python — inheritance
+# Python — наследование
 class Animal:
     def __init__(self, name: str):
         self.name = name
@@ -235,15 +234,15 @@ class Animal:
 
 class Dog(Animal):
     def speak(self) -> str:
-        return f"{self.name} says Woof!"
+        return f"{self.name} говорит: Гав!"
 
 class Cat(Animal):
     def speak(self) -> str:
-        return f"{self.name} says Meow!"
+        return f"{self.name} говорит: Мяу!"
 ```
 
 ```rust
-// Rust — traits + composition (no inheritance)
+// Rust — трейты и композиция (без наследования)
 trait Animal {
     fn name(&self) -> &str;
     fn speak(&self) -> String;
@@ -255,18 +254,18 @@ struct Cat { name: String }
 impl Animal for Dog {
     fn name(&self) -> &str { &self.name }
     fn speak(&self) -> String {
-        format!("{} says Woof!", self.name)
+        format!("{} говорит: Гав!", self.name)
     }
 }
 
 impl Animal for Cat {
     fn name(&self) -> &str { &self.name }
     fn speak(&self) -> String {
-        format!("{} says Meow!", self.name)
+        format!("{} говорит: Мяу!", self.name)
     }
 }
 
-// Use trait objects for polymorphism (like Python's duck typing):
+// Для полиморфизма используйте трейт-объекты (как утиную типизацию в Python):
 fn animal_roll_call(animals: &[&dyn Animal]) {
     for a in animals {
         println!("{}", a.speak());
@@ -274,16 +273,15 @@ fn animal_roll_call(animals: &[&dyn Animal]) {
 }
 ```
 
-> **Mental model**: Python says "inherit behavior". Rust says "implement contracts".
-> The result is similar, but Rust avoids the diamond problem and fragile base class issues.
+> **Ментальная модель**: Python говорит «унаследуй поведение». Rust говорит «реализуй контракт». Результат похож, но Rust избегает проблемы ромбовидного наследования и хрупкости базовых классов.
 
 ***
 
-## Vec vs list
+## Vec и list
 
-`Vec<T>` is Rust's growable, heap-allocated array — the closest equivalent to Python's `list`.
+`Vec<T>` — это растущий массив Rust в куче, ближайший аналог `list` в Python.
 
-### Creating Vectors
+### Создание векторов
 ```python
 # Python
 numbers = [1, 2, 3]
@@ -294,69 +292,69 @@ from_range = list(range(1, 6))
 
 ```rust
 // Rust
-let numbers = vec![1, 2, 3];            // vec! macro (like a list literal)
-let empty: Vec<i32> = Vec::new();        // Empty vec (type annotation needed)
+let numbers = vec![1, 2, 3];            // макрос vec! (аналог литерала списка)
+let empty: Vec<i32> = Vec::new();        // Пустой vec (нужна аннотация типа)
 let repeated = vec![0; 10];              // [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 let from_range: Vec<i32> = (1..6).collect(); // [1, 2, 3, 4, 5]
 ```
 
-### Common Operations
+### Частые операции
 ```python
-# Python list operations
+# Операции со списками Python
 nums = [1, 2, 3]
 nums.append(4)                   # [1, 2, 3, 4]
 nums.extend([5, 6])             # [1, 2, 3, 4, 5, 6]
 nums.insert(0, 0)               # [0, 1, 2, 3, 4, 5, 6]
 last = nums.pop()               # 6, nums = [0, 1, 2, 3, 4, 5]
 length = len(nums)              # 6
-nums.sort()                     # In-place sort
-sorted_copy = sorted(nums)     # New sorted list
-nums.reverse()                  # In-place reverse
+nums.sort()                     # Сортировка на месте
+sorted_copy = sorted(nums)     # Новый отсортированный список
+nums.reverse()                  # Разворот на месте
 contains = 3 in nums           # True
-index = nums.index(3)          # Index of first 3
+index = nums.index(3)          # Индекс первой тройки
 ```
 
 ```rust
-// Rust Vec operations
+// Операции с Vec в Rust
 let mut nums = vec![1, 2, 3];
 nums.push(4);                          // [1, 2, 3, 4]
 nums.extend([5, 6]);                   // [1, 2, 3, 4, 5, 6]
 nums.insert(0, 0);                     // [0, 1, 2, 3, 4, 5, 6]
 let last = nums.pop();                 // Some(6), nums = [0, 1, 2, 3, 4, 5]
 let length = nums.len();               // 6
-nums.sort();                           // In-place sort
+nums.sort();                           // Сортировка на месте
 let mut sorted_copy = nums.clone();
-sorted_copy.sort();                    // Sort a clone
-nums.reverse();                        // In-place reverse
+sorted_copy.sort();                    // Сортируем копию
+nums.reverse();                        // Разворот на месте
 let contains = nums.contains(&3);      // true
-let index = nums.iter().position(|&x| x == 3); // Some(index) or None
+let index = nums.iter().position(|&x| x == 3); // Some(index) или None
 ```
 
-### Quick Reference
+### Краткая справка
 
-| Python | Rust | Notes |
-|--------|------|-------|
+| Python | Rust | Примечания |
+|--------|------|------------|
 | `lst.append(x)` | `vec.push(x)` | |
 | `lst.extend(other)` | `vec.extend(other)` | |
-| `lst.pop()` | `vec.pop()` | Returns `Option<T>` |
+| `lst.pop()` | `vec.pop()` | Возвращает `Option<T>` |
 | `lst.insert(i, x)` | `vec.insert(i, x)` | |
-| `lst.remove(x)` | `vec.iter().position(\|v\| v == &x).map(\|i\| vec.remove(i))` | Removes first match only (use `retain` to remove all) |
-| `del lst[i]` | `vec.remove(i)` | Returns the removed element |
+| `lst.remove(x)` | `vec.iter().position(\|v\| v == &x).map(\|i\| vec.remove(i))` | Удаляет только первое совпадение (чтобы удалить все, используйте `retain`) |
+| `del lst[i]` | `vec.remove(i)` | Возвращает удалённый элемент |
 | `len(lst)` | `vec.len()` | |
 | `x in lst` | `vec.contains(&x)` | |
 | `lst.sort()` | `vec.sort()` | |
-| `sorted(lst)` | Clone + sort, or iterator | |
-| `lst[i]` | `vec[i]` | Panics if out of bounds |
-| `lst.get(i, default)` | `vec.get(i)` | Returns `Option<&T>` |
-| `lst[1:3]` | `&vec[1..3]` | Returns a slice (no copy) |
+| `sorted(lst)` | Клонирование + sort или итератор | |
+| `lst[i]` | `vec[i]` | Паника, если индекс вне границ |
+| `lst.get(i, default)` | `vec.get(i)` | Возвращает `Option<&T>` |
+| `lst[1:3]` | `&vec[1..3]` | Возвращает срез (без копирования) |
 
 ***
 
-## HashMap vs dict
+## HashMap и dict
 
-`HashMap<K, V>` is Rust's hash map — equivalent to Python's `dict`.
+`HashMap<K, V>` — хеш-таблица Rust, аналог `dict` в Python.
 
-### Creating HashMaps
+### Создание HashMap
 ```python
 # Python
 scores = {"Alice": 100, "Bob": 85}
@@ -375,14 +373,14 @@ let from_pairs: HashMap<&str, i32> = [("x", 1), ("y", 2)].into_iter().collect();
 let comprehension: HashMap<_, _> = keys.iter().zip(values.iter()).collect();
 ```
 
-### Common Operations
+### Частые операции
 ```python
-# Python dict operations
+# Операции со словарём Python
 d = {"a": 1, "b": 2}
-d["c"] = 3                      # Insert
-val = d["a"]                     # 1 (KeyError if missing)
-val = d.get("z", 0)             # 0 (default if missing)
-del d["b"]                       # Remove
+d["c"] = 3                      # Вставка
+val = d["a"]                     # 1 (KeyError, если ключа нет)
+val = d.get("z", 0)             # 0 (значение по умолчанию, если ключа нет)
+del d["b"]                       # Удаление
 exists = "a" in d               # True
 keys = list(d.keys())           # ["a", "c"]
 values = list(d.values())       # [1, 3]
@@ -397,42 +395,42 @@ for word in words:
 ```
 
 ```rust
-// Rust HashMap operations
+// Операции с HashMap в Rust
 use std::collections::HashMap;
 
 let mut d = HashMap::new();
 d.insert("a", 1);
 d.insert("b", 2);
-d.insert("c", 3);                       // Insert or overwrite
+d.insert("c", 3);                       // Вставка или перезапись
 
-let val = d["a"];                        // 1 (panics if missing)
-let val = d.get("z").copied().unwrap_or(0); // 0 (safe access)
-d.remove("b");                          // Remove
+let val = d["a"];                        // 1 (паника, если ключа нет)
+let val = d.get("z").copied().unwrap_or(0); // 0 (безопасный доступ)
+d.remove("b");                          // Удаление
 let exists = d.contains_key("a");       // true
 let keys: Vec<_> = d.keys().collect();
 let values: Vec<_> = d.values().collect();
 let length = d.len();
 
-// entry API = Python's setdefault / defaultdict pattern
+// Entry API — аналог паттерна setdefault / defaultdict в Python
 let mut word_count: HashMap<&str, i32> = HashMap::new();
 for word in words {
     *word_count.entry(word).or_insert(0) += 1;
 }
 ```
 
-### Quick Reference
+### Краткая справка
 
-| Python | Rust | Notes |
-|--------|------|-------|
-| `d[key] = val` | `d.insert(key, val)` | Returns `Option<V>` (old value) |
-| `d[key]` | `d[&key]` | Panics if missing |
-| `d.get(key)` | `d.get(&key)` | Returns `Option<&V>` |
+| Python | Rust | Примечания |
+|--------|------|------------|
+| `d[key] = val` | `d.insert(key, val)` | Возвращает `Option<V>` (старое значение) |
+| `d[key]` | `d[&key]` | Паника, если ключа нет |
+| `d.get(key)` | `d.get(&key)` | Возвращает `Option<&V>` |
 | `d.get(key, default)` | `d.get(&key).unwrap_or(&default)` | |
 | `key in d` | `d.contains_key(&key)` | |
-| `del d[key]` | `d.remove(&key)` | Returns `Option<V>` |
-| `d.keys()` | `d.keys()` | Iterator |
-| `d.values()` | `d.values()` | Iterator |
-| `d.items()` | `d.iter()` | Iterator of `(&K, &V)` |
+| `del d[key]` | `d.remove(&key)` | Возвращает `Option<V>` |
+| `d.keys()` | `d.keys()` | Итератор |
+| `d.values()` | `d.values()` | Итератор |
+| `d.items()` | `d.iter()` | Итератор по `(&K, &V)` |
 | `len(d)` | `d.len()` | |
 | `d.update(other)` | `d.extend(other)` | |
 | `defaultdict(int)` | `.entry().or_insert(0)` | Entry API |
@@ -440,27 +438,27 @@ for word in words {
 
 ***
 
-### Other Collections
+### Другие коллекции
 
-| Python | Rust | Notes |
-|--------|------|-------|
+| Python | Rust | Примечания |
+|--------|------|------------|
 | `set()` | `HashSet<T>` | `use std::collections::HashSet;` |
 | `collections.deque` | `VecDeque<T>` | `use std::collections::VecDeque;` |
-| `heapq` | `BinaryHeap<T>` | Max-heap by default |
-| `collections.OrderedDict` | `IndexMap` (crate) | HashMap doesn't preserve order |
-| `sortedcontainers.SortedList` | `BTreeSet<T>` / `BTreeMap<K,V>` | Tree-based, sorted |
+| `heapq` | `BinaryHeap<T>` | Max-куча по умолчанию |
+| `collections.OrderedDict` | `IndexMap` (крейт) | HashMap не сохраняет порядок |
+| `sortedcontainers.SortedList` | `BTreeSet<T>` / `BTreeMap<K,V>` | На основе дерева, отсортировано |
 
 ---
 
-## Exercises
+## Упражнения
 
 <details>
-<summary><strong>🏋️ Exercise: Word Frequency Counter</strong> (click to expand)</summary>
+<summary><strong>🏋️ Упражнение: счётчик частоты слов</strong> (нажмите, чтобы раскрыть)</summary>
 
-**Challenge**: Write a function that takes a `&str` sentence and returns a `HashMap<String, usize>` of word frequencies (case-insensitive). In Python this is `Counter(s.lower().split())`. Translate it to Rust.
+**Задание**: напишите функцию, которая принимает предложение `&str` и возвращает `HashMap<String, usize>` с частотами слов (без учёта регистра). В Python это `Counter(s.lower().split())`. Перепишите её на Rust.
 
 <details>
-<summary>🔑 Solution</summary>
+<summary>🔑 Решение</summary>
 
 ```rust
 use std::collections::HashMap;
@@ -483,11 +481,10 @@ fn main() {
 }
 ```
 
-**Key takeaway**: `HashMap::entry().or_insert()` is Rust's equivalent of Python's `defaultdict` or `Counter`. The `*` dereference is needed because `or_insert` returns `&mut usize`.
+**Ключевой вывод**: `HashMap::entry().or_insert()` — аналог `defaultdict` или `Counter` в Python. Разыменование `*` нужно, потому что `or_insert` возвращает `&mut usize`.
 
 </details>
 </details>
 
 ***
-
 
