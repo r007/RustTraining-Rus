@@ -5,48 +5,48 @@ use std::net::TcpListener;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-/// (slug, title, description, category)
+/// Книги сборника: (каталог, название, описание, категория).
 const BOOKS: &[(&str, &str, &str, &str)] = &[
     (
         "c-cpp-book",
-        "Rust for C/C++ Programmers",
-        "Move semantics, RAII, FFI, embedded, no_std",
+        "Курс Rust для программистов на C/C++",
+        "Семантика перемещения, RAII, FFI, embedded, no_std",
         "bridge",
     ),
     (
         "csharp-book",
-        "Rust for C# Programmers",
-        "Best for Swift / C# / Java developers",
+        "Rust для программистов C#",
+        "Для разработчиков Swift / C# / Java",
         "bridge",
     ),
     (
         "python-book",
-        "Rust for Python Programmers",
-        "Dynamic → static typing, GIL-free concurrency",
+        "Rust для программистов на Python",
+        "От динамической к статической типизации, конкурентность без GIL",
         "bridge",
     ),
     (
         "async-book",
-        "Async Rust: From Futures to Production",
-        "Tokio, streams, cancellation safety",
+        "Async Rust: от Future до продакшена",
+        "Tokio, потоки (streams), отмена и безопасность при отмене",
         "deep-dive",
     ),
     (
         "rust-patterns-book",
-        "Rust Patterns",
-        "Pin, allocators, lock-free structures, unsafe",
+        "Паттерны Rust",
+        "Pin, аллокаторы, lock-free-структуры, unsafe",
         "advanced",
     ),
     (
         "type-driven-correctness-book",
-        "Type-Driven Correctness",
-        "Type-state, phantom types, capability tokens",
+        "Корректность на уровне типов",
+        "Typestate, phantom-типы, capability-токены",
         "expert",
     ),
     (
         "engineering-book",
-        "Rust Engineering Practices",
-        "Build scripts, cross-compilation, coverage, CI/CD",
+        "Инженерные практики Rust",
+        "Build-скрипты, кросс-компиляция, покрытие кода, CI/CD",
         "practices",
     ),
 ];
@@ -54,7 +54,7 @@ const BOOKS: &[(&str, &str, &str, &str)] = &[
 fn project_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
-        .expect("xtask must live in a workspace subdirectory")
+        .expect("xtask должен находиться во вложенном каталоге воркспейса")
         .to_path_buf()
 }
 
@@ -70,7 +70,7 @@ fn main() {
         Some("clean") => cmd_clean(),
         Some("--help" | "-h" | "help") | None => print_usage(0),
         Some(other) => {
-            eprintln!("Unknown command: {other}\n");
+            eprintln!("Неизвестная команда: {other}\n");
             print_usage(1);
         }
     }
@@ -85,22 +85,22 @@ fn print_usage(code: i32) {
     let _ = writeln!(
         stream,
         "\
-Usage: cargo xtask <COMMAND>
+Использование: cargo xtask <КОМАНДА>
 
-Commands:
-  build    Build all books into site/ (for local preview)
-  serve    Build and serve at http://localhost:3000
-  deploy   Build all books into docs/ (for GitHub Pages)
-  clean    Remove site/ and docs/ directories"
+Команды:
+  build    Собрать все книги в site/ (для локального просмотра)
+  serve    Собрать и запустить сервер на http://localhost:3000
+  deploy   Собрать все книги в docs/ (для GitHub Pages)
+  clean    Удалить каталоги site/ и docs/"
     );
     std::process::exit(code);
 }
 
-// ── build ────────────────────────────────────────────────────────────
+// ── сборка ───────────────────────────────────────────────────────────
 
 fn cmd_build() {
     if !check_mdbook() {
-        eprintln!("Error: 'mdbook' not found in PATH. Please install it: https://rust-lang.github.io/mdbook/guide/installation.html");
+        eprintln!("Ошибка: 'mdbook' не найден в PATH. Установите его: https://rust-lang.github.io/mdBook/guide/installation.html");
         std::process::exit(1);
     }
     build_to("site");
@@ -108,11 +108,11 @@ fn cmd_build() {
 
 fn cmd_deploy() {
     if !check_mdbook() {
-        eprintln!("Error: 'mdbook' not found in PATH.");
+        eprintln!("Ошибка: 'mdbook' не найден в PATH.");
         std::process::exit(1);
     }
     build_to("docs");
-    println!("\nTo publish, commit docs/ and enable GitHub Pages → \"Deploy from a branch\" → /docs.");
+    println!("\nЧтобы опубликовать результат, закоммитьте docs/ и включите GitHub Pages: Settings → Pages → Deploy from a branch → /docs.");
 }
 
 fn check_mdbook() -> bool {
@@ -130,17 +130,17 @@ fn build_to(dir_name: &str) {
     let out = root.join(dir_name);
 
     if out.exists() {
-        fs::remove_dir_all(&out).expect("failed to clean output dir");
+        fs::remove_dir_all(&out).expect("не удалось очистить каталог вывода");
     }
-    fs::create_dir_all(&out).expect("failed to create output dir");
+    fs::create_dir_all(&out).expect("не удалось создать каталог вывода");
 
-    println!("Building unified site into {dir_name}/\n");
+    println!("Сборка общего сайта в {dir_name}/\n");
 
     let mut ok = 0u32;
     for &(slug, _, _, _) in BOOKS {
         let book_dir = root.join(slug);
         if !book_dir.is_dir() {
-            eprintln!("  ✗ {slug}/ not found, skipping");
+            eprintln!("  ✗ {slug}/ не найден, пропускаю");
             continue;
         }
         let dest = out.join(slug);
@@ -149,31 +149,31 @@ fn build_to(dir_name: &str) {
             .arg(&dest)
             .current_dir(&book_dir)
             .status()
-            .expect("failed to run mdbook — is it installed?");
+            .expect("не удалось запустить mdbook: установлен ли он?");
 
         if status.success() {
             println!("  ✓ {slug}");
             ok += 1;
         } else {
-            eprintln!("  ✗ {slug} FAILED");
+            eprintln!("  ✗ {slug}: ОШИБКА СБОРКИ");
         }
     }
-    println!("\n  {ok}/{} books built", BOOKS.len());
+    println!("\n  собрано книг: {ok}/{}", BOOKS.len());
 
     write_landing_page(&out);
 
-    // Prevent GitHub Pages from processing the output with Jekyll
-    fs::write(out.join(".nojekyll"), "").expect("failed to create .nojekyll");
-    println!("\nDone! Output in {dir_name}/");
+    // Отключаем обработку Jekyll на GitHub Pages
+    fs::write(out.join(".nojekyll"), "").expect("не удалось создать .nojekyll");
+    println!("\nГотово! Результат в {dir_name}/");
 }
 
 fn category_label(cat: &str) -> &str {
     match cat {
-        "bridge" => "Bridge",
-        "deep-dive" => "Deep Dive",
-        "advanced" => "Advanced",
-        "expert" => "Expert",
-        "practices" => "Practices",
+        "bridge" => "Мост",
+        "deep-dive" => "Погружение",
+        "advanced" => "Продвинутый",
+        "expert" => "Эксперт",
+        "practices" => "Практики",
         _ => cat,
     }
 }
@@ -195,11 +195,11 @@ fn write_landing_page(site: &Path) {
 
     let html = format!(
         r##"<!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Rust Training Books</title>
+  <title>Учебные книги по Rust</title>
   <style>
     :root {{
       --bg: #1a1a2e;
@@ -228,7 +228,7 @@ fn write_landing_page(site: &Path) {
     h1 span {{ color: var(--accent); }}
     .subtitle {{ color: var(--muted); font-size: 1.1rem; margin-bottom: 1.2rem; }}
 
-    /* Legend */
+    /* Легенда */
     .legend {{
       display: flex; flex-wrap: wrap; gap: 0.6rem 1.4rem;
       justify-content: center; margin-bottom: 2.2rem;
@@ -239,7 +239,7 @@ fn write_landing_page(site: &Path) {
       width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
     }}
 
-    /* Grid & Cards */
+    /* Сетка и карточки */
     .grid {{
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -266,14 +266,14 @@ fn write_landing_page(site: &Path) {
     .card h2 {{ font-size: 1.2rem; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }}
     .card p  {{ color: var(--muted); font-size: 0.9rem; line-height: 1.4; }}
 
-    /* Category colours */
+    /* Цвета категорий */
     .cat-bridge     {{ --stripe: var(--clr-bridge); }}
     .cat-deep-dive  {{ --stripe: var(--clr-deep-dive); }}
     .cat-advanced   {{ --stripe: var(--clr-advanced); }}
     .cat-expert     {{ --stripe: var(--clr-expert); }}
     .cat-practices  {{ --stripe: var(--clr-practices); }}
 
-    /* Label pill */
+    /* Метка категории */
     .label {{
       font-size: 0.55rem; font-weight: 700; letter-spacing: 0.08em;
       text-transform: uppercase; padding: 0.15em 0.55em;
@@ -285,28 +285,28 @@ fn write_landing_page(site: &Path) {
   </style>
 </head>
 <body>
-  <h1>🦀 <span>Rust</span> Training Books</h1>
-  <p class="subtitle">Pick the guide that matches your background</p>
+  <h1>🦀 <span>Rust</span>: учебные книги</h1>
+  <p class="subtitle">Выберите курс, который соответствует вашему опыту</p>
 
   <div class="legend">
-    <span class="legend-item"><span class="legend-dot" style="background:var(--clr-bridge)"></span> Bridge &mdash; learn Rust from another language</span>
-    <span class="legend-item"><span class="legend-dot" style="background:var(--clr-deep-dive)"></span> Deep Dive</span>
-    <span class="legend-item"><span class="legend-dot" style="background:var(--clr-advanced)"></span> Advanced</span>
-    <span class="legend-item"><span class="legend-dot" style="background:var(--clr-expert)"></span> Expert</span>
-    <span class="legend-item"><span class="legend-dot" style="background:var(--clr-practices)"></span> Practices</span>
+    <span class="legend-item"><span class="legend-dot" style="background:var(--clr-bridge)"></span> Мост: изучение Rust из другого языка</span>
+    <span class="legend-item"><span class="legend-dot" style="background:var(--clr-deep-dive)"></span> Погружение</span>
+    <span class="legend-item"><span class="legend-dot" style="background:var(--clr-advanced)"></span> Продвинутый</span>
+    <span class="legend-item"><span class="legend-dot" style="background:var(--clr-expert)"></span> Эксперт</span>
+    <span class="legend-item"><span class="legend-dot" style="background:var(--clr-practices)"></span> Практики</span>
   </div>
 
   <div class="grid">
 {cards}
   </div>
-  <footer>Built with <a href="https://rust-lang.github.io/mdBook/" style="color:var(--accent)">mdBook</a></footer>
+  <footer>Собрано с помощью <a href="https://rust-lang.github.io/mdBook/" style="color:var(--accent)">mdBook</a></footer>
 </body>
 </html>
 "##
     );
 
     let path = site.join("index.html");
-    fs::write(&path, html).expect("failed to write index.html");
+    fs::write(&path, html).expect("не удалось записать index.html");
     println!("  ✓ index.html");
 }
 
@@ -316,15 +316,15 @@ enum ResolveResult {
     NotFound,
 }
 
-/// Resolve `request_target` (HTTP request path, e.g. `/foo/bar?x=1`) to a file under `site_canon`.
-/// Returns `ResolveResult::File` for success, `Redirect` if a trailing slash is needed for a directory,
-/// or `NotFound` for traversal attempts or missing files.
+/// Преобразует `request_target` (путь HTTP-запроса, например `/foo/bar?x=1`) в файл внутри `site_canon`.
+/// Возвращает `ResolveResult::File`, если файл найден, `Redirect`, если для каталога нужен завершающий слеш,
+/// и `NotFound` для попыток обхода каталогов и отсутствующих файлов.
 ///
-/// NOTE: This function preserves and hardens the multi-layer security from PR#18:
-/// 1. Percent-decoding via `percent_decode_path`.
-/// 2. Null byte rejection.
-/// 3. Traversal blocking (`..`).
-/// 4. Symlink escape prevention via canonicalization and prefix checking.
+/// ПРИМЕЧАНИЕ: функция сохраняет и усиливает многоуровневую защиту из PR#18:
+/// 1. Декодирование percent-encoding через `percent_decode_path`.
+/// 2. Отказ от нулевых байтов.
+/// 3. Блокировка обхода каталогов (`..`).
+/// 4. Защита от выхода за пределы каталога через символические ссылки: канонизация и проверка префикса.
 fn resolve_site_file(site_canon: &Path, request_target: &str) -> ResolveResult {
     let path_only = match request_target
         .split('?')
@@ -335,7 +335,7 @@ fn resolve_site_file(site_canon: &Path, request_target: &str) -> ResolveResult {
         None => return ResolveResult::NotFound,
     };
 
-    // [Security] Handle percent-encoding and reject null bytes (from PR#18)
+    // [Безопасность] Декодируем percent-encoding и отклоняем нулевые байты (из PR#18)
     let decoded = percent_decode_path(path_only);
     if decoded.as_bytes().contains(&0) {
         return ResolveResult::NotFound;
@@ -345,7 +345,7 @@ fn resolve_site_file(site_canon: &Path, request_target: &str) -> ResolveResult {
     let mut file_path = site_canon.to_path_buf();
     if !rel.is_empty() {
         for seg in rel.split('/').filter(|s| !s.is_empty()) {
-            // [Security] Block directory traversal (from PR#18)
+            // [Безопасность] Блокируем обход каталогов (из PR#18)
             if seg == ".." {
                 return ResolveResult::NotFound;
             }
@@ -354,14 +354,14 @@ fn resolve_site_file(site_canon: &Path, request_target: &str) -> ResolveResult {
     }
 
     if file_path.is_dir() {
-        // If it refers to a directory but lacks a trailing slash, redirect so relative links work.
+        // Если путь указывает на каталог без завершающего слеша, перенаправляем, чтобы относительные ссылки работали.
         if !request_target.ends_with('/') && !request_target.is_empty() {
             return ResolveResult::Redirect(format!("{path_only}/"));
         }
         file_path.push("index.html");
     }
 
-    // [Security] Canonicalize and verify we're still within site_canon (from PR#18)
+    // [Безопасность] Канонизируем путь и проверяем, что он остаётся внутри site_canon (из PR#18)
     let real = match fs::canonicalize(&file_path) {
         Ok(r) => r,
         Err(_) => return ResolveResult::NotFound,
@@ -401,20 +401,20 @@ fn percent_decode_path(input: &str) -> String {
     String::from_utf8_lossy(&decoded).into_owned()
 }
 
-// ── serve ────────────────────────────────────────────────────────────
+// ── сервер ───────────────────────────────────────────────────────────
 
 fn cmd_serve() {
     let site = project_root().join("site");
     let site_canon = fs::canonicalize(&site).expect(
-        "site/ not found — run `cargo xtask build` first (e.g. `cargo xtask serve` runs build automatically)",
+        "каталог site/ не найден: сначала выполните `cargo xtask build` (команда `cargo xtask serve` запускает сборку автоматически)",
     );
     let addr = "127.0.0.1:3000";
-    let listener = TcpListener::bind(addr).expect("failed to bind port 3000");
+    let listener = TcpListener::bind(addr).expect("не удалось занять порт 3000");
 
-    // Handle Ctrl+C gracefully so cargo doesn't report an error
+    // Обрабатываем Ctrl+C, чтобы cargo не сообщал об ошибке
     ctrlc_exit();
 
-    println!("\nServing at http://localhost:3000  (Ctrl+C to stop)");
+    println!("\nСервер запущен: http://localhost:3000  (Ctrl+C — остановить)");
 
     for stream in listener.incoming() {
         let Ok(mut stream) = stream else { continue };
@@ -458,13 +458,13 @@ fn cmd_serve() {
     }
 }
 
-/// Install a Ctrl+C handler that exits cleanly (code 0) instead of
-/// letting the OS terminate with STATUS_CONTROL_C_EXIT.
+/// Устанавливает обработчик Ctrl+C, который завершает программу с кодом 0.
+/// Без него ОС завершает процесс с STATUS_CONTROL_C_EXIT.
 fn ctrlc_exit() {
     ctrlc::set_handler(move || {
         std::process::exit(0);
     })
-    .expect("Error setting Ctrl-C handler");
+    .expect("не удалось установить обработчик Ctrl-C");
 }
 
 fn guess_mime(path: &Path) -> &'static str {
@@ -482,15 +482,15 @@ fn guess_mime(path: &Path) -> &'static str {
     }
 }
 
-// ── clean ────────────────────────────────────────────────────────────
+// ── очистка ──────────────────────────────────────────────────────────
 
 fn cmd_clean() {
     let root = project_root();
     for dir_name in ["site", "docs"] {
         let dir = root.join(dir_name);
         if dir.exists() {
-            fs::remove_dir_all(&dir).expect("failed to remove dir");
-            println!("Removed {dir_name}/");
+            fs::remove_dir_all(&dir).expect("не удалось удалить каталог");
+            println!("Удалено: {dir_name}/");
         }
     }
 }

@@ -1,14 +1,15 @@
 [book]
-title = "Rust for C/C++ Programmers"
-authors = ["Rust Training Team"]
-language = "en"
+title = "Курс Rust для программистов на C/C++"
+authors = ["Rust Training Team (оригинал)", "Участники проекта RustTraining-Rus (перевод)"]
+language = "ru"
 src = "src"
 
 [build]
 build-dir = "book"
 
 [output.html]
-git-repository-url = "https://github.com/microsoft/RustTraining"
+git-repository-url = "https://github.com/r007/RustTraining-Rus"
+edit-url-template = "https://github.com/r007/RustTraining-Rus/edit/main/c-cpp-book/src/{path}"
 default-theme = "light"
 preferred-dark-theme = "ayu"
 additional-js = ["mermaid.min.js", "mermaid-init.js"]

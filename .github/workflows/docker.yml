@@ -1,7 +1,8 @@
-name: Docker image
+name: Образ Docker
 
-# Build-only. Nothing is published, so this adds no release surface or
-# registry credentials — it exists so the Dockerfile cannot silently rot.
+# Только сборка. Ничего не публикуется, поэтому нет дополнительной поверхности
+# релизов и учётных данных реестра. Workflow нужен, чтобы Dockerfile не
+# сломался незаметно.
 on:
   push:
     branches: [main]
@@ -31,7 +32,7 @@ jobs:
 
       - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
 
-      - name: Build image
+      - name: Сборка образа
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
@@ -42,7 +43,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Smoke test
+      - name: Дымовой тест
         run: |
           docker run -d --name books -p 3000:8080 rust-training:ci
           for i in $(seq 1 30); do
@@ -50,12 +51,12 @@ jobs:
             sleep 2
           done
           if [ "${ok:-0}" != "1" ]; then
-            echo "::error::server did not come up"; docker logs books; exit 1
+            echo "::error::сервер не поднялся"; docker logs books; exit 1
           fi
-          # Landing page and at least one book must resolve.
-          # NB: match the <title>; the <h1> is split by a <span> tag.
-          curl -fsS http://localhost:3000/ | grep -q "<title>Rust Training Books</title>"
+          # Обложка и хотя бы одна книга должны открываться.
+          # ПРИМЕЧАНИЕ: сравниваем по <title>, потому что <h1> разбит тегом <span>.
+          curl -fsS http://localhost:3000/ | grep -q "<title>Учебные книги по Rust</title>"
           curl -fsS -o /dev/null -w '%{http_code}\n' http://localhost:3000/async-book/ | grep -q 200
-          # Extensionless links must resolve via try_files.
+          # Ссылки без расширения должны открываться через try_files.
           curl -fsS -o /dev/null -w '%{http_code}\n' http://localhost:3000/async-book/ch00-introduction | grep -q 200
           docker rm -f books

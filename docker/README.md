@@ -1,67 +1,49 @@
-# Containerized deployment
+# Контейнерное развёртывание
 
-Optional, opt-in way to self-host the book collection without GitHub Pages —
-useful behind a firewall or on an internal network.
+Необязательный способ развернуть сборник книг самостоятельно, без GitHub Pages. Подходит, например, для сети за файрволом или внутренней сети.
 
-**This is not the local development path.** For writing and previewing, use
-`cargo xtask serve`, which rebuilds and serves at <http://localhost:3000> with
-no container involved.
+**Это не путь для локальной разработки.** Для написания и просмотра книг используйте `cargo xtask serve`: он пересобирает книги и запускает сервер на <http://localhost:3000> без контейнера.
 
-## Usage
+## Использование
 
-From the repository root:
+Из корня репозитория:
 
 ```bash
 docker compose -f docker/compose.yaml up --build
 ```
 
-Then open <http://localhost:3000>. Override the host port with `PORT`:
+Затем откройте <http://localhost:3000>. Порт хоста можно переопределить через `PORT`:
 
 ```bash
 PORT=8080 docker compose -f docker/compose.yaml up --build
 ```
 
-Without Compose:
+Без Compose:
 
 ```bash
 docker build -f docker/Dockerfile -t rust-training .
 docker run --rm -p 3000:8080 rust-training
 ```
 
-Note the build context is the repository root in both cases — the build needs
-the book sources and the `xtask` crate.
+В обоих случаях контекст сборки — корень репозитория: сборке нужны исходники книг и крейт `xtask`.
 
-## How it works
+## Как это работает
 
-Two stages:
+Сборка идёт в две стадии:
 
-1. **builder** (`rust:1-slim-bookworm`) installs `mdbook` and `mdbook-mermaid`,
-   then runs `cargo xtask build`, which builds all seven books into `site/`
-   along with the generated landing page.
-2. **runtime** (`nginxinc/nginx-unprivileged:alpine`) serves `site/` on port
-   8080. No Rust toolchain, no mdbook, no book sources in the final image.
+1. **builder** (`rust:1-slim-bookworm`) устанавливает `mdbook` и `mdbook-mermaid`, затем запускает `cargo xtask build`. Эта команда собирает все семь книг в `site/` вместе со страницей-обложкой.
+2. **runtime** (`nginxinc/nginx-unprivileged:alpine`) раздаёт `site/` на порту 8080. В итоговом образе нет тулчейна Rust, mdbook и исходников книг.
 
-`xtask build` is used rather than `xtask deploy` because the two produce
-identical content — `deploy` only differs in writing to `docs/` and printing
-GitHub Pages instructions, which are irrelevant in a container.
+Используется `xtask build`, а не `xtask deploy`, потому что результат одинаковый. `deploy` отличается только записью в `docs/` и выводом инструкций для GitHub Pages, которые в контейнере не нужны.
 
-## Pinned versions
+## Фиксированные версии
 
-`MDBOOK_VERSION` and `MDBOOK_MERMAID_VERSION` are build args in the Dockerfile.
-CI (`pages.yml`) currently installs both unpinned via `cargo install`, so the
-container may lag or lead the published site after an upstream mdbook release.
-Bump the args when that matters.
+`MDBOOK_VERSION` и `MDBOOK_MERMAID_VERSION` задаются аргументами сборки в Dockerfile. CI (`pages.yml`) пока устанавливает оба инструмента через `cargo install` без фиксации версий. Поэтому контейнер может отставать от опубликованного сайта или опережать его после выхода новой версии mdbook. Меняйте аргументы, когда это важно.
 
-Prebuilt release binaries are used where upstream publishes them, falling back
-to `cargo install` otherwise. As of the pinned versions, `mdbook-mermaid` has no
-published arm64 Linux binary, so arm64 builds compile it from source and take
-noticeably longer.
+Там, где upstream публикует готовые бинарники, они и используются. Иначе выполняется `cargo install`. На момент фиксации версий `mdbook-mermaid` не публикует готовый бинарник для arm64 Linux, поэтому сборка под arm64 компилирует его из исходников и занимает заметно больше времени.
 
-## Notes
+## Примечания
 
-- The container runs as uid 101 and binds an unprivileged port, so it needs no
-  root and no added capabilities.
-- Adding `read_only: true` to the service is possible but requires tmpfs mounts
-  for nginx's cache and pid paths; it is left off by default rather than shipped
-  untested.
-- Content is baked in at build time. Rebuild the image to pick up book changes.
+- Контейнер работает от пользователя с uid 101 и слушает непривилегированный порт. Поэтому ему не нужны root-права и дополнительные capabilities.
+- Можно добавить `read_only: true` для сервиса, но тогда понадобятся tmpfs-монтирования для кэша и pid-файлов nginx. По умолчанию этого нет: вариант не проверялся.
+- Содержимое встраивается при сборке образа. Чтобы подхватить изменения в книгах, пересоберите образ.

@@ -1,11 +1,25 @@
-# Microsoft Open Source Code of Conduct
+# Кодекс поведения участников
 
-This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/).
+Мы хотим, чтобы участие в проекте было открытым и безопасным для всех, независимо от опыта, возраста, пола, национальности, религии, инвалидности и других личных признаков.
 
-Resources:
+## Чего мы ждём
 
-- [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/)
-- [Microsoft Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/)
-- Contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with questions or concerns
-- Employees can reach out at [aka.ms/opensource/moderation-support](https://aka.ms/opensource/moderation-support)
+- Уважительного общения и готовности выслушать других.
+- Конструктивной критики, которая направлена на текст и код, а не на человека.
+- Внимания к технической сути: проверяйте факты и ссылки на документацию.
+- Признания чужого вклада, в том числе в переводе и в ревью.
 
+## Что недопустимо
+
+- Оскорбления, унижения, преследование и травля.
+- Публикация чужих личных данных без согласия.
+- Сознательное введение в заблуждение, спам и реклама, не связанные с проектом.
+- Любое поведение, которое создаёт враждебную обстановку для участников.
+
+## Ответственность
+
+Мейнтейнеры проекта могут удалить комментарии, коммиты и Pull Request'ы, которые нарушают этот кодекс, и ограничить доступ к обсуждениям участникам, которые систематически его нарушают.
+
+## Как сообщить о проблеме
+
+Вопросы о кодексе задавайте через Issues репозитория. Если обращение конфиденциально, напишите мейнтейнеру напрямую через его профиль на GitHub: [@r007](https://github.com/r007).

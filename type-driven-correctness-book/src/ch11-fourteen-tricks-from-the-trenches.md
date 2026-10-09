@@ -423,8 +423,8 @@ let level: DiagLevel = "extendedd".parse()?;
 
 | Тип | Модуль | Заметные синонимы |
 |-----|--------|-------------------|
-| `DiagLevel` | `config_loader` | `"1"` = Quick, `"4"` = Stress |
-| `Component` | `event_handler` | `"MEM"` / `"DIMM"` = Memory, `"SSD"` / `"NVME"` = Disk |
+| `DiagLevel` | `config_loader` | `"1"` = быстрый, `"4"` = стресс |
+| `Component` | `event_handler` | `"MEM"` / `"DIMM"` = память, `"SSD"` / `"NVME"` = диск |
 | `SkuVariant` | `net_inventory` | `"Accel-X1"` = S2001, `"Accel-M1"` = S2002, `"Accel-Z1"` = S3001 |
 | `SkuVariant` | `inventory` | Те же синонимы (отдельный модуль, тот же паттерн) |
 | `FaultStatus` | `config_loader` | Состояния жизненного цикла неисправности |

@@ -1,14 +1,47 @@
-# Contributing
+# Как внести вклад
 
-This project welcomes contributions and suggestions. Most contributions require you to
-agree to a Contributor License Agreement (CLA) declaring that you have the right to,
-and actually do, grant us the rights to use your contribution. For details, visit
-https://cla.microsoft.com.
+Спасибо, что хотите помочь проекту! Здесь принимаются исправления текста и перевода, правки примеров кода, улучшения сборки и предложения новых тем.
 
-When you submit a pull request, a CLA-bot will automatically determine whether you need
-to provide a CLA and decorate the PR appropriately (e.g., label, comment). Simply follow the
-instructions provided by the bot. You will only need to do this once across all repositories using our CLA.
+Подписывать соглашение о вкладе (CLA) не нужно. Отправляя изменения, вы соглашаетесь, что они распространяются по лицензиям проекта: MIT для кода и CC BY 4.0 для текста.
 
-This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/).
-For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/)
-or contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
+## Что можно предложить
+
+- Исправления опечаток, неточностей и ошибок в переводе.
+- Улучшения примеров кода и упражнений. Код должен компилироваться.
+- Исправления ссылок, якорей и сборки.
+- Новые главы или книги. Сначала откройте Issue, чтобы обсудить объём и структуру.
+
+## Как работать
+
+1. Сделайте fork репозитория и создайте ветку от `main`.
+2. Внесите изменения и проверьте сборку: `cargo xtask build` или `cd <книга> && mdbook build`.
+3. Откройте Pull Request с кратким описанием того, что изменено и почему.
+
+## Стиль перевода
+
+- Обращение к читателю на «вы».
+- Термины используем единообразно (см. таблицу ниже).
+- Код, идентификаторы, имена файлов, команды и сообщения компилятора остаются на английском.
+- Комментарии в примерах кода пишем по-русски.
+- Имена файлов и якорные ссылки без необходимости не меняем: от них зависят ссылки внутри книг и связь с оригиналом.
+
+## Глоссарий
+
+| English | Русский | Примечание |
+|---------|---------|------------|
+| trait | трейт | |
+| crate | крейт | |
+| ownership | владение | |
+| borrowing | заимствование | |
+| lifetime | время жизни | |
+| closure | замыкание | |
+| iterator | итератор | |
+| panic | паника | |
+| thread | поток | |
+| channel | канал | |
+| runtime | рантайм | |
+| Future, Pin, Mutex, Send, Sync, PhantomData, newtype, typestate, UB | — | оставляем английскими |
+
+## Кодекс поведения
+
+Участие в проекте регулируется [кодексом поведения](CODE_OF_CONDUCT.md).

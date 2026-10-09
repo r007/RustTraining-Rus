@@ -749,7 +749,7 @@ graph LR
 | `target remote :3333` | GDB подключается к `localhost:1337` |
 | `monitor reset halt` | `probe-rs reset --chip ...` |
 | `load firmware.elf` | `cargo flash --chip ...` |
-| `printf("debug: %d\n", val)` (semihosting) | `defmt::info!("debug: {}", val)` (RTT) |
+| `printf("debug: %d\n", val)` (семихостинг) | `defmt::info!("debug: {}", val)` (RTT) |
 | Графический отладчик Keil/IAR | VS Code + расширение `probe-rs-debugger` |
 | Segger SystemView | `defmt` + просмотрщик RTT из `probe-rs` |
 

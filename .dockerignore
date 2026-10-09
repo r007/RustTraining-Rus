@@ -1,17 +1,17 @@
-# Keep the build context small and deterministic.
-# NOTE: do NOT exclude *.md — the book sources are markdown.
+# Держим контекст сборки небольшим и детерминированным.
+# ПРИМЕЧАНИЕ: НЕ исключайте *.md — исходники книг написаны в Markdown.
 
 .git
 .github
 .gitignore
 
-# Build output (mirrors .gitignore)
+# Результаты сборки (повторяют .gitignore)
 target/
 site/
 docs/
 **/book/
 
-# Editor / OS noise
+# Файлы редакторов и ОС
 .vscode/
 .idea/
 **/*:Zone.Identifier

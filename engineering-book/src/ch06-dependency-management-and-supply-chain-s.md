@@ -218,10 +218,10 @@ cargo semver-checks
 
 # Вывод:
 # ✗ Function `parse_gpu_csv` is now private (was public)
-#   → This is a BREAKING change. Bump MAJOR version.
+#   → Несовместимое изменение (BREAKING). Повысьте MAJOR-версию.
 #
 # ✗ Struct `GpuInfo` has a new required field `power_limit_w`
-#   → This is a BREAKING change. Bump MAJOR version.
+#   → Несовместимое изменение (BREAKING). Повысьте MAJOR-версию.
 #
 # ✓ Function `parse_gpu_csv_v2` was added (non-breaking)
 ```

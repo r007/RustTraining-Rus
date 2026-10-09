@@ -143,7 +143,7 @@ cargo doc --open     # Сгенерировать и открыть докуме
 
 ### Workspace против Solution
 
-**C# Solution (.sln)**
+**Решение C# (.sln)**
 ```text
 MySolution/
 ├── MySolution.sln
@@ -155,7 +155,7 @@ MySolution/
     └── Tests.csproj
 ```
 
-**Rust Workspace (Cargo.toml)**
+**Рабочее пространство Rust (Cargo.toml)**
 ```toml
 [workspace]
 members = [

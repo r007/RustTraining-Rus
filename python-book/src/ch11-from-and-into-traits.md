@@ -26,7 +26,7 @@ class Celsius:
 c = Celsius.from_fahrenheit(212.0)  # 100.0°C
 ```
 
-### Rust From/Into
+### From/Into в Rust
 ```rust
 // Rust — трейт From задаёт преобразования
 // Реализация From<T> даёт вам Into<U> автоматически!
