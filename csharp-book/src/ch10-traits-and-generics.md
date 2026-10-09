@@ -1,29 +1,29 @@
-## Traits - Rust's Interfaces
+## Трейты — интерфейсы Rust
 
-> **What you'll learn:** Traits vs C# interfaces, default method implementations, trait objects (`dyn Trait`)
-> vs generic bounds (`impl Trait`), derived traits, common standard library traits, associated types,
-> and operator overloading via traits.
+> **Что вы узнаете:** трейты против интерфейсов C#, реализации методов по умолчанию, трейт-объекты (`dyn Trait`)
+> против ограничений обобщений (`impl Trait`), производные трейты, распространённые трейты стандартной библиотеки,
+> ассоциированные типы и перегрузку операторов через трейты.
 >
-> **Difficulty:** 🟡 Intermediate
+> **Сложность:** 🟡 Средний
 
-Traits are Rust's way of defining shared behavior, similar to interfaces in C# but more powerful.
+Трейты — способ Rust описывать общее поведение. Они похожи на интерфейсы C#, но мощнее.
 
-### C# Interface Comparison
+### Сравнение с интерфейсами C#
 ```csharp
-// C# interface definition
+// Определение интерфейса в C#
 public interface IAnimal
 {
     string Name { get; }
     void MakeSound();
     
-    // Default implementation (C# 8+)
+    // Реализация по умолчанию (C# 8+)
     string Describe()
     {
         return $"{Name} makes a sound";
     }
 }
 
-// C# interface implementation
+// Реализация интерфейса в C#
 public class Dog : IAnimal
 {
     public string Name { get; }
@@ -38,14 +38,14 @@ public class Dog : IAnimal
         Console.WriteLine("Woof!");
     }
     
-    // Can override default implementation
+    // Можно переопределить реализацию по умолчанию
     public string Describe()
     {
         return $"{Name} is a loyal dog";
     }
 }
 
-// Generic constraints
+// Ограничения обобщений
 public void ProcessAnimal<T>(T animal) where T : IAnimal
 {
     animal.MakeSound();
@@ -53,26 +53,26 @@ public void ProcessAnimal<T>(T animal) where T : IAnimal
 }
 ```
 
-### Rust Trait Definition and Implementation
+### Определение и реализация трейтов в Rust
 ```rust
-// Trait definition
+// Определение трейта
 trait Animal {
     fn name(&self) -> &str;
     fn make_sound(&self);
     
-    // Default implementation
+    // Реализация по умолчанию
     fn describe(&self) -> String {
         format!("{} makes a sound", self.name())
     }
     
-    // Default implementation using other trait methods
+    // Реализация по умолчанию, использующая другие методы трейта
     fn introduce(&self) {
         println!("Hi, I'm {}", self.name());
         self.make_sound();
     }
 }
 
-// Struct definition
+// Определение структуры
 #[derive(Debug)]
 struct Dog {
     name: String,
@@ -85,7 +85,7 @@ impl Dog {
     }
 }
 
-// Trait implementation
+// Реализация трейта
 impl Animal for Dog {
     fn name(&self) -> &str {
         &self.name
@@ -95,13 +95,13 @@ impl Animal for Dog {
         println!("Woof!");
     }
     
-    // Override default implementation
+    // Переопределяем реализацию по умолчанию
     fn describe(&self) -> String {
         format!("{} is a loyal {} dog", self.name, self.breed)
     }
 }
 
-// Another implementation
+// Ещё одна реализация
 #[derive(Debug)]
 struct Cat {
     name: String,
@@ -117,17 +117,17 @@ impl Animal for Cat {
         println!("Meow!");
     }
     
-    // Use default describe() implementation
+    // Используем describe() по умолчанию
 }
 
-// Generic function with trait bounds
+// Обобщённая функция с ограничениями трейтов
 fn process_animal<T: Animal>(animal: &T) {
     animal.make_sound();
     println!("{}", animal.describe());
     animal.introduce();
 }
 
-// Multiple trait bounds
+// Несколько ограничений трейтов
 fn process_animal_debug<T: Animal + std::fmt::Debug>(animal: &T) {
     println!("Debug: {:?}", animal);
     process_animal(animal);
@@ -144,19 +144,19 @@ fn main() {
 }
 ```
 
-### Trait Objects and Dynamic Dispatch
+### Трейт-объекты и динамическая диспетчеризация
 ```csharp
-// C# dynamic polymorphism
+// Динамический полиморфизм в C#
 public void ProcessAnimals(List<IAnimal> animals)
 {
     foreach (var animal in animals)
     {
-        animal.MakeSound(); // Dynamic dispatch
+        animal.MakeSound(); // Динамическая диспетчеризация
         Console.WriteLine(animal.Describe());
     }
 }
 
-// Usage
+// Использование
 var animals = new List<IAnimal>
 {
     new Dog("Buddy"),
@@ -168,15 +168,15 @@ ProcessAnimals(animals);
 ```
 
 ```rust
-// Rust trait objects for dynamic dispatch
+// Трейт-объекты Rust для динамической диспетчеризации
 fn process_animals(animals: &[Box<dyn Animal>]) {
     for animal in animals {
-        animal.make_sound(); // Dynamic dispatch
+        animal.make_sound(); // Динамическая диспетчеризация
         println!("{}", animal.describe());
     }
 }
 
-// Alternative: using references
+// Альтернатива: использование ссылок
 fn process_animal_refs(animals: &[&dyn Animal]) {
     for animal in animals {
         animal.make_sound();
@@ -185,7 +185,7 @@ fn process_animal_refs(animals: &[&dyn Animal]) {
 }
 
 fn main() {
-    // Using Box<dyn Trait>
+    // Использование Box<dyn Trait>
     let animals: Vec<Box<dyn Animal>> = vec![
         Box::new(Dog::new("Buddy".to_string(), "Golden Retriever".to_string())),
         Box::new(Cat { name: "Whiskers".to_string(), indoor: true }),
@@ -194,7 +194,7 @@ fn main() {
     
     process_animals(&animals);
     
-    // Using references
+    // Использование ссылок
     let dog = Dog::new("Buddy".to_string(), "Golden Retriever".to_string());
     let cat = Cat { name: "Whiskers".to_string(), indoor: true };
     
@@ -203,16 +203,16 @@ fn main() {
 }
 ```
 
-### Derived Traits
+### Производные трейты
 ```rust
-// Automatically derive common traits
+// Автоматически выводим распространённые трейты
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct Person {
     name: String,
     age: u32,
 }
 
-// What this generates (simplified):
+// Что генерируется (упрощённо):
 impl std::fmt::Debug for Person {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Person")
@@ -237,45 +237,45 @@ impl PartialEq for Person {
     }
 }
 
-// Usage
+// Использование
 fn main() {
     let person1 = Person {
         name: "Alice".to_string(),
         age: 30,
     };
     
-    let person2 = person1.clone(); // Clone trait
+    let person2 = person1.clone(); // Трейт Clone
     
-    println!("{:?}", person1); // Debug trait
-    println!("Equal: {}", person1 == person2); // PartialEq trait
+    println!("{:?}", person1); // Трейт Debug
+    println!("Equal: {}", person1 == person2); // Трейт PartialEq
 }
 ```
 
-### Common Standard Library Traits
+### Распространённые трейты стандартной библиотеки
 ```rust
 use std::collections::HashMap;
 
-// Display trait for user-friendly output
+// Трейт Display для удобного для пользователя вывода
 impl std::fmt::Display for Person {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} (age {})", self.name, self.age)
     }
 }
 
-// From trait for conversions
+// Трейт From для преобразований
 impl From<(String, u32)> for Person {
     fn from((name, age): (String, u32)) -> Self {
         Person { name, age }
     }
 }
 
-// Into trait is automatically implemented when From is implemented
+// Трейт Into реализуется автоматически, когда реализован From
 fn create_person() {
     let person: Person = ("Alice".to_string(), 30).into();
     println!("{}", person);
 }
 
-// Iterator trait implementation
+// Реализация трейта Iterator
 struct PersonIterator {
     people: Vec<Person>,
     index: usize,
@@ -308,9 +308,9 @@ fn main() {
         Person::from(("Charlie".to_string(), 35)),
     ];
     
-    // Use our custom iterator
+    // Используем наш собственный итератор
     for person in Person::iterator(people.clone()) {
-        println!("{}", person); // Uses Display trait
+        println!("{}", person); // Использует трейт Display
     }
 }
 ```
@@ -319,12 +319,12 @@ fn main() {
 
 
 <details>
-<summary><strong>🏋️ Exercise: Trait-Based Drawing System</strong> (click to expand)</summary>
+<summary><strong>🏋️ Упражнение: система рисования на основе трейтов</strong> (нажмите, чтобы раскрыть)</summary>
 
-**Challenge**: Implement a `Drawable` trait with an `area()` method and a `draw()` default method. Create `Circle` and `Rect` structs. Write a function that accepts `&[Box<dyn Drawable>]` and prints total area.
+**Задача**: реализуйте трейт `Drawable` с методом `area()` и методом `draw()` по умолчанию. Создайте структуры `Circle` и `Rect`. Напишите функцию, которая принимает `&[Box<dyn Drawable>]` и выводит суммарную площадь.
 
 <details>
-<summary>🔑 Solution</summary>
+<summary>🔑 Решение</summary>
 
 ```rust
 use std::f64::consts::PI;
@@ -363,29 +363,29 @@ fn main() {
 }
 ```
 
-**Key takeaways**:
-- `dyn Trait` gives runtime polymorphism (like C# `IDrawable`)
-- `Box<dyn Trait>` is heap-allocated, needed for heterogeneous collections
-- Default methods work exactly like C# 8+ default interface methods
+**Ключевые выводы**:
+- `dyn Trait` даёт полиморфизм времени выполнения (как `IDrawable` в C#)
+- `Box<dyn Trait>` размещается в куче и нужен для коллекций разнородных типов
+- Методы по умолчанию работают точно так же, как методы интерфейсов по умолчанию в C# 8+
 
 </details>
 </details>
 
-### Associated Types: Traits With Type Members
+### Ассоциированные типы: трейты с типовыми членами
 
-C# interfaces don't have associated types — Rust traits do. This is how `Iterator` works:
+Интерфейсы C# не имеют ассоциированных типов — трейты Rust имеют. Так устроен `Iterator`:
 
 ```rust
-// The Iterator trait has an associated type 'Item'
+// Трейт Iterator имеет ассоциированный тип 'Item'
 trait Iterator {
-    type Item;                         // Each implementor defines what Item is
+    type Item;                         // Каждая реализация определяет, что такое Item
     fn next(&mut self) -> Option<Self::Item>;
 }
 
 struct Counter { max: u32, current: u32 }
 
 impl Iterator for Counter {
-    type Item = u32;                   // This Counter yields u32 values
+    type Item = u32;                   // Этот Counter выдаёт значения u32
     fn next(&mut self) -> Option<u32> {
         if self.current < self.max {
             self.current += 1;
@@ -397,11 +397,11 @@ impl Iterator for Counter {
 }
 ```
 
-In C#, `IEnumerator<T>` uses a generic parameter (`T`) for this purpose. Rust's associated types are different: `Iterator` has *one* `Item` type per implementation, not a generic parameter at the trait level. This makes trait bounds simpler: `impl Iterator<Item = u32>` vs C#'s `IEnumerable<int>`.
+В C# для этой цели `IEnumerator<T>` использует параметр обобщения (`T`). Ассоциированные типы Rust устроены иначе: у `Iterator` *один* тип `Item` на каждую реализацию, а не параметр обобщения на уровне трейта. Это упрощает ограничения трейтов: `impl Iterator<Item = u32>` против `IEnumerable<int>` в C#.
 
-### Operator Overloading via Traits
+### Перегрузка операторов через трейты
 
-In C#, you define `public static MyType operator+(MyType a, MyType b)`. In Rust, every operator maps to a trait in `std::ops`:
+В C# вы определяете `public static MyType operator+(MyType a, MyType b)`. В Rust каждый оператор соответствует трейту из `std::ops`:
 
 ```rust
 use std::ops::Add;
@@ -418,81 +418,81 @@ impl Add for Vec2 {
 
 let a = Vec2 { x: 1.0, y: 2.0 };
 let b = Vec2 { x: 3.0, y: 4.0 };
-let c = a + b;  // calls <Vec2 as Add>::add(a, b)
+let c = a + b;  // вызывает <Vec2 as Add>::add(a, b)
 ```
 
-| C# | Rust | Notes |
+| C# | Rust | Примечания |
 |----|------|-------|
-| `operator+` | `impl Add` | `self` by value — consumes for non-`Copy` types |
-| `operator==` | `impl PartialEq` | Usually `#[derive(PartialEq)]` |
-| `operator<` | `impl PartialOrd` | Usually `#[derive(PartialOrd)]` |
-| `ToString()` | `impl fmt::Display` | Used by `println!("{}", x)` |
-| Implicit conversion | No equivalent | Rust has no implicit conversions — use `From`/`Into` |
+| `operator+` | `impl Add` | `self` передаётся по значению — для типов, не реализующих `Copy`, это потребление |
+| `operator==` | `impl PartialEq` | Обычно `#[derive(PartialEq)]` |
+| `operator<` | `impl PartialOrd` | Обычно `#[derive(PartialOrd)]` |
+| `ToString()` | `impl fmt::Display` | Используется в `println!("{}", x)` |
+| Неявное преобразование | Аналога нет | В Rust нет неявных преобразований — используйте `From`/`Into` |
 
-### Coherence: The Orphan Rule
+### Согласованность: правило сироты
 
-You can only implement a trait if you own either the trait or the type. This prevents conflicting implementations across crates:
+Трейт можно реализовать, только если вы владеете либо трейтом, либо типом. Это предотвращает конфликтующие реализации между крейтами:
 
 ```rust
-// ✅ OK — you own MyType
+// ✅ OK — вы владеете MyType
 impl Display for MyType { ... }
 
-// ✅ OK — you own MyTrait
+// ✅ OK — вы владеете MyTrait
 impl MyTrait for String { ... }
 
-// ❌ ERROR — you own neither Display nor String
+// ❌ ОШИБКА — вы не владеете ни Display, ни String
 impl Display for String { ... }
 ```
 
-C# has no equivalent restriction — any code can add extension methods to any type, which can lead to ambiguity.
+В C# такого ограничения нет — любой код может добавить методы расширения к любому типу, что может привести к неоднозначности.
 
 <!-- ch10.0a: impl Trait and Dispatch Strategies -->
-## `impl Trait`: Returning Traits Without Boxing
+## `impl Trait`: возврат трейтов без упаковки в Box
 
-C# interfaces can always be used as return types. In Rust, returning a trait requires a decision: static dispatch (`impl Trait`) or dynamic dispatch (`dyn Trait`).
+Интерфейсы C# всегда можно использовать как возвращаемые типы. В Rust возврат трейта требует выбора: статическая диспетчеризация (`impl Trait`) или динамическая (`dyn Trait`).
 
-### `impl Trait` in Argument Position (Shorthand for Generics)
+### `impl Trait` в позиции аргумента (сокращённая запись обобщения)
 ```rust
-// These two are equivalent:
+// Эти две записи эквивалентны:
 fn print_animal(animal: &impl Animal) { animal.make_sound(); }
 fn print_animal<T: Animal>(animal: &T)  { animal.make_sound(); }
 
-// impl Trait is just syntactic sugar for a generic parameter
-// The compiler generates a specialized copy for each concrete type (monomorphization)
+// impl Trait — это просто синтаксический сахар для параметра обобщения
+// Компилятор генерирует специализированную копию для каждого конкретного типа (мономорфизация)
 ```
 
-### `impl Trait` in Return Position (The Key Difference)
+### `impl Trait` в позиции возвращаемого значения (ключевое отличие)
 ```rust
-// Return an iterator without exposing the concrete type
+// Возвращаем итератор, не раскрывая конкретный тип
 fn even_squares(limit: u32) -> impl Iterator<Item = u32> {
     (0..limit)
         .filter(|n| n % 2 == 0)
         .map(|n| n * n)
 }
-// The caller sees "some type that implements Iterator<Item = u32>"
-// The actual type (Filter<Map<Range<u32>, ...>>) is unnameable — impl Trait solves this.
+// Вызывающий код видит «какой-то тип, реализующий Iterator<Item = u32>»
+// Фактический тип (Filter<Map<Range<u32>, ...>>) не имеет имени — impl Trait решает эту проблему
 
 fn main() {
     for n in even_squares(20) {
         print!("{n} ");
     }
-    // Output: 0 4 16 36 64 100 144 196 256 324
+    // Вывод: 0 4 16 36 64 100 144 196 256 324
 }
 ```
 
 ```csharp
-// C# — returning an interface (always dynamic dispatch, heap-allocated iterator object)
+// C# — возврат интерфейса (всегда динамическая диспетчеризация, объект итератора в куче)
 public IEnumerable<int> EvenSquares(int limit) =>
     Enumerable.Range(0, limit)
         .Where(n => n % 2 == 0)
         .Select(n => n * n);
-// The return type hides the concrete iterator behind the IEnumerable interface
-// Unlike Rust's Box<dyn Trait>, C# doesn't explicitly box — the runtime handles allocation
+// Тип возвращаемого значения скрывает конкретный итератор за интерфейсом IEnumerable
+// В отличие от Box<dyn Trait> в Rust, C# не упаковывает явно — выделением памяти занимается рантайм
 ```
 
-### Returning Closures: `impl Fn` vs `Box<dyn Fn>`
+### Возврат замыканий: `impl Fn` против `Box<dyn Fn>`
 ```rust
-// Return a closure — you CANNOT name the closure type, so impl Fn is essential
+// Возвращаем замыкание — тип замыкания назвать нельзя, поэтому impl Fn необходим
 fn make_adder(x: i32) -> impl Fn(i32) -> i32 {
     move |y| x + y
 }
@@ -500,7 +500,7 @@ fn make_adder(x: i32) -> impl Fn(i32) -> i32 {
 let add5 = make_adder(5);
 println!("{}", add5(3)); // 8
 
-// If you need to return DIFFERENT closures conditionally, you need Box:
+// Если нужно условно возвращать РАЗНЫЕ замыкания, понадобится Box:
 fn choose_op(add: bool) -> Box<dyn Fn(i32, i32) -> i32> {
     if add {
         Box::new(|a, b| a + b)
@@ -508,43 +508,43 @@ fn choose_op(add: bool) -> Box<dyn Fn(i32, i32) -> i32> {
         Box::new(|a, b| a * b)
     }
 }
-// impl Trait requires a SINGLE concrete type; different closures are different types
+// impl Trait требует ОДНОГО конкретного типа; разные замыкания — это разные типы
 ```
 
 ```csharp
-// C# — delegates handle this naturally (always heap-allocated)
+// C# — делегаты решают это естественно (всегда выделяются в куче)
 Func<int, int> MakeAdder(int x) => y => x + y;
 Func<int, int, int> ChooseOp(bool add) => add ? (a, b) => a + b : (a, b) => a * b;
 ```
 
-### The Dispatch Decision: `impl Trait` vs `dyn Trait` vs Generics
+### Решение о диспетчеризации: `impl Trait` против `dyn Trait` против обобщений
 
-This is an architectural decision C# developers face immediately in Rust. Here's the complete guide:
+С этим архитектурным решением разработчики C# сталкиваются в Rust сразу. Вот полное руководство:
 
 ```mermaid
 graph TD
-    START["Function accepts or returns<br/>a trait-based type?"]
-    POSITION["Argument or return position?"]
-    ARG_SAME["All callers pass<br/>the same type?"]
-    RET_SINGLE["Always returns the<br/>same concrete type?"]
-    COLLECTION["Storing in a collection<br/>or as struct field?"]
+    START["Функция принимает или возвращает<br/>тип на основе трейта?"]
+    POSITION["Позиция аргумента или возврата?"]
+    ARG_SAME["Все вызывающие передают<br/>один и тот же тип?"]
+    RET_SINGLE["Всегда возвращается один и тот же<br/>конкретный тип?"]
+    COLLECTION["Хранится в коллекции<br/>или как поле структуры?"]
 
-    GENERIC["Use generics<br/><code>fn foo&lt;T: Trait&gt;(x: T)</code>"]
-    IMPL_ARG["Use impl Trait<br/><code>fn foo(x: impl Trait)</code>"]
-    IMPL_RET["Use impl Trait<br/><code>fn foo() -> impl Trait</code>"]
-    DYN_BOX["Use Box&lt;dyn Trait&gt;<br/>Dynamic dispatch"]
-    DYN_REF["Use &dyn Trait<br/>Borrowed dynamic dispatch"]
+    GENERIC["Используйте обобщения<br/><code>fn foo&lt;T: Trait&gt;(x: T)</code>"]
+    IMPL_ARG["Используйте impl Trait<br/><code>fn foo(x: impl Trait)</code>"]
+    IMPL_RET["Используйте impl Trait<br/><code>fn foo() -> impl Trait</code>"]
+    DYN_BOX["Используйте Box&lt;dyn Trait&gt;<br/>Динамическая диспетчеризация"]
+    DYN_REF["Используйте &dyn Trait<br/>Динамическая диспетчеризация по ссылке"]
 
     START --> POSITION
-    POSITION -->|Argument| ARG_SAME
-    POSITION -->|Return| RET_SINGLE
-    ARG_SAME -->|"Yes (syntactic sugar)"| IMPL_ARG
-    ARG_SAME -->|"Complex bounds/multiple uses"| GENERIC
-    RET_SINGLE -->|Yes| IMPL_RET
-    RET_SINGLE -->|"No (conditional types)"| DYN_BOX
-    RET_SINGLE -->|"Heterogeneous collection"| COLLECTION
-    COLLECTION -->|Owned| DYN_BOX
-    COLLECTION -->|Borrowed| DYN_REF
+    POSITION -->|Аргумент| ARG_SAME
+    POSITION -->|Возврат| RET_SINGLE
+    ARG_SAME -->|"Да (синтаксический сахар)"| IMPL_ARG
+    ARG_SAME -->|"Сложные ограничения/несколько использований"| GENERIC
+    RET_SINGLE -->|Да| IMPL_RET
+    RET_SINGLE -->|"Нет (условные типы)"| DYN_BOX
+    RET_SINGLE -->|"Коллекция разнородных типов"| COLLECTION
+    COLLECTION -->|Владеемая| DYN_BOX
+    COLLECTION -->|Заимствованная| DYN_REF
 
     style GENERIC fill:#c8e6c9,color:#000
     style IMPL_ARG fill:#c8e6c9,color:#000
@@ -553,20 +553,20 @@ graph TD
     style DYN_REF fill:#fff3e0,color:#000
 ```
 
-| Approach | Dispatch | Allocation | When to Use |
+| Подход | Диспетчеризация | Выделение памяти | Когда использовать |
 |----------|----------|------------|-------------|
-| `fn foo<T: Trait>(x: T)` | Static (monomorphized) | Stack | Multiple trait bounds, turbofish needed, same type reused |
-| `fn foo(x: impl Trait)` | Static (monomorphized) | Stack | Simple bounds, cleaner syntax, one-off parameters |
-| `fn foo() -> impl Trait` | Static | Stack | Single concrete return type, iterators, closures |
-| `fn foo() -> Box<dyn Trait>` | Dynamic (vtable) | **Heap** | Different return types, trait objects in collections |
-| `&dyn Trait` / `&mut dyn Trait` | Dynamic (vtable) | No alloc | Borrowed heterogeneous references, function parameters |
+| `fn foo<T: Trait>(x: T)` | Статическая (мономорфизация) | Стек | Несколько ограничений трейтов, нужен turbofish, один и тот же тип используется повторно |
+| `fn foo(x: impl Trait)` | Статическая (мономорфизация) | Стек | Простые ограничения, более чистый синтаксис, разовые параметры |
+| `fn foo() -> impl Trait` | Статическая | Стек | Один конкретный тип возвращаемого значения, итераторы, замыкания |
+| `fn foo() -> Box<dyn Trait>` | Динамическая (таблица виртуальных методов) | **Куча** | Разные типы возвращаемых значений, трейт-объекты в коллекциях |
+| `&dyn Trait` / `&mut dyn Trait` | Динамическая (таблица виртуальных методов) | Без выделения | Заимствованные ссылки на разнородные типы, параметры функций |
 
 ```rust
-// Summary: from fastest to most flexible
-fn static_dispatch(x: impl Display)             { /* fastest, no alloc */ }
-fn generic_dispatch<T: Display + Clone>(x: T)    { /* fastest, multiple bounds */ }
-fn dynamic_dispatch(x: &dyn Display)             { /* vtable lookup, no alloc */ }
-fn boxed_dispatch(x: Box<dyn Display>)           { /* vtable lookup + heap alloc */ }
+// Сводка: от самого быстрого к самому гибкому
+fn static_dispatch(x: impl Display)             { /* быстрее всего, без выделения */ }
+fn generic_dispatch<T: Display + Clone>(x: T)    { /* быстрее всего, несколько ограничений */ }
+fn dynamic_dispatch(x: &dyn Display)             { /* поиск в таблице виртуальных методов, без выделения */ }
+fn boxed_dispatch(x: Box<dyn Display>)           { /* поиск в таблице виртуальных методов + выделение в куче */ }
 ```
 
 ***

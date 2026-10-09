@@ -1,33 +1,33 @@
-## Type Conversions in Rust
+## Преобразования типов в Rust
 
-> **What you'll learn:** `From`/`Into` traits vs C#'s implicit/explicit operators, `TryFrom`/`TryInto`
-> for fallible conversions, `FromStr` for parsing, and idiomatic string conversion patterns.
+> **Что вы узнаете:** трейты `From`/`Into` против неявных и явных операторов C#, `TryFrom`/`TryInto`
+> для преобразований, которые могут завершиться ошибкой, `FromStr` для разбора строк, а также идиоматичные паттерны преобразования строк.
 >
-> **Difficulty:** 🟡 Intermediate
+> **Сложность:** 🟡 Средний
 
-C# uses implicit/explicit conversions and casting operators. Rust uses the `From` and `Into` traits for safe, explicit conversions.
+В C# используются неявные и явные преобразования и операторы приведения. В Rust для безопасных и явных преобразований применяются трейты `From` и `Into`.
 
-### C# Conversion Patterns
+### Паттерны преобразований в C#
 ```csharp
-// C# implicit/explicit conversions
+// Неявные и явные преобразования в C#
 public class Temperature
 {
     public double Celsius { get; }
     
     public Temperature(double celsius) { Celsius = celsius; }
     
-    // Implicit conversion
+    // Неявное преобразование
     public static implicit operator double(Temperature t) => t.Celsius;
     
-    // Explicit conversion
+    // Явное преобразование
     public static explicit operator Temperature(double d) => new Temperature(d);
 }
 
-double temp = new Temperature(100.0);  // implicit
-Temperature t = (Temperature)37.5;     // explicit
+double temp = new Temperature(100.0);  // неявно
+Temperature t = (Temperature)37.5;     // явно
 ```
 
-### Rust From and Into
+### From и Into в Rust
 ```rust
 #[derive(Debug)]
 struct Temperature {
@@ -50,10 +50,10 @@ fn main() {
     // From
     let temp = Temperature::from(100.0);
     
-    // Into (automatically available when From is implemented)
+    // Into (доступен автоматически, когда реализован From)
     let temp2: Temperature = 37.5.into();
     
-    // Works in function arguments too
+    // Работает и в аргументах функций
     fn process_temp(temp: impl Into<Temperature>) {
         let t: Temperature = temp.into();
         println!("Temperature: {:.1}°C", t.celsius);
@@ -66,18 +66,18 @@ fn main() {
 
 ```mermaid
 graph LR
-    A["impl From&lt;f64&gt; for Temperature"] -->|"auto-generates"| B["impl Into&lt;Temperature&gt; for f64"]
-    C["Temperature::from(37.5)"] -->|"explicit"| D["Temperature"]
-    E["37.5.into()"] -->|"implicit via Into"| D
-    F["fn process(t: impl Into&lt;Temperature&gt;)"] -->|"accepts both"| D
+    A["impl From&lt;f64&gt; for Temperature"] -->|"генерирует автоматически"| B["impl Into&lt;Temperature&gt; for f64"]
+    C["Temperature::from(37.5)"] -->|"явно"| D["Temperature"]
+    E["37.5.into()"] -->|"неявно через Into"| D
+    F["fn process(t: impl Into&lt;Temperature&gt;)"] -->|"принимает оба варианта"| D
 
     style A fill:#c8e6c9,color:#000
     style B fill:#bbdefb,color:#000
 ```
 
-> **Rule of thumb**: Implement `From`, and you get `Into` for free. Callers can use whichever reads better.
+> **Эмпирическое правило**: реализуйте `From` — и `Into` получите бесплатно. Вызывающий код может использовать тот вариант, который читается лучше.
 
-### TryFrom for Fallible Conversions
+### TryFrom для преобразований, которые могут завершиться ошибкой
 ```rust
 use std::convert::TryFrom;
 
@@ -101,19 +101,19 @@ fn main() {
 }
 ```
 
-### String Conversions
+### Преобразования строк
 ```rust
-// ToString via Display trait
+// ToString через трейт Display
 impl std::fmt::Display for Temperature {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:.1}°C", self.celsius)
     }
 }
 
-// Now .to_string() works automatically
+// Теперь .to_string() работает автоматически
 let s = Temperature::from(100.0).to_string(); // "100.0°C"
 
-// FromStr for parsing
+// FromStr для разбора
 use std::str::FromStr;
 
 impl FromStr for Temperature {
@@ -131,22 +131,22 @@ let t: Temperature = "100.0°C".parse().unwrap();
 
 ---
 
-## Exercises
+## Упражнения
 
 <details>
-<summary><strong>🏋️ Exercise: Currency Converter</strong> (click to expand)</summary>
+<summary><strong>🏋️ Упражнение: конвертер валют</strong> (нажмите, чтобы раскрыть)</summary>
 
-Create a `Money` struct that demonstrates the full conversion ecosystem:
+Создайте структуру `Money`, которая демонстрирует всю экосистему преобразований:
 
-1. `Money { cents: i64 }` (stores value in cents to avoid floating-point issues)
-2. Implement `From<i64>` (treats input as whole dollars → `cents = dollars * 100`)
-3. Implement `TryFrom<f64>` — reject negative amounts, round to nearest cent
-4. Implement `Display` to show `"$1.50"` format
-5. Implement `FromStr` to parse `"$1.50"` or `"1.50"` back into `Money`
-6. Write a function `fn total(items: &[impl Into<Money> + Copy]) -> Money` that sums values
+1. `Money { cents: i64 }` (хранит значение в центах, чтобы избежать проблем с плавающей точкой)
+2. Реализуйте `From<i64>` (входное значение — целые доллары → `cents = dollars * 100`)
+3. Реализуйте `TryFrom<f64>` — отвергайте отрицательные суммы, округляйте до ближайшего цента
+4. Реализуйте `Display`, чтобы выводить формат `"$1.50"`
+5. Реализуйте `FromStr`, чтобы разбирать `"$1.50"` или `"1.50"` обратно в `Money`
+6. Напишите функцию `fn total(items: &[impl Into<Money> + Copy]) -> Money`, которая суммирует значения
 
 <details>
-<summary>🔑 Solution</summary>
+<summary>🔑 Решение</summary>
 
 ```rust
 use std::fmt;

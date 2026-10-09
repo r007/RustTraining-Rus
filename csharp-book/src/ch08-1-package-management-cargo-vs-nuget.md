@@ -1,13 +1,13 @@
-## Package Management: Cargo vs NuGet
+## Управление пакетами: Cargo против NuGet
 
-> **What you'll learn:** `Cargo.toml` vs `.csproj`, version specifiers, `Cargo.lock`,
-> feature flags for conditional compilation, and common Cargo commands mapped to their NuGet/dotnet equivalents.
+> **Что вы узнаете:** `Cargo.toml` против `.csproj`, спецификаторы версий, `Cargo.lock`,
+> флаги функций для условной компиляции, а также распространённые команды Cargo и их аналоги в NuGet/dotnet.
 >
-> **Difficulty:** 🟢 Beginner
+> **Сложность:** 🟢 Начальный
 
-### Dependency Declaration
+### Объявление зависимостей
 
-#### C# NuGet Dependencies
+#### Зависимости NuGet в C#
 ```xml
 <!-- MyApp.csproj -->
 <Project Sdk="Microsoft.NET.Sdk">
@@ -23,7 +23,7 @@
 </Project>
 ```
 
-#### Rust Cargo Dependencies
+#### Зависимости Cargo в Rust
 ```toml
 # Cargo.toml
 [package]
@@ -32,28 +32,28 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-serde_json = "1.0"               # From crates.io (like NuGet)
-serde = { version = "1.0", features = ["derive"] }  # With features
+serde_json = "1.0"               # Из crates.io (как NuGet)
+serde = { version = "1.0", features = ["derive"] }  # С функциями
 log = "0.4"
 tokio = { version = "1.0", features = ["full"] }
 
-# Local dependencies (like ProjectReference)
+# Локальные зависимости (как ProjectReference)
 my_library = { path = "../my_library" }
 
-# Git dependencies
+# Зависимости из git
 my_git_crate = { git = "https://github.com/user/repo" }
 
-# Development dependencies (like test packages)
+# Зависимости для разработки (как тестовые пакеты)
 [dev-dependencies]
-criterion = "0.5"               # Benchmarking
-proptest = "1.0"               # Property testing
+criterion = "0.5"               # Бенчмарки
+proptest = "1.0"               # Property-тестирование
 ```
 
-### Version Management
+### Управление версиями
 
-#### C# Package Versioning
+#### Версионирование пакетов в C#
 ```xml
-<!-- Centralized package management (Directory.Packages.props) -->
+<!-- Централизованное управление пакетами (Directory.Packages.props) -->
 <Project>
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
@@ -63,29 +63,29 @@ proptest = "1.0"               # Property testing
   <PackageVersion Include="Serilog" Version="3.0.1" />
 </Project>
 
-<!-- packages.lock.json for reproducible builds -->
+<!-- packages.lock.json для воспроизводимых сборок -->
 ```
 
-#### Rust Version Management
+#### Управление версиями в Rust
 ```toml
-# Cargo.toml - Semantic versioning
+# Cargo.toml — семантическое версионирование
 [dependencies]
-serde = "1.0"        # Compatible with 1.x.x (>=1.0.0, <2.0.0)
-log = "0.4.17"       # Compatible with 0.4.x (>=0.4.17, <0.5.0)
-regex = "=1.5.4"     # Exact version
-chrono = "^0.4"      # Caret requirements (default)
-uuid = "~1.3.0"      # Tilde requirements (>=1.3.0, <1.4.0)
+serde = "1.0"        # Совместимо с 1.x.x (>=1.0.0, <2.0.0)
+log = "0.4.17"       # Совместимо с 0.4.x (>=0.4.17, <0.5.0)
+regex = "=1.5.4"     # Точная версия
+chrono = "^0.4"      # Требования с кареткой (по умолчанию)
+uuid = "~1.3.0"      # Требования с тильдой (>=1.3.0, <1.4.0)
 
-# Cargo.lock - Exact versions for reproducible builds (auto-generated)
+# Cargo.lock — точные версии для воспроизводимых сборок (генерируется автоматически)
 [[package]]
 name = "serde"
 version = "1.0.163"
-# ... exact dependency tree
+# ... точное дерево зависимостей
 ```
 
-### Package Sources
+### Источники пакетов
 
-#### C# Package Sources
+#### Источники пакетов в C#
 ```xml
 <!-- nuget.config -->
 <configuration>
@@ -96,7 +96,7 @@ version = "1.0.163"
 </configuration>
 ```
 
-#### Rust Package Sources
+#### Источники пакетов в Rust
 ```toml
 # .cargo/config.toml
 [source.crates-io]
@@ -105,30 +105,30 @@ replace-with = "my-awesome-registry"
 [source.my-awesome-registry]
 registry = "https://my-intranet:8080/index"
 
-# Alternative registries
+# Альтернативные реестры
 [registries]
 my-registry = { index = "https://my-intranet:8080/index" }
 
-# In Cargo.toml
+# В Cargo.toml
 [dependencies]
 my_crate = { version = "1.0", registry = "my-registry" }
 ```
 
-### Common Commands Comparison
+### Сравнение распространённых команд
 
-| Task | C# Command | Rust Command |
+| Задача | Команда C# | Команда Rust |
 |------|------------|-------------|
-| Restore packages | `dotnet restore` | `cargo fetch` |
-| Add package | `dotnet add package Newtonsoft.Json` | `cargo add serde_json` |
-| Remove package | `dotnet remove package Newtonsoft.Json` | `cargo remove serde_json` |
-| Update packages | `dotnet update` | `cargo update` |
-| List packages | `dotnet list package` | `cargo tree` |
-| Audit security | `dotnet list package --vulnerable` | `cargo audit` |
-| Clean build | `dotnet clean` | `cargo clean` |
+| Восстановить пакеты | `dotnet restore` | `cargo fetch` |
+| Добавить пакет | `dotnet add package Newtonsoft.Json` | `cargo add serde_json` |
+| Удалить пакет | `dotnet remove package Newtonsoft.Json` | `cargo remove serde_json` |
+| Обновить пакеты | `dotnet update` | `cargo update` |
+| Список пакетов | `dotnet list package` | `cargo tree` |
+| Аудит безопасности | `dotnet list package --vulnerable` | `cargo audit` |
+| Чистая сборка | `dotnet clean` | `cargo clean` |
 
-### Features: Conditional Compilation
+### Features: условная компиляция
 
-#### C# Conditional Compilation
+#### Условная компиляция в C#
 ```csharp
 #if DEBUG
     Console.WriteLine("Debug mode");
@@ -136,20 +136,20 @@ my_crate = { version = "1.0", registry = "my-registry" }
     Console.WriteLine("Release mode");
 #endif
 
-// Project file features
+// Функции в файле проекта
 <PropertyGroup Condition="'$(Configuration)'=='Debug'">
     <DefineConstants>DEBUG;TRACE</DefineConstants>
 </PropertyGroup>
 ```
 
-#### Rust Feature Gates
+#### Feature-флаги в Rust
 ```toml
 # Cargo.toml
 [features]
-default = ["json"]              # Default features
-json = ["serde_json"]          # Feature that enables serde_json
-xml = ["serde_xml"]            # Alternative serialization
-advanced = ["json", "xml"]     # Composite feature
+default = ["json"]              # Функции по умолчанию
+json = ["serde_json"]          # Функция, включающая serde_json
+xml = ["serde_xml"]            # Альтернативная сериализация
+advanced = ["json", "xml"]     # Составная функция
 
 [dependencies]
 serde_json = { version = "1.0", optional = true }
@@ -157,7 +157,7 @@ serde_xml = { version = "0.4", optional = true }
 ```
 
 ```rust
-// Conditional compilation based on features
+// Условная компиляция на основе функций
 #[cfg(feature = "json")]
 use serde_json;
 
@@ -176,24 +176,24 @@ pub fn serialize_data(data: &MyStruct) -> String {
 }
 ```
 
-### Using External Crates
+### Использование внешних крейтов
 
-#### Popular Crates for C# Developers
+#### Популярные крейты для разработчиков C#
 
-| C# Library | Rust Crate | Purpose |
+| Библиотека C# | Крейт Rust | Назначение |
 |------------|------------|---------|
-| System.Text.Json / Newtonsoft.Json | `serde_json` | JSON serialization |
-| HttpClient | `reqwest` | HTTP client |
-| Entity Framework | `diesel` / `sqlx` | ORM / SQL toolkit |
-| NLog/Serilog | `log` + `env_logger` | Logging |
-| xUnit/NUnit | Built-in `#[test]` | Unit testing |
-| Moq | `mockall` | Mocking |
-| Flurl | `url` | URL manipulation |
-| Polly | `tower` | Resilience patterns |
+| System.Text.Json / Newtonsoft.Json | `serde_json` | Сериализация JSON |
+| HttpClient | `reqwest` | HTTP-клиент |
+| Entity Framework | `diesel` / `sqlx` | ORM / инструментарий SQL |
+| NLog/Serilog | `log` + `env_logger` | Логирование |
+| xUnit/NUnit | Встроенный `#[test]` | Модульное тестирование |
+| Moq | `mockall` | Моки |
+| Flurl | `url` | Работа с URL |
+| Polly | `tower` | Паттерны отказоустойчивости |
 
-#### Example: HTTP Client Migration
+#### Пример: миграция HTTP-клиента
 ```csharp
-// C# HttpClient usage
+// Использование HttpClient в C#
 public class ApiClient
 {
     private readonly HttpClient _httpClient;
@@ -208,7 +208,7 @@ public class ApiClient
 ```
 
 ```rust
-// Rust reqwest usage
+// Использование reqwest в Rust
 use reqwest;
 use serde::Deserialize;
 

@@ -1,106 +1,106 @@
-## Rust Closures
+## Замыкания в Rust
 
-> **What you'll learn:** Closures with ownership-aware captures (`Fn`/`FnMut`/`FnOnce`) vs C# lambdas,
-> Rust iterators as a zero-cost replacement for LINQ, lazy vs eager evaluation,
-> and parallel iteration with `rayon`.
+> **Что вы узнаете:** замыкания с захватом с учётом владения (`Fn`/`FnMut`/`FnOnce`) в сравнении с лямбдами C#,
+> итераторы Rust как замену LINQ с нулевой стоимостью, ленивые и энергичные вычисления,
+> а также параллельную итерацию с `rayon`.
 >
-> **Difficulty:** 🟡 Intermediate
+> **Сложность:** 🟡 Средний
 
-Closures in Rust are similar to C# lambdas and delegates, but with ownership-aware captures.
+Замыкания в Rust похожи на лямбды и делегаты C#, но захватывают переменные с учётом владения.
 
-### C# Lambdas and Delegates
+### Лямбды и делегаты C#
 ```csharp
-// C# - Lambdas capture by reference
+// C# — лямбды захватывают по ссылке
 Func<int, int> doubler = x => x * 2;
 Action<string> printer = msg => Console.WriteLine(msg);
 
-// Closure capturing outer variables
+// Замыкание, захватывающее внешние переменные
 int multiplier = 3;
 Func<int, int> multiply = x => x * multiplier;
 Console.WriteLine(multiply(5)); // 15
 
-// LINQ uses lambdas extensively
+// LINQ активно использует лямбды
 var evens = numbers.Where(n => n % 2 == 0).ToList();
 ```
 
-### Rust Closures
+### Замыкания в Rust
 ```rust
-// Rust closures - ownership-aware
+// Замыкания Rust — с учётом владения
 let doubler = |x: i32| x * 2;
 let printer = |msg: &str| println!("{}", msg);
 
-// Closure capturing by reference (default for immutable)
+// Замыкание, захватывающее по ссылке (по умолчанию для неизменяемых)
 let multiplier = 3;
-let multiply = |x: i32| x * multiplier; // borrows multiplier
+let multiply = |x: i32| x * multiplier; // заимствует multiplier
 println!("{}", multiply(5)); // 15
-println!("{}", multiplier); // still accessible
+println!("{}", multiplier); // по-прежнему доступен
 
-// Closure capturing by move
+// Замыкание, захватывающее перемещением
 let data = vec![1, 2, 3];
 let owns_data = move || {
-    println!("{:?}", data); // data moved into closure
+    println!("{:?}", data); // data перемещается в замыкание
 };
 owns_data();
-// println!("{:?}", data); // ERROR: data was moved
+// println!("{:?}", data); // ОШИБКА: data было перемещено
 
-// Using closures with iterators
+// Использование замыканий с итераторами
 let numbers = vec![1, 2, 3, 4, 5];
 let evens: Vec<&i32> = numbers.iter().filter(|&&n| n % 2 == 0).collect();
 ```
 
-### Closure Types
+### Виды замыканий
 ```rust
-// Fn - borrows captured values immutably
+// Fn — заимствует захваченные значения неизменяемо
 fn apply_fn(f: impl Fn(i32) -> i32, x: i32) -> i32 {
     f(x)
 }
 
-// FnMut - borrows captured values mutably
+// FnMut — заимствует захваченные значения изменяемо
 fn apply_fn_mut(mut f: impl FnMut(i32), values: &[i32]) {
     for &v in values {
         f(v);
     }
 }
 
-// FnOnce - takes ownership of captured values
+// FnOnce — забирает владение захваченными значениями
 fn apply_fn_once(f: impl FnOnce() -> Vec<i32>) -> Vec<i32> {
-    f() // can only call once
+    f() // можно вызвать только один раз
 }
 
 fn main() {
-    // Fn example
+    // Пример Fn
     let multiplier = 3;
     let result = apply_fn(|x| x * multiplier, 5);
     
-    // FnMut example
+    // Пример FnMut
     let mut sum = 0;
     apply_fn_mut(|x| sum += x, &[1, 2, 3, 4, 5]);
     println!("Sum: {}", sum); // 15
     
-    // FnOnce example
+    // Пример FnOnce
     let data = vec![1, 2, 3];
-    let result = apply_fn_once(move || data); // moves data
+    let result = apply_fn_once(move || data); // перемещает data
 }
 ```
 
 ***
 
-## LINQ vs Rust Iterators
+## LINQ против итераторов Rust
 
-### C# LINQ (Language Integrated Query)
+### LINQ в C# (Language Integrated Query)
 ```csharp
-// C# LINQ - Declarative data processing
+// LINQ в C# — декларативная обработка данных
 var numbers = new[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
 
 var result = numbers
-    .Where(n => n % 2 == 0)           // Filter even numbers
-    .Select(n => n * n)               // Square them
-    .Where(n => n > 10)               // Filter > 10
-    .OrderByDescending(n => n)        // Sort descending
-    .Take(3)                          // Take first 3
-    .ToList();                        // Materialize
+    .Where(n => n % 2 == 0)           // Отбираем чётные числа
+    .Select(n => n * n)               // Возводим в квадрат
+    .Where(n => n > 10)               // Отбираем > 10
+    .OrderByDescending(n => n)        // Сортируем по убыванию
+    .Take(3)                          // Берём первые 3
+    .ToList();                        // Материализуем
 
-// LINQ with complex objects
+// LINQ со сложными объектами
 var users = GetUsers();
 var activeAdults = users
     .Where(u => u.IsActive && u.Age >= 18)
@@ -113,7 +113,7 @@ var activeAdults = users
     .OrderBy(x => x.Department)
     .ToList();
 
-// Async LINQ (with additional libraries)
+// Асинхронный LINQ (с дополнительными библиотеками)
 var results = await users
     .ToAsyncEnumerable()
     .WhereAwait(async u => await IsActiveAsync(u.Id))
@@ -121,23 +121,23 @@ var results = await users
     .ToListAsync();
 ```
 
-### Rust Iterators
+### Итераторы Rust
 ```rust
-// Rust iterators - Lazy, zero-cost abstractions
+// Итераторы Rust — ленивые абстракции с нулевой стоимостью
 let numbers = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
 let result: Vec<i32> = numbers
     .iter()
-    .filter(|&&n| n % 2 == 0)        // Filter even numbers
-    .map(|&n| n * n)                 // Square them
-    .filter(|&n| n > 10)             // Filter > 10
-    .collect::<Vec<_>>()             // Collect to Vec
+    .filter(|&&n| n % 2 == 0)        // Отбираем чётные числа
+    .map(|&n| n * n)                 // Возводим в квадрат
+    .filter(|&n| n > 10)             // Отбираем > 10
+    .collect::<Vec<_>>()             // Собираем в Vec
     .into_iter()
-    .rev()                           // Reverse iteration order
-    .take(3)                         // Take first 3
-    .collect();                      // Materialize
+    .rev()                           // Меняем порядок обхода
+    .take(3)                         // Берём первые 3
+    .collect();                      // Материализуем
 
-// Complex iterator chains
+// Сложные цепочки итераторов
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
@@ -154,41 +154,41 @@ fn process_users(users: Vec<User>) -> HashMap<String, (usize, f64)> {
         .filter(|u| u.is_active && u.age >= 18)
         .fold(HashMap::new(), |mut acc, user| {
             let entry = acc.entry(user.department.clone()).or_insert((0, 0.0));
-            entry.0 += 1;  // count
-            entry.1 += user.age as f64;  // sum of ages
+            entry.0 += 1;  // количество
+            entry.1 += user.age as f64;  // сумма возрастов
             acc
         })
         .into_iter()
-        .map(|(dept, (count, sum))| (dept, (count, sum / count as f64)))  // average
+        .map(|(dept, (count, sum))| (dept, (count, sum / count as f64)))  // среднее
         .collect()
 }
 
-// Parallel processing with rayon
+// Параллельная обработка с rayon
 use rayon::prelude::*;
 
 fn parallel_processing(numbers: Vec<i32>) -> Vec<i32> {
     numbers
-        .par_iter()                  // Parallel iterator
+        .par_iter()                  // Параллельный итератор
         .filter(|&&n| n % 2 == 0)
         .map(|&n| expensive_computation(n))
         .collect()
 }
 
 fn expensive_computation(n: i32) -> i32 {
-    // Simulate heavy computation
+    // Имитация тяжёлых вычислений
     (0..1000).fold(n, |acc, _| acc + 1)
 }
 ```
 
 ```mermaid
 graph TD
-    subgraph "C# LINQ Characteristics"
-        CS_LINQ["LINQ Expression"]
-        CS_EAGER["Often eager evaluation<br/>(ToList(), ToArray())"]
-        CS_REFLECTION["[ERROR] Some runtime reflection<br/>Expression trees"]
-        CS_ALLOCATIONS["[ERROR] Intermediate collections<br/>Garbage collection pressure"]
-        CS_ASYNC["[OK] Async support<br/>(with additional libraries)"]
-        CS_SQL["[OK] LINQ to SQL/EF integration"]
+    subgraph "Особенности LINQ в C#"
+        CS_LINQ["Выражение LINQ"]
+        CS_EAGER["Часто энергичные вычисления<br/>(ToList(), ToArray())"]
+        CS_REFLECTION["[ERROR] Часть рефлексии во время выполнения<br/>Деревья выражений"]
+        CS_ALLOCATIONS["[ERROR] Промежуточные коллекции<br/>Нагрузка на сборщик мусора"]
+        CS_ASYNC["[OK] Поддержка async<br/>(с дополнительными библиотеками)"]
+        CS_SQL["[OK] Интеграция LINQ to SQL/EF"]
         
         CS_LINQ --> CS_EAGER
         CS_LINQ --> CS_REFLECTION
@@ -197,13 +197,13 @@ graph TD
         CS_LINQ --> CS_SQL
     end
     
-    subgraph "Rust Iterator Characteristics"
-        RUST_ITER["Iterator Chain"]
-        RUST_LAZY["[OK] Lazy evaluation<br/>No work until .collect()"]
-        RUST_ZERO["[OK] Zero-cost abstractions<br/>Compiles to optimal loops"]
-        RUST_NO_ALLOC["[OK] No intermediate allocations<br/>Stack-based processing"]
-        RUST_PARALLEL["[OK] Easy parallelization<br/>(rayon crate)"]
-        RUST_FUNCTIONAL["[OK] Functional programming<br/>Immutable by default"]
+    subgraph "Особенности итераторов Rust"
+        RUST_ITER["Цепочка итераторов"]
+        RUST_LAZY["[OK] Ленивые вычисления<br/>Никакой работы до .collect()"]
+        RUST_ZERO["[OK] Абстракции с нулевой стоимостью<br/>Компилируются в оптимальные циклы"]
+        RUST_NO_ALLOC["[OK] Без промежуточных выделений<br/>Обработка на стеке"]
+        RUST_PARALLEL["[OK] Простая параллелизация<br/>(крейт rayon)"]
+        RUST_FUNCTIONAL["[OK] Функциональное программирование<br/>Неизменяемость по умолчанию"]
         
         RUST_ITER --> RUST_LAZY
         RUST_ITER --> RUST_ZERO
@@ -212,9 +212,9 @@ graph TD
         RUST_ITER --> RUST_FUNCTIONAL
     end
     
-    subgraph "Performance Comparison"
-        CS_PERF["C# LINQ Performance<br/>[ERROR] Allocation overhead<br/>[ERROR] Virtual dispatch<br/>[OK] Good enough for most cases"]
-        RUST_PERF["Rust Iterator Performance<br/>[OK] Hand-optimized speed<br/>[OK] No allocations<br/>[OK] Compile-time optimization"]
+    subgraph "Сравнение производительности"
+        CS_PERF["Производительность LINQ в C#<br/>[ERROR] Накладные расходы на выделение памяти<br/>[ERROR] Виртуальная диспетчеризация<br/>[OK] Достаточно для большинства случаев"]
+        RUST_PERF["Производительность итераторов Rust<br/>[OK] Скорость уровня ручной оптимизации<br/>[OK] Без выделений памяти<br/>[OK] Оптимизация на этапе компиляции"]
     end
     
     style CS_REFLECTION fill:#ffcdd2,color:#000
@@ -230,12 +230,12 @@ graph TD
 
 
 <details>
-<summary><strong>🏋️ Exercise: LINQ to Iterators Translation</strong> (click to expand)</summary>
+<summary><strong>🏋️ Упражнение: перевод из LINQ в итераторы</strong> (нажмите, чтобы раскрыть)</summary>
 
-**Challenge**: Translate this C# LINQ pipeline to idiomatic Rust iterators.
+**Задача**: переведите этот конвейер LINQ на C# в идиоматичные итераторы Rust.
 
 ```csharp
-// C# — translate to Rust
+// C# — переведите на Rust
 record Employee(string Name, string Dept, int Salary);
 
 var result = employees
@@ -251,7 +251,7 @@ var result = employees
 ```
 
 <details>
-<summary>🔑 Solution</summary>
+<summary>🔑 Решение</summary>
 
 ```rust
 use std::collections::HashMap;
@@ -281,19 +281,19 @@ fn department_stats(employees: &[Employee]) -> Vec<DeptStats> {
 }
 ```
 
-**Key takeaways**:
-- Rust has no built-in `group_by` on iterators — `HashMap` + `fold`/`for` is the idiomatic pattern
-- `itertools` crate adds `.group_by()` for more LINQ-like syntax
-- Iterator chains are zero-cost — the compiler optimizes them to simple loops
+**Ключевые выводы**:
+- В Rust нет встроенного `group_by` для итераторов — идиоматичный паттерн это `HashMap` + `fold`/`for`
+- Крейт `itertools` добавляет `.group_by()` для синтаксиса, более похожего на LINQ
+- Цепочки итераторов не имеют накладных расходов — компилятор превращает их в простые циклы
 
 </details>
 </details>
 
 
 <!-- ch12.0a: itertools — LINQ Power Tools -->
-## itertools: The Missing LINQ Operations
+## itertools: недостающие операции LINQ
 
-Standard Rust iterators cover `map`, `filter`, `fold`, `take`, and `collect`. But C# developers using `GroupBy`, `Zip`, `Chunk`, `SelectMany`, and `Distinct` will immediately notice gaps. The **`itertools`** crate fills them.
+Стандартные итераторы Rust покрывают `map`, `filter`, `fold`, `take` и `collect`. Но разработчики C#, привыкшие к `GroupBy`, `Zip`, `Chunk`, `SelectMany` и `Distinct`, сразу заметят пробелы. Крейт **`itertools`** их восполняет.
 
 ```toml
 # Cargo.toml
@@ -301,26 +301,26 @@ Standard Rust iterators cover `map`, `filter`, `fold`, `take`, and `collect`. Bu
 itertools = "0.12"
 ```
 
-### Side-by-Side: LINQ vs itertools
+### Бок о бок: LINQ и itertools
 
 ```csharp
 // C# — GroupBy
 var byDept = employees.GroupBy(e => e.Department)
     .Select(g => new { Dept = g.Key, Count = g.Count() });
 
-// C# — Chunk (batching)
+// C# — Chunk (пакетирование)
 var batches = items.Chunk(100);  // IEnumerable<T[]>
 
 // C# — Distinct / DistinctBy
 var unique = users.DistinctBy(u => u.Email);
 
-// C# — SelectMany (flatten)
+// C# — SelectMany (уплощение)
 var allTags = posts.SelectMany(p => p.Tags);
 
 // C# — Zip
 var pairs = names.Zip(scores, (n, s) => new { Name = n, Score = s });
 
-// C# — Sliding window
+// C# — скользящее окно
 var windows = data.Zip(data.Skip(1), data.Skip(2))
     .Select(triple => (triple.First + triple.Second + triple.Third) / 3.0);
 ```
@@ -328,7 +328,7 @@ var windows = data.Zip(data.Skip(1), data.Skip(2))
 ```rust
 use itertools::Itertools;
 
-// Rust — group_by (requires sorted input)
+// Rust — group_by (требует отсортированный ввод)
 let by_dept = employees.iter()
     .sorted_by_key(|e| &e.department)
     .group_by(|e| &e.department);
@@ -336,7 +336,7 @@ for (dept, group) in &by_dept {
     println!("{}: {} employees", dept, group.count());
 }
 
-// Rust — chunks (batching)
+// Rust — chunks (пакетирование)
 let batches = items.iter().chunks(100);
 for batch in &batches {
     process_batch(batch.collect::<Vec<_>>());
@@ -345,43 +345,43 @@ for batch in &batches {
 // Rust — unique / unique_by
 let unique: Vec<_> = users.iter().unique_by(|u| &u.email).collect();
 
-// Rust — flat_map (SelectMany equivalent — built-in!)
+// Rust — flat_map (аналог SelectMany — встроен в std!)
 let all_tags: Vec<&str> = posts.iter().flat_map(|p| &p.tags).collect();
 
-// Rust — zip (built-in!)
+// Rust — zip (встроен в std!)
 let pairs: Vec<_> = names.iter().zip(scores.iter()).collect();
 
-// Rust — tuple_windows (sliding window)
+// Rust — tuple_windows (скользящее окно)
 let moving_avg: Vec<f64> = data.iter()
     .tuple_windows::<(_, _, _)>()
     .map(|(a, b, c)| (*a + *b + *c) as f64 / 3.0)
     .collect();
 ```
 
-### itertools Quick Reference
+### Краткая справка по itertools
 
-| LINQ Method | itertools Equivalent | Notes |
+| Метод LINQ | Аналог в itertools | Примечания |
 |------------|---------------------|-------|
-| `GroupBy(key)` | `.sorted_by_key().group_by()` | Requires sorted input (unlike LINQ) |
-| `Chunk(n)` | `.chunks(n)` | Returns iterator of iterators |
-| `Distinct()` | `.unique()` | Requires `Eq + Hash` |
+| `GroupBy(key)` | `.sorted_by_key().group_by()` | Требует отсортированный ввод (в отличие от LINQ) |
+| `Chunk(n)` | `.chunks(n)` | Возвращает итератор итераторов |
+| `Distinct()` | `.unique()` | Требует `Eq + Hash` |
 | `DistinctBy(key)` | `.unique_by(key)` | |
-| `SelectMany()` | `.flat_map()` | Built into std — no crate needed |
-| `Zip()` | `.zip()` | Built into std |
-| `Aggregate()` | `.fold()` | Built into std |
-| `Any()` / `All()` | `.any()` / `.all()` | Built into std |
-| `First()` / `Last()` | `.next()` / `.last()` | Built into std |
-| `Skip(n)` / `Take(n)` | `.skip(n)` / `.take(n)` | Built into std |
-| `OrderBy()` | `.sorted()` / `.sorted_by()` | `itertools` (std has none) |
-| `ThenBy()` | `.sorted_by(\|a,b\| a.x.cmp(&b.x).then(a.y.cmp(&b.y)))` | Chained `Ordering::then` |
-| `Intersect()` | `HashSet` intersection | No direct iterator method |
-| `Concat()` | `.chain()` | Built into std |
-| Sliding window | `.tuple_windows()` | Fixed-size tuples |
-| Cartesian product | `.cartesian_product()` | `itertools` |
-| Interleave | `.interleave()` | `itertools` |
-| Permutations | `.permutations(k)` | `itertools` |
+| `SelectMany()` | `.flat_map()` | Встроен в std — крейт не нужен |
+| `Zip()` | `.zip()` | Встроен в std |
+| `Aggregate()` | `.fold()` | Встроен в std |
+| `Any()` / `All()` | `.any()` / `.all()` | Встроены в std |
+| `First()` / `Last()` | `.next()` / `.last()` | Встроены в std |
+| `Skip(n)` / `Take(n)` | `.skip(n)` / `.take(n)` | Встроены в std |
+| `OrderBy()` | `.sorted()` / `.sorted_by()` | `itertools` (в std сортировки нет) |
+| `ThenBy()` | `.sorted_by(\|a,b\| a.x.cmp(&b.x).then(a.y.cmp(&b.y)))` | Цепочка через `Ordering::then` |
+| `Intersect()` | Пересечение `HashSet` | Прямого метода итератора нет |
+| `Concat()` | `.chain()` | Встроен в std |
+| Скользящее окно | `.tuple_windows()` | Кортежи фиксированного размера |
+| Декартово произведение | `.cartesian_product()` | `itertools` |
+| Чередование | `.interleave()` | `itertools` |
+| Перестановки | `.permutations(k)` | `itertools` |
 
-### Real-World Example: Log Analysis Pipeline
+### Пример из практики: конвейер анализа логов
 
 ```rust
 use itertools::Itertools;
@@ -391,9 +391,9 @@ use std::collections::HashMap;
 struct LogEntry { level: String, module: String, message: String }
 
 fn analyze_logs(entries: &[LogEntry]) {
-    // Top 5 noisiest modules (like LINQ GroupBy + OrderByDescending + Take)
+    // Топ-5 самых «шумных» модулей (как LINQ GroupBy + OrderByDescending + Take)
     let noisy: Vec<_> = entries.iter()
-        .into_group_map_by(|e| &e.module) // itertools: direct group into HashMap
+        .into_group_map_by(|e| &e.module) // itertools: сразу группируем в HashMap
         .into_iter()
         .sorted_by(|a, b| b.1.len().cmp(&a.1.len()))
         .take(5)
@@ -403,15 +403,15 @@ fn analyze_logs(entries: &[LogEntry]) {
         println!("{}: {} entries", module, entries.len());
     }
 
-    // Error rate per 100-entry window (sliding window)
+    // Доля ошибок в окне из 100 записей (скользящее окно)
     let error_rates: Vec<f64> = entries.iter()
         .map(|e| if e.level == "ERROR" { 1.0 } else { 0.0 })
         .collect::<Vec<_>>()
-        .windows(100)  // std slice method
+        .windows(100)  // метод среза из std
         .map(|w| w.iter().sum::<f64>() / 100.0)
         .collect();
 
-    // Deduplicate consecutive identical messages
+    // Удаляем подряд идущие одинаковые сообщения
     let deduped: Vec<_> = entries.iter().dedup_by(|a, b| a.message == b.message).collect();
     println!("Deduped {} → {} entries", entries.len(), deduped.len());
 }
