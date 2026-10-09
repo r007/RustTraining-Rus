@@ -1,24 +1,24 @@
-# 12. Common Pitfalls 🔴
+# 12. Типичные ловушки 🔴
 
-> **What you'll learn:**
-> - 9 common async Rust bugs and how to fix each one
-> - Why blocking the executor is the #1 mistake (and how `spawn_blocking` fixes it)
-> - Cancellation hazards: what happens when a future is dropped mid-await
-> - Debugging: `tokio-console`, `tracing`, `#[instrument]`
-> - Testing: `#[tokio::test]`, `time::pause()`, trait-based mocking
+> **Что вы узнаете:**
+> - 9 типичных ошибок асинхронного Rust и как исправить каждую
+> - Почему блокировка исполнителя — ошибка номер один (и как её исправляет `spawn_blocking`)
+> - Опасности отмены: что происходит, когда future уничтожается посреди `await`
+> - Отладка: `tokio-console`, `tracing`, `#[instrument]`
+> - Тестирование: `#[tokio::test]`, `time::pause()`, моки на основе трейтов
 
-## Blocking the Executor
+## Блокировка исполнителя
 
-The #1 mistake in async Rust: running blocking code on the async executor thread. This starves other tasks.
+Ошибка номер один в асинхронном Rust: выполнение блокирующего кода в потоке исполнителя. Это морит голодом другие задачи.
 
 ```rust
-// ❌ WRONG: Blocks the entire executor thread
+// ❌ НЕПРАВИЛЬНО: блокирует весь поток исполнителя
 async fn bad_handler() -> String {
-    let data = std::fs::read_to_string("big_file.txt").unwrap(); // BLOCKS!
+    let data = std::fs::read_to_string("big_file.txt").unwrap(); // БЛОКИРУЕТ!
     process(&data)
 }
 
-// ✅ CORRECT: Offload blocking work to a dedicated thread pool
+// ✅ ПРАВИЛЬНО: переносим блокирующую работу в отдельный пул потоков
 async fn good_handler() -> String {
     let data = tokio::task::spawn_blocking(|| {
         std::fs::read_to_string("big_file.txt").unwrap()
@@ -26,7 +26,7 @@ async fn good_handler() -> String {
     process(&data)
 }
 
-// ✅ ALSO CORRECT: Use tokio's async fs
+// ✅ ТОЖЕ ПРАВИЛЬНО: используем асинхронную fs из tokio
 async fn also_good_handler() -> String {
     let data = tokio::fs::read_to_string("big_file.txt").await.unwrap();
     process(&data)
@@ -35,257 +35,250 @@ async fn also_good_handler() -> String {
 
 ```mermaid
 graph TB
-    subgraph "❌ Blocking Call on Executor"
-        T1_BAD["Thread 1: std::fs::read()<br/>🔴 BLOCKED for 500ms"]
-        T2_BAD["Thread 2: handling requests<br/>🟢 Working alone"]
-        TASKS_BAD["100 pending tasks<br/>⏳ Starved"]
-        T1_BAD -->|"can't poll"| TASKS_BAD
+    subgraph "❌ Блокирующий вызов в исполнителе"
+        T1_BAD["Поток 1: std::fs::read()<br/>🔴 ЗАБЛОКИРОВАН на 500 мс"]
+        T2_BAD["Поток 2: обрабатывает запросы<br/>🟢 Работает в одиночку"]
+        TASKS_BAD["100 ожидающих задач<br/>⏳ Голодают"]
+        T1_BAD -->|"не может опрашивать"| TASKS_BAD
     end
 
     subgraph "✅ spawn_blocking"
-        T1_GOOD["Thread 1: polling futures<br/>🟢 Available"]
-        T2_GOOD["Thread 2: polling futures<br/>🟢 Available"]
-        BT["Blocking pool thread:<br/>std::fs::read()<br/>🔵 Separate pool"]
-        TASKS_GOOD["100 tasks<br/>✅ All making progress"]
-        T1_GOOD -->|"polls"| TASKS_GOOD
-        T2_GOOD -->|"polls"| TASKS_GOOD
+        T1_GOOD["Поток 1: опрашивает future<br/>🟢 Свободен"]
+        T2_GOOD["Поток 2: опрашивает future<br/>🟢 Свободен"]
+        BT["Поток пула для блокирующих задач:<br/>std::fs::read()<br/>🔵 Отдельный пул"]
+        TASKS_GOOD["100 задач<br/>✅ Все продвигаются"]
+        T1_GOOD -->|"опрашивает"| TASKS_GOOD
+        T2_GOOD -->|"опрашивает"| TASKS_GOOD
     end
 ```
 
-### std::thread::sleep vs tokio::time::sleep
+### std::thread::sleep и tokio::time::sleep
 
 ```rust
-// ❌ WRONG: Blocks the executor thread for 5 seconds
+// ❌ НЕПРАВИЛЬНО: блокирует поток исполнителя на 5 секунд
 async fn bad_delay() {
-    std::thread::sleep(Duration::from_secs(5)); // Thread can't poll anything else!
+    std::thread::sleep(Duration::from_secs(5)); // Поток не может опрашивать ничего другого!
 }
 
-// ✅ CORRECT: Yields to the executor, other tasks can run
+// ✅ ПРАВИЛЬНО: уступаем управление исполнителю, другие задачи могут работать
 async fn good_delay() {
-    tokio::time::sleep(Duration::from_secs(5)).await; // Non-blocking!
+    tokio::time::sleep(Duration::from_secs(5)).await; // Не блокирует!
 }
 ```
 
-### Holding MutexGuard Across .await
+### Удержание MutexGuard через .await
 
 ```rust
-use std::sync::Mutex; // std Mutex — NOT async-aware
+use std::sync::Mutex; // std Mutex — НЕ учитывает async
 
-// ⚠️ RISKY: MutexGuard held across .await
+// ⚠️ РИСКОВАННО: MutexGuard удерживается через .await
 async fn bad_mutex(data: &Mutex<Vec<String>>) {
     let mut guard = data.lock().unwrap();
     guard.push("item".into());
-    some_io().await; // Guard is held here — blocks other threads from locking!
+    some_io().await; // Guard удерживается здесь — другие потоки не могут взять блокировку!
     guard.push("another".into());
 }
-// NOTE: This compiles! std::sync::MutexGuard is !Send, but the compiler only
-// enforces Send on the Future when you pass it to something that requires it
-// (e.g., tokio::spawn). Calling bad_mutex(...).await directly compiles fine.
-// However, tokio::spawn(bad_mutex(data)) will fail with a Send bound error.
+// ПРИМЕЧАНИЕ: это компилируется! std::sync::MutexGuard — !Send, но компилятор требует Send
+// для Future только тогда, когда вы передаёте его туда, где это требуется
+// (например, в tokio::spawn). Прямой вызов bad_mutex(...).await компилируется без проблем.
+// Однако tokio::spawn(bad_mutex(data)) упадёт с ошибкой ограничения Send.
 ```
 
-**Why this is usually a problem** — but not always:
+**Почему это обычно проблема** — но не всегда:
 
-Holding a `std::sync::Mutex` across `.await` blocks the **OS thread** for the
-duration of the I/O, preventing the executor from polling other tasks on that
-thread. For short critical sections this is wasteful; for long I/O it's a
-performance trap.
+Удержание `std::sync::Mutex` через `.await` блокирует **поток ОС** на всё время I/O, не давая исполнителю опрашивать другие задачи в этом потоке. Для коротких критических секций это расточительно; для длительного I/O — это ловушка производительности.
 
-**However**, there are legitimate cases where you *must* hold a lock across an
-`.await` — the same way a database transaction holds a lock between read and
-commit. Dropping and re-acquiring the lock introduces a **TOCTOU (time-of-check
-to time-of-use) race**: another task can modify the data between your two
-critical sections. The right fix depends on the use case:
+**Однако** бывают законные случаи, когда блокировку *необходимо* удерживать через `.await` — так же как транзакция базы данных удерживает блокировку между чтением и фиксацией. Если отпустить и заново захватить блокировку, возникает **гонка TOCTOU (time-of-check to time-of-use)**: другая задача может изменить данные между вашими двумя критическими секциями. Правильное решение зависит от сценария:
 
 ```rust
-// OPTION 1: Scope the guard — works when operations are independent
+// ВАРИАНТ 1: ограничиваем область видимости guard — подходит, когда операции независимы
 async fn scoped_mutex(data: &Mutex<Vec<String>>) {
     {
         let mut guard = data.lock().unwrap();
         guard.push("item".into());
-    } // Guard dropped here
-    some_io().await; // Lock is released — other tasks can proceed
+    } // Guard уничтожается здесь
+    some_io().await; // Блокировка снята — другие задачи могут продолжать
     {
         let mut guard = data.lock().unwrap();
         guard.push("another".into());
     }
 }
-// ⚠️ Careful: another task can lock + modify the Vec between the two sections.
-//    This is fine if the two pushes are independent, but wrong if "another"
-//    depends on state set by "item".
+// ⚠️ Осторожно: другая задача может захватить блокировку и изменить Vec между двумя секциями.
+//    Это нормально, если два push независимы, но неверно, если "another"
+//    зависит от состояния, установленного "item".
 
-// OPTION 2: Use tokio::sync::Mutex — holds lock across .await without
-//           blocking the OS thread. Best when you need transactional
-//           read-modify-write across an await point.
+// ВАРИАНТ 2: используем tokio::sync::Mutex — удерживает блокировку через .await,
+//            не блокируя поток ОС. Лучше всего, когда нужна транзакционная
+//            операция «прочитать-изменить-записать» через точку await.
 use tokio::sync::Mutex as AsyncMutex;
 
 async fn async_mutex(data: &AsyncMutex<Vec<String>>) {
-    let mut guard = data.lock().await; // Async lock — doesn't block the thread
+    let mut guard = data.lock().await; // Асинхронная блокировка — не блокирует поток
     guard.push("item".into());
-    some_io().await; // OK — tokio Mutex guard is Send
+    some_io().await; // OK — guard tokio Mutex является Send
     guard.push("another".into());
-    // Guard held the whole time — no TOCTOU race, no thread blocked.
+    // Guard удерживался всё время — ни гонки TOCTOU, ни заблокированного потока.
 }
 ```
 
-> **When to use which Mutex**:
-> - `std::sync::Mutex`: Short critical sections with no `.await` inside
-> - `tokio::sync::Mutex`: When you need to hold the lock across `.await` points
->   (transactional semantics, TOCTOU avoidance)
-> - `parking_lot::Mutex`: Drop-in `std` replacement, faster, smaller, still no `.await`
+> **Когда какой Mutex использовать**:
+> - `std::sync::Mutex`: короткие критические секции без `.await` внутри
+> - `tokio::sync::Mutex`: когда нужно удерживать блокировку через точки `.await`
+>   (транзакционная семантика, предотвращение TOCTOU)
+> - `parking_lot::Mutex`: прямая замена `std`, быстрее и компактнее, но тоже без `.await`
 >
-> **Rule of thumb**: Don't blindly split a critical section around an `.await`.
-> Ask whether the two halves are truly independent. If they aren't — if the
-> second half depends on state from the first — use `tokio::sync::Mutex` or
-> redesign the data flow.
+> **Эмпирическое правило**: не режьте критическую секцию вокруг `.await` не задумываясь.
+> Спросите себя, действительно ли обе половины независимы. Если нет — если вторая половина
+> зависит от состояния из первой, — используйте `tokio::sync::Mutex` или перепроектируйте
+> поток данных.
 
-### Cancellation Hazards
+### Опасности отмены
 
-Dropping a future cancels it — but this can leave things in an inconsistent state:
+Уничтожение future отменяет его — но это может оставить систему в несогласованном состоянии:
 
 ```rust
-// ❌ DANGEROUS: Resource leak on cancellation
+// ❌ ОПАСНО: утечка ресурсов при отмене
 async fn transfer(from: &Account, to: &Account, amount: u64) {
-    from.debit(amount).await;  // If cancelled HERE...
-    to.credit(amount).await;   // ...money vanishes!
+    from.debit(amount).await;  // Если отменить ЗДЕСЬ...
+    to.credit(amount).await;   // ...деньги пропадут!
 }
 
-// ✅ SAFE: Make operations atomic or use compensation
+// ✅ БЕЗОПАСНО: делаем операции атомарными или используем компенсацию
 async fn safe_transfer(from: &Account, to: &Account, amount: u64) -> Result<(), Error> {
-    // Use a database transaction (all-or-nothing)
+    // Используем транзакцию базы данных (всё или ничего)
     let tx = db.begin_transaction().await?;
     tx.debit(from, amount).await?;
     tx.credit(to, amount).await?;
-    tx.commit().await?; // Only commits if everything succeeded
+    tx.commit().await?; // Фиксируется, только если всё прошло успешно
     Ok(())
 }
 
-// ✅ ALSO SAFE: Use tokio::select! with cancellation awareness
+// ✅ ТОЖЕ БЕЗОПАСНО: tokio::select! с учётом отмены
 tokio::select! {
     result = transfer(from, to, amount) => {
-        // Transfer completed
+        // Перевод завершён
     }
     _ = shutdown_signal() => {
-        // Don't cancel mid-transfer — let it finish
-        // Or: roll back explicitly
+        // Не прерываем перевод на полпути — даём ему завершиться
+        // Или: явно откатываем
     }
 }
 ```
 
-### No Async Drop
+### Нет асинхронного Drop
 
-Rust's `Drop` trait is synchronous — you **cannot** `.await` inside `drop()`. This is a frequent source of confusion:
+Трейт `Drop` в Rust синхронный — вы **не можете** вызвать `.await` внутри `drop()`. Это частый источник путаницы:
 
 ```rust
 struct DbConnection { /* ... */ }
 
 impl Drop for DbConnection {
     fn drop(&mut self) {
-        // ❌ Can't do this — drop() is sync!
+        // ❌ Так нельзя — drop() синхронный!
         // self.connection.shutdown().await;
 
-        // ✅ Workaround 1: Spawn a cleanup task (fire-and-forget)
+        // ✅ Обходной путь 1: порождаем задачу очистки (fire-and-forget)
         let conn = self.connection.take();
         tokio::spawn(async move {
             let _ = conn.shutdown().await;
         });
 
-        // ✅ Workaround 2: Use a synchronous close
+        // ✅ Обходной путь 2: синхронное закрытие
         // self.connection.blocking_close();
     }
 }
 ```
 
-**Best practice**: Provide an explicit `async fn close(self)` method and document that callers should use it. Rely on `Drop` only as a safety net, not the primary cleanup path.
+**Лучшая практика**: предоставьте явный метод `async fn close(self)` и задокументируйте, что вызывающий код должен использовать его. Полагайтесь на `Drop` только как на страховочную сетку, а не как на основной путь очистки.
 
-### select! Fairness and Starvation
+### Справедливость и голодание в select!
 
 ```rust
 use tokio::sync::mpsc;
 
-// ❌ UNFAIR: busy_stream always wins, slow_stream starves
+// ❌ НЕСПРАВЕДЛИВО: busy_stream всегда побеждает, slow_stream голодает
 async fn unfair(mut fast: mpsc::Receiver<i32>, mut slow: mpsc::Receiver<i32>) {
     loop {
         tokio::select! {
             Some(v) = fast.recv() => println!("fast: {v}"),
             Some(v) = slow.recv() => println!("slow: {v}"),
-            // If both are ready, tokio randomly picks one.
-            // But if `fast` is ALWAYS ready, `slow` rarely gets polled.
+            // Если готовы оба, tokio выбирает случайно.
+            // Но если `fast` ВСЕГДА готов, `slow` почти никогда не опрашивается.
         }
     }
 }
 
-// ✅ FAIR: Use biased select or drain in batches
+// ✅ СПРАВЕДЛИВО: используем biased select или вычитываем пачками
 async fn fair(mut fast: mpsc::Receiver<i32>, mut slow: mpsc::Receiver<i32>) {
     loop {
         tokio::select! {
-            biased; // Always check in order — explicit priority
+            biased; // Всегда проверяем по порядку — явный приоритет
 
-            Some(v) = slow.recv() => println!("slow: {v}"),  // Priority!
+            Some(v) = slow.recv() => println!("slow: {v}"),  // Приоритет!
             Some(v) = fast.recv() => println!("fast: {v}"),
         }
     }
 }
 ```
 
-### Accidental Sequential Execution
+### Случайное последовательное выполнение
 
 ```rust
-// ❌ SEQUENTIAL: Takes 2 seconds total
+// ❌ ПОСЛЕДОВАТЕЛЬНО: занимает в сумме 2 секунды
 async fn slow() {
-    let a = fetch("url_a").await; // 1 second
-    let b = fetch("url_b").await; // 1 second (waits for a to finish first!)
+    let a = fetch("url_a").await; // 1 секунда
+    let b = fetch("url_b").await; // 1 секунда (ждёт, пока завершится a!)
 }
 
-// ✅ CONCURRENT: Takes 1 second total
+// ✅ КОНКУРЕНТНО: занимает в сумме 1 секунду
 async fn fast() {
     let (a, b) = tokio::join!(
-        fetch("url_a"), // Both start immediately
+        fetch("url_a"), // Оба стартуют сразу
         fetch("url_b"),
     );
 }
 
-// ✅ ALSO CONCURRENT: Using let + join
+// ✅ ТОЖЕ КОНКУРЕНТНО: через let + join
 async fn also_fast() {
-    let fut_a = fetch("url_a"); // Create future (lazy — not started yet)
-    let fut_b = fetch("url_b"); // Create future
-    let (a, b) = tokio::join!(fut_a, fut_b); // NOW both run concurrently
+    let fut_a = fetch("url_a"); // Создаём future (ленивый — ещё не запущен)
+    let fut_b = fetch("url_b"); // Создаём future
+    let (a, b) = tokio::join!(fut_a, fut_b); // ТЕПЕРЬ оба выполняются конкурентно
 }
 ```
 
-> **Trap**: `let a = fetch(url).await; let b = fetch(url).await;` is sequential!
-> The second `.await` doesn't start until the first finishes. Use `join!` or
-> `spawn` for concurrency.
+> **Ловушка**: `let a = fetch(url).await; let b = fetch(url).await;` выполняется последовательно!
+> Второй `.await` не начнётся, пока не завершится первый. Для конкурентности используйте `join!` или
+> `spawn`.
 
-## Case Study: Debugging a Hung Production Service
+## Разбор кейса: отладка зависшего продакшен-сервиса
 
-A real-world scenario: a service handles requests fine for 10 minutes, then stops responding. No errors in logs. CPU at 0%.
+Реальный сценарий: сервис 10 минут обрабатывает запросы нормально, а потом перестаёт отвечать. В логах нет ошибок. Загрузка CPU — 0%.
 
-**Diagnosis steps:**
+**Шаги диагностики:**
 
-1. **Attach `tokio-console`** — reveals 200+ tasks stuck in `Pending` state
-2. **Check task details** — all waiting on the same `Mutex::lock().await`
-3. **Root cause** — one task held a `std::sync::MutexGuard` across an `.await` and panicked, poisoning the mutex. All other tasks now fail on `lock().unwrap()`
+1. **Подключаем `tokio-console`** — показывает 200+ задач, застрявших в состоянии `Pending`
+2. **Смотрим детали задач** — все ждут одного и того же `Mutex::lock().await`
+3. **Первопричина** — одна задача удерживала `std::sync::MutexGuard` через `.await` и упала с паникой, «отравив» мьютекс. Теперь все остальные задачи падают на `lock().unwrap()`
 
-**The fix:**
+**Исправление:**
 
-| Before (broken) | After (fixed) |
-|-----------------|---------------|
+| Было (сломано) | Стало (исправлено) |
+|----------------|--------------------|
 | `std::sync::Mutex` | `tokio::sync::Mutex` |
-| `.lock().unwrap()` across `.await` | Scope lock before `.await` |
-| No timeout on lock acquisition | `tokio::time::timeout(dur, mutex.lock())` |
-| No recovery on poisoned mutex | `tokio::sync::Mutex` doesn't poison |
+| `.lock().unwrap()` через `.await` | Ограничиваем блокировку до `.await` |
+| Нет таймаута на получение блокировки | `tokio::time::timeout(dur, mutex.lock())` |
+| Нет восстановления после отравленного мьютекса | `tokio::sync::Mutex` не отравляется |
 
-**Prevention checklist:**
-- [ ] Use `tokio::sync::Mutex` if the guard crosses any `.await`
-- [ ] Add `#[tracing::instrument]` to async functions for span tracking
-- [ ] Run `tokio-console` in staging to catch hung tasks early
-- [ ] Add health check endpoints that verify task responsiveness
+**Чек-лист профилактики:**
+- [ ] Используйте `tokio::sync::Mutex`, если guard пересекает любой `.await`
+- [ ] Добавляйте `#[tracing::instrument]` к асинхронным функциям для отслеживания span
+- [ ] Запускайте `tokio-console` в staging, чтобы рано замечать зависшие задачи
+- [ ] Добавляйте эндпоинты проверки работоспособности, которые проверяют отзывчивость задач
 
 <details>
-<summary><strong>🏋️ Exercise: Spot the Bugs</strong> (click to expand)</summary>
+<summary><strong>🏋️ Упражнение: найдите ошибки</strong> (нажмите, чтобы раскрыть)</summary>
 
-**Challenge**: Find all the async pitfalls in this code and fix them.
+**Задача**: найдите все асинхронные ловушки в этом коде и исправьте их.
 
 ```rust
 use std::sync::Mutex;
@@ -295,10 +288,10 @@ async fn process_requests(urls: Vec<String>) -> Vec<String> {
     
     for url in &urls {
         let response = reqwest::get(url).await.unwrap().text().await.unwrap();
-        std::thread::sleep(std::time::Duration::from_millis(100)); // Rate limit
+        std::thread::sleep(std::time::Duration::from_millis(100)); // Ограничение частоты
         let mut guard = results.lock().unwrap();
         guard.push(response);
-        expensive_parse(&guard).await; // Parse all results so far
+        expensive_parse(&guard).await; // Разбираем все результаты на данный момент
     }
     
     results.into_inner().unwrap()
@@ -306,14 +299,14 @@ async fn process_requests(urls: Vec<String>) -> Vec<String> {
 ```
 
 <details>
-<summary>🔑 Solution</summary>
+<summary>🔑 Решение</summary>
 
-**Bugs found:**
+**Найденные ошибки:**
 
-1. **Sequential fetches** — URLs are fetched one at a time instead of concurrently
-2. **`std::thread::sleep`** — Blocks the executor thread
-3. **MutexGuard held across `.await`** — `guard` is alive when `expensive_parse` is awaited
-4. **No concurrency** — Should use `join!` or `FuturesUnordered`
+1. **Последовательные запросы** — URL запрашиваются по одному, а не конкурентно
+2. **`std::thread::sleep`** — блокирует поток исполнителя
+3. **MutexGuard удерживается через `.await`** — `guard` жив, когда ожидается `expensive_parse`
+4. **Нет конкурентности** — следовало использовать `join!` или `FuturesUnordered`
 
 ```rust
 use tokio::sync::Mutex;
@@ -321,19 +314,19 @@ use std::sync::Arc;
 use futures::stream::{self, StreamExt};
 
 async fn process_requests(urls: Vec<String>) -> Vec<String> {
-    // Fix 4: Process URLs concurrently with buffer_unordered
+    // Исправление 4: обрабатываем URL конкурентно с помощью buffer_unordered
     let results: Vec<String> = stream::iter(urls)
         .map(|url| async move {
             let response = reqwest::get(&url).await.unwrap().text().await.unwrap();
-            // Fix 2: Use tokio::time::sleep instead of std::thread::sleep
+            // Исправление 2: используем tokio::time::sleep вместо std::thread::sleep
             tokio::time::sleep(std::time::Duration::from_millis(100)).await;
             response
         })
-        .buffer_unordered(10) // Up to 10 concurrent requests
+        .buffer_unordered(10) // До 10 одновременных запросов
         .collect()
         .await;
 
-    // Fix 3: Parse after collecting — no mutex needed at all!
+    // Исправление 3: разбираем после сбора — мьютекс вообще не нужен!
     for result in &results {
         expensive_parse(result).await;
     }
@@ -342,20 +335,20 @@ async fn process_requests(urls: Vec<String>) -> Vec<String> {
 }
 ```
 
-**Key takeaway**: Often you can restructure async code to eliminate mutexes entirely. Collect results with streams/join, then process. Simpler, faster, no deadlock risk.
+**Ключевой вывод**: часто асинхронный код можно перестроить так, чтобы мьютексы не понадобились вовсе. Собирайте результаты через потоки или join, а затем обрабатывайте. Это проще, быстрее и без риска взаимной блокировки (deadlock).
 
 </details>
 </details>
 
 ---
 
-### Debugging Async Code
+### Отладка асинхронного кода
 
-Async stack traces are notoriously cryptic — they show the executor's poll loop rather than your logical call chain. Here are the essential debugging tools.
+Асинхронные трассировки стека известны своей невнятностью — они показывают цикл опроса исполнителя, а не вашу логическую цепочку вызовов. Ниже перечислены основные инструменты отладки.
 
-#### tokio-console: Real-Time Task Inspector
+#### tokio-console: инспектор задач в реальном времени
 
-[tokio-console](https://github.com/tokio-rs/console) gives you an `htop`-like view of every spawned task: its state, poll duration, waker activity, and resource usage.
+[tokio-console](https://github.com/tokio-rs/console) даёт вид, похожий на `htop`, для каждой порождённой задачи: её состояние, длительность опроса, активность waker и использование ресурсов.
 
 ```toml
 # Cargo.toml
@@ -367,59 +360,59 @@ tokio = { version = "1", features = ["full", "tracing"] }
 ```rust
 #[tokio::main]
 async fn main() {
-    console_subscriber::init(); // Replaces the default tracing subscriber
-    // ... rest of your application
+    console_subscriber::init(); // Заменяет стандартный подписчик tracing
+    // ... остальная часть вашего приложения
 }
 ```
 
-Then in another terminal:
+Затем в другом терминале:
 
 ```bash
-$ RUSTFLAGS="--cfg tokio_unstable" cargo run   # Required compile-time flag
-$ tokio-console                                # Connects to 127.0.0.1:6669
+$ RUSTFLAGS="--cfg tokio_unstable" cargo run   # Обязательный флаг на этапе компиляции
+$ tokio-console                                # Подключается к 127.0.0.1:6669
 ```
 
-#### tracing + #[instrument]: Structured Logging for Async
+#### tracing + #[instrument]: структурированное логирование для async
 
-The [`tracing`](https://docs.rs/tracing) crate understands `Future` lifetimes. Spans stay open across `.await` points, giving you a logical call stack even when the OS thread has moved on:
+Крейт [`tracing`](https://docs.rs/tracing) понимает времена жизни `Future`. Span остаются открытыми через точки `.await`, давая логический стек вызовов, даже когда поток ОС уже переключился на другую работу:
 
 ```rust
 use tracing::{info, instrument};
 
 #[instrument(skip(db_pool), fields(user_id = %user_id))]
 async fn handle_request(user_id: u64, db_pool: &Pool) -> Result<Response> {
-    info!("looking up user");
-    let user = db_pool.get_user(user_id).await?;  // span stays open across .await
-    info!(email = %user.email, "found user");
-    let orders = fetch_orders(user_id).await?;     // still the same span
+    info!("ищем пользователя");
+    let user = db_pool.get_user(user_id).await?;  // span остаётся открытым через .await
+    info!(email = %user.email, "пользователь найден");
+    let orders = fetch_orders(user_id).await?;     // всё тот же span
     Ok(build_response(user, orders))
 }
 ```
 
-Output (with `tracing_subscriber::fmt::json()`):
+Вывод (с `tracing_subscriber::fmt::json()`):
 
 ```json
-{"timestamp":"...","level":"INFO","span":{"name":"handle_request","user_id":"42"},"message":"looking up user"}
-{"timestamp":"...","level":"INFO","span":{"name":"handle_request","user_id":"42"},"fields":{"email":"a@b.com"},"message":"found user"}
+{"timestamp":"...","level":"INFO","span":{"name":"handle_request","user_id":"42"},"message":"ищем пользователя"}
+{"timestamp":"...","level":"INFO","span":{"name":"handle_request","user_id":"42"},"fields":{"email":"a@b.com"},"message":"пользователь найден"}
 ```
 
-#### Debugging Checklist
+#### Чек-лист отладки
 
-| Symptom | Likely Cause | Tool |
-|---------|-------------|------|
-| Task hangs forever | Missing `.await` or deadlocked `Mutex` | `tokio-console` task view |
-| Low throughput | Blocking call on async thread | `tokio-console` poll-time histogram |
-| `Future is not Send` | Non-Send type held across `.await` | Compiler error + `#[instrument]` to locate |
-| Mysterious cancellation | Parent `select!` dropped a branch | `tracing` span lifecycle events |
+| Симптом | Вероятная причина | Инструмент |
+|---------|-------------------|------------|
+| Задача зависает навсегда | Пропущен `.await` или взаимная блокировка `Mutex` | Представление задач в `tokio-console` |
+| Низкая пропускная способность | Блокирующий вызов в асинхронном потоке | Гистограмма времени опроса в `tokio-console` |
+| `Future is not Send` | Тип !Send удерживается через `.await` | Ошибка компилятора + `#[instrument]` для поиска места |
+| Загадочная отмена | Родительский `select!` отбросил ветку | События жизненного цикла span в `tracing` |
 
-> **Tip**: Enable `RUSTFLAGS="--cfg tokio_unstable"` to get task-level metrics
-> in tokio-console. This is a compile-time flag, not a runtime one.
+> **Совет**: включите `RUSTFLAGS="--cfg tokio_unstable"`, чтобы получить метрики на уровне задач
+> в tokio-console. Это флаг времени компиляции, а не времени выполнения.
 
-### Testing Async Code
+### Тестирование асинхронного кода
 
-Async code introduces unique testing challenges — you need a runtime, time control, and strategies for testing concurrent behavior.
+Асинхронный код создаёт особые трудности для тестирования: нужны рантайм, управление временем и стратегии проверки конкурентного поведения.
 
-**Basic async tests** with `#[tokio::test]`:
+**Базовые асинхронные тесты** с `#[tokio::test]`:
 
 ```rust
 // Cargo.toml
@@ -432,7 +425,7 @@ async fn test_basic_async() {
     assert_eq!(result, "expected");
 }
 
-// Single-threaded test (useful for !Send types):
+// Однопоточный тест (полезно для типов !Send):
 #[tokio::test(flavor = "current_thread")]
 async fn test_single_threaded() {
     let rc = std::rc::Rc::new(42);
@@ -440,10 +433,10 @@ async fn test_single_threaded() {
     assert_eq!(val, 42);
 }
 
-// Multi-threaded with explicit worker count:
+// Многопоточный тест с явным количеством воркеров:
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_concurrent_behavior() {
-    // Tests race conditions with real concurrency
+    // Проверяет гонки при реальной конкурентности
     let counter = std::sync::Arc::new(std::sync::atomic::AtomicU32::new(0));
     let c1 = counter.clone();
     let c2 = counter.clone();
@@ -457,27 +450,27 @@ async fn test_concurrent_behavior() {
 }
 ```
 
-**Time manipulation** — test timeouts without actually waiting:
+**Управление временем** — тестируем таймауты, не дожидаясь их:
 
 ```rust
 use tokio::time::{self, Duration, Instant};
 
 #[tokio::test]
 async fn test_timeout_behavior() {
-    // Pause time — sleep() advances instantly, no real wall-clock delay
+    // Останавливаем время — sleep() переходит вперёд мгновенно, без реальной задержки
     time::pause();
 
     let start = Instant::now();
-    time::sleep(Duration::from_secs(3600)).await; // "waits" 1 hour — takes 0ms
+    time::sleep(Duration::from_secs(3600)).await; // «ждём» 1 час — занимает 0 мс
     assert!(start.elapsed() >= Duration::from_secs(3600));
-    // Test ran in milliseconds, not an hour!
+    // Тест выполнился за миллисекунды, а не за час!
 }
 
 #[tokio::test]
 async fn test_retry_timing() {
     time::pause();
 
-    // Test that our retry logic waits the expected durations
+    // Проверяем, что логика повторов ждёт ожидаемое время
     let start = Instant::now();
     let result = retry_with_backoff(|| async {
         Err::<(), _>("simulated failure")
@@ -485,7 +478,7 @@ async fn test_retry_timing() {
     .await;
 
     assert!(result.is_err());
-    // 1s + 2s + 4s = 7s of backoff (exponential)
+    // 1с + 2с + 4с = 7с ожидания (экспоненциально)
     assert!(start.elapsed() >= Duration::from_secs(7));
 }
 
@@ -496,30 +489,30 @@ async fn test_deadline_exceeded() {
     let result = tokio::time::timeout(
         Duration::from_secs(5),
         async {
-            // Simulate slow operation
+            // Имитируем медленную операцию
             time::sleep(Duration::from_secs(10)).await;
             "done"
         }
     ).await;
 
-    assert!(result.is_err()); // Timed out
+    assert!(result.is_err()); // Таймаут
 }
 ```
 
-**Mocking async dependencies** — use trait objects or generics:
+**Мокирование асинхронных зависимостей** — используйте трейт-объекты или дженерики:
 
 ```rust
-// Define a trait for the dependency:
+// Определяем трейт для зависимости:
 trait Storage {
     async fn get(&self, key: &str) -> Option<String>;
     async fn set(&self, key: &str, value: String);
 }
 
-// Production implementation:
+// Продакшен-реализация:
 struct RedisStorage { /* ... */ }
 impl Storage for RedisStorage {
     async fn get(&self, key: &str) -> Option<String> {
-        // Real Redis call
+        // Реальный вызов Redis
         todo!()
     }
     async fn set(&self, key: &str, value: String) {
@@ -527,7 +520,7 @@ impl Storage for RedisStorage {
     }
 }
 
-// Test mock:
+// Тестовый мок:
 struct MockStorage {
     data: std::sync::Mutex<std::collections::HashMap<String, String>>,
 }
@@ -547,7 +540,7 @@ impl Storage for MockStorage {
     }
 }
 
-// Tested function is generic over Storage:
+// Тестируемая функция обобщена по Storage:
 async fn cache_lookup<S: Storage>(store: &S, key: &str) -> String {
     match store.get(key).await {
         Some(val) => val,
@@ -563,18 +556,18 @@ async fn cache_lookup<S: Storage>(store: &S, key: &str) -> String {
 async fn test_cache_miss_then_hit() {
     let mock = MockStorage::new();
 
-    // First call: miss → computes and stores
+    // Первый вызов: промах → вычисляем и сохраняем
     let val = cache_lookup(&mock, "key1").await;
     assert_eq!(val, "computed");
 
-    // Second call: hit → returns stored value
+    // Второй вызов: попадание → возвращаем сохранённое значение
     let val = cache_lookup(&mock, "key1").await;
     assert_eq!(val, "computed");
     assert!(mock.data.lock().unwrap().contains_key("key1"));
 }
 ```
 
-**Testing channels and task communication**:
+**Тестирование каналов и обмена между задачами**:
 
 ```rust
 #[tokio::test]
@@ -585,7 +578,7 @@ async fn test_producer_consumer() {
         for i in 0..5 {
             tx.send(i).await.unwrap();
         }
-        // tx dropped here — channel closes
+        // tx уничтожается здесь — канал закрывается
     });
 
     let mut received = Vec::new();
@@ -597,23 +590,21 @@ async fn test_producer_consumer() {
 }
 ```
 
-| Test Pattern | When to Use | Key Tool |
-|-------------|-------------|----------|
-| `#[tokio::test]` | All async tests | `tokio = { features = ["macros", "rt"] }` |
-| `time::pause()` | Testing timeouts, retries, periodic tasks | `tokio::time::pause()` |
-| Trait mocking | Testing business logic without I/O | Generic `<S: Storage>` |
-| `current_thread` flavor | Testing `!Send` types or deterministic scheduling | `#[tokio::test(flavor = "current_thread")]` |
-| `multi_thread` flavor | Testing race conditions | `#[tokio::test(flavor = "multi_thread")]` |
+| Паттерн тестирования | Когда использовать | Ключевой инструмент |
+|---------------------|--------------------|---------------------|
+| `#[tokio::test]` | Все асинхронные тесты | `tokio = { features = ["macros", "rt"] }` |
+| `time::pause()` | Тестирование таймаутов, повторов, периодических задач | `tokio::time::pause()` |
+| Мокирование через трейты | Тестирование бизнес-логики без I/O | Обобщение `<S: Storage>` |
+| Вариант `current_thread` | Тестирование типов `!Send` или детерминированного планирования | `#[tokio::test(flavor = "current_thread")]` |
+| Вариант `multi_thread` | Тестирование гонок | `#[tokio::test(flavor = "multi_thread")]` |
 
-> **Key Takeaways — Common Pitfalls**
-> - Never block the executor — use `spawn_blocking` for CPU/sync work
-> - Never hold a `MutexGuard` across `.await` — scope locks tightly or use `tokio::sync::Mutex`
-> - Cancellation drops the future instantly — use "cancel-safe" patterns for partial operations
-> - Use `tokio-console` and `#[tracing::instrument]` for debugging async code
-> - Test async code with `#[tokio::test]` and `time::pause()` for deterministic timing
+> **Ключевые выводы — типичные ловушки**
+> - Никогда не блокируйте исполнитель — используйте `spawn_blocking` для работы с CPU или синхронного кода
+> - Никогда не удерживайте `MutexGuard` через `.await` — ограничивайте блокировки или используйте `tokio::sync::Mutex`
+> - Отмена мгновенно уничтожает future — для частично выполненных операций используйте паттерны, устойчивые к отмене (cancel-safe)
+> - Используйте `tokio-console` и `#[tracing::instrument]` для отладки асинхронного кода
+> - Тестируйте асинхронный код через `#[tokio::test]` и `time::pause()` для детерминированного тайминга
 
-> **See also:** [Ch 8 — Tokio Deep Dive](ch08-tokio-deep-dive.md) for sync primitives, [Ch 13 — Production Patterns](ch13-production-patterns.md) for graceful shutdown and structured concurrency
+> **См. также:** [Гл. 8 — Глубокое погружение в Tokio](ch08-tokio-deep-dive.md) — примитивы синхронизации, [Гл. 13 — Продакшен-паттерны](ch13-production-patterns.md) — graceful shutdown и структурированную конкурентность
 
 ***
-
-
