@@ -1,103 +1,105 @@
 <div style="background-color: #d9d9d9; padding: 16px; border-radius: 6px; color: #000000;">
 
-**License** This project is dual-licensed under the [MIT License](LICENSE) and [Creative Commons Attribution 4.0 International (CC-BY-4.0)](LICENSE-DOCS).
+**Лицензия** Проект распространяется по двойной лицензии: [MIT License](LICENSE) и [Creative Commons Attribution 4.0 International (CC-BY-4.0)](LICENSE-DOCS).
 
 </div>
 
 <div style="background-color: #d9d9d9; padding: 16px; border-radius: 6px; color: #000000;">
 
-**Trademarks** This project may contain trademarks or logos for projects, products, or services. Authorized use of Microsoft trademarks or logos is subject to and must follow [Microsoft's Trademark & Brand Guidelines](https://www.microsoft.com/en-us/legal/intellectualproperty/trademarks/usage/general). Use of Microsoft trademarks or logos in modified versions of this project must not cause confusion or imply Microsoft sponsorship. Any use of third-party trademarks or logos are subject to those third-party's policies.
+**Товарные знаки** Проект может содержать товарные знаки или логотипы проектов, продуктов и сервисов. Использование товарных знаков и логотипов Microsoft допускается только в соответствии с [правилами использования товарных знаков и фирменного стиля Microsoft](https://www.microsoft.com/en-us/legal/intellectualproperty/trademarks/usage/general). Использование товарных знаков или логотипов Microsoft в изменённых версиях проекта не должно вводить в заблуждение и создавать впечатление поддержки со стороны Microsoft. Использование сторонних товарных знаков и логотипов регулируется политиками их правообладателей.
 
 </div>
 
-# Rust Training Books
+> *Это перевод README на русский язык. Для юридических формулировок (лицензии и товарные знаки) приоритет имеет английская версия.*
 
-Seven training courses covering Rust from different programming backgrounds, plus deep-dives on async, advanced patterns, and engineering practices.
+# Учебные книги по Rust
 
-This material combines original content with ideas and examples inspired by some of the best resources in the Rust ecosystem. The goal is to present an in-depth, technically accurate curriculum that weaves together knowledge scattered across books, blogs, conference talks, and video series into a cohesive, pedagogically structured experience.
+Семь учебных курсов по Rust для разработчиков с разным опытом, а также углублённые материалы по async, продвинутым паттернам и инженерным практикам.
 
-> **Disclaimer:** These books are training material, not an authoritative reference. While we strive for accuracy, always verify critical details against the [official Rust documentation](https://doc.rust-lang.org/) and the [Rust Reference](https://doc.rust-lang.org/reference/).
+Материалы сочетают оригинальное содержание с идеями и примерами, вдохновлёнными лучшими ресурсами экосистемы Rust. Цель — подробная и технически точная программа, которая собирает знания, разбросанные по книгам, блогам, докладам и видеосериям, в цельный и педагогически выстроенный курс.
 
-### Inspirations & Acknowledgments
+> **Важно:** Эти книги — учебные материалы, а не авторитетный справочник. Мы стремимся к точности, но критически важные детали всегда сверяйте с [официальной документацией Rust](https://doc.rust-lang.org/) и [Rust Reference](https://doc.rust-lang.org/reference/).
 
-- [**The Rust Programming Language**](https://doc.rust-lang.org/book/) — the foundation everything builds on
-- [**Jon Gjengset**](https://www.youtube.com/c/JonGjengset) — deep-dive streams on advanced Rust internals, `Crust of Rust` series
-- [**withoutboats**](https://without.boats/blog/) — async design, `Pin`, and the futures model
-- [**fasterthanlime (Amos)**](https://fasterthanli.me/) — systems programming from first principles, engaging long-form explorations
-- [**Mara Bos**](https://marabos.nl/) — *Rust Atomics and Locks*, concurrency primitives
-- [**Aleksey Kladov (matklad)**](https://matklad.github.io/) — Rust analyzer insights, API design, error handling patterns
-- [**Niko Matsakis**](https://smallcultfollowing.com/babysteps/) — language design, borrow checker internals, Polonius
-- [**Rust by Example**](https://doc.rust-lang.org/rust-by-example/) and [**Rustonomicon**](https://doc.rust-lang.org/nomicon/) — practical patterns and unsafe deep-dives
-- [**This Week in Rust**](https://this-week-in-rust.org/) — community discoveries that shaped many examples
-- …and many others in the **Rust community at large** whose blog posts, conference talks, RFCs, and forum discussions have informed this material — too numerous to list individually, but deeply appreciated
+### Источники вдохновения и благодарности
 
-## 📖 Start Reading
+- [**The Rust Programming Language**](https://doc.rust-lang.org/book/) — основа, на которой строится всё остальное
+- [**Jon Gjengset**](https://www.youtube.com/c/JonGjengset) — глубокие стримы о внутреннем устройстве Rust, серия `Crust of Rust`
+- [**withoutboats**](https://without.boats/blog/) — дизайн async, `Pin` и модель futures
+- [**fasterthanlime (Amos)**](https://fasterthanli.me/) — системное программирование с нуля и подробные развёрнутые разборы
+- [**Mara Bos**](https://marabos.nl/) — *Rust Atomics and Locks*, примитивы конкурентности
+- [**Aleksey Kladov (matklad)**](https://matklad.github.io/) — идеи о rust-analyzer, дизайне API и обработке ошибок
+- [**Niko Matsakis**](https://smallcultfollowing.com/babysteps/) — дизайн языка, внутреннее устройство borrow checker, Polonius
+- [**Rust by Example**](https://doc.rust-lang.org/rust-by-example/) и [**Rustonomicon**](https://doc.rust-lang.org/nomicon/) — практические паттерны и углублённое изучение unsafe
+- [**This Week in Rust**](https://this-week-in-rust.org/) — находки сообщества, которые повлияли на многие примеры
+- …и многие другие участники **сообщества Rust**, чьи статьи, доклады, RFC и обсуждения на форумах легли в основу этих материалов. Их слишком много, чтобы перечислить поимённо, но мы искренне благодарны каждому
 
-Pick the book that matches your background. Books are grouped by complexity so you can chart a learning path:
+## 📖 С чего начать
 
-| Level | Description |
-|-------|-------------|
-| 🟢 **Bridge** | Learn Rust coming from another language — start here |
-| 🔵 **Deep Dive** | Focused exploration of a major Rust subsystem |
-| 🟡 **Advanced** | Patterns and techniques for experienced Rustaceans |
-| 🟣 **Expert** | Cutting-edge type-level and correctness techniques |
-| 🟤 **Practices** | Engineering, tooling, and production readiness |
+Выберите книгу, которая соответствует вашему опыту. Книги сгруппированы по сложности, чтобы вы могли построить путь обучения:
 
-| Book | Level | Who it's for |
-|------|-------|-------------|
-| [**Rust for C/C++ Programmers**](c-cpp-book/src/SUMMARY.md) | 🟢 Bridge | Move semantics, RAII, FFI, embedded, no_std |
-| [**Rust for C# Programmers**](csharp-book/src/SUMMARY.md) | 🟢 Bridge | Swift / C# / Java → ownership & type system |
-| [**Rust for Python Programmers**](python-book/src/SUMMARY.md) | 🟢 Bridge | Dynamic → static typing, GIL-free concurrency |
-| [**Async Rust**](async-book/src/SUMMARY.md) | 🔵 Deep Dive | Tokio, streams, cancellation safety |
-| [**Rust Patterns**](rust-patterns-book/src/SUMMARY.md) | 🟡 Advanced | Pin, allocators, lock-free structures, unsafe |
-| [**Type-Driven Correctness**](type-driven-correctness-book/src/SUMMARY.md) | 🟣 Expert | Type-state, phantom types, capability tokens |
-| [**Rust Engineering Practices**](engineering-book/src/SUMMARY.md) | 🟤 Practices | Build scripts, cross-compilation, CI/CD, Miri |
+| Уровень | Описание |
+|---------|----------|
+| 🟢 **Мост** | Изучение Rust для тех, кто пришёл из другого языка — начните отсюда |
+| 🔵 **Погружение** | Углублённое изучение крупной подсистемы Rust |
+| 🟡 **Продвинутый** | Паттерны и приёмы для опытных Rust-разработчиков |
+| 🟣 **Эксперт** | Передовые техники на уровне типов и корректности |
+| 🟤 **Практики** | Инженерия, инструменты и готовность к продакшну |
 
-Each book has 15–16 chapters with Mermaid diagrams, editable Rust playgrounds, exercises, and full-text search.
+| Книга | Уровень | Для кого |
+|-------|---------|----------|
+| [**Rust для программистов C/C++**](c-cpp-book/src/SUMMARY.md) | 🟢 Мост | Семантика перемещения, RAII, FFI, embedded, no_std |
+| [**Rust для программистов C#**](csharp-book/src/SUMMARY.md) | 🟢 Мост | Swift / C# / Java → владение и система типов |
+| [**Rust для программистов Python**](python-book/src/SUMMARY.md) | 🟢 Мост | От динамической типизации к статической, конкурентность без GIL |
+| [**Async Rust**](async-book/src/SUMMARY.md) | 🔵 Погружение | Tokio, потоки (streams), отмена и безопасность при отмене |
+| [**Паттерны Rust**](rust-patterns-book/src/SUMMARY.md) | 🟡 Продвинутый | Pin, аллокаторы, lock-free-структуры, unsafe |
+| [**Корректность на уровне типов**](type-driven-correctness-book/src/SUMMARY.md) | 🟣 Эксперт | Typestate, phantom-типы, capability-токены |
+| [**Инженерные практики Rust**](engineering-book/src/SUMMARY.md) | 🟤 Практики | Build scripts, кросс-компиляция, CI/CD, Miri |
 
-> **Tip:** You can read the markdown source directly on GitHub, or browse the rendered site with sidebar navigation and search at the GitHub Pages site (link in the repo's About section).
+В каждой книге 15–16 глав с диаграммами Mermaid, редактируемыми песочницами Rust, упражнениями и полнотекстовым поиском.
+
+> **Совет:** Исходный markdown можно читать прямо на GitHub или открыть сайт с навигацией по главам и поиском на GitHub Pages (ссылка указана в разделе About репозитория).
 >
-> **Local serving:** For the best reading experience (keyboard navigation between chapters, instant search, offline access), clone the repo and run:
+> **Локальный просмотр:** Для лучшего опыта чтения (навигация по главам с клавиатуры, мгновенный поиск, работа без интернета) склонируйте репозиторий и выполните:
 > ```
-> # Install Rust via rustup if you don't have it yet:
+> # Если Rust ещё не установлен, поставьте его через rustup:
 > # https://rustup.rs/
 >
 > cargo install mdbook mdbook-mermaid
-> cargo xtask serve          # builds all books and opens a local server
+> cargo xtask serve          # собирает все книги и открывает локальный сервер
 > ```
 
 ---
 
-## 🔧 For Maintainers
+## 🔧 Для мейнтейнеров
 
 <details>
-<summary>Building, serving, and editing the books locally</summary>
+<summary>Сборка, просмотр и редактирование книг локально</summary>
 
-### Prerequisites
+### Требования
 
-Install [Rust via **rustup**](https://rustup.rs/) if you haven't already, then:
+Установите [Rust через **rustup**](https://rustup.rs/), если у вас его ещё нет, затем выполните:
 
 ```bash
 cargo install mdbook mdbook-mermaid
 ```
 
-### Build & serve
+### Сборка и запуск
 
 ```bash
-cargo xtask build               # Build all books into site/ (local preview)
-cargo xtask serve               # Build and serve at http://localhost:3000
-cargo xtask deploy              # Build all books into docs/ (for GitHub Pages)
-cargo xtask clean               # Remove site/ and docs/
+cargo xtask build               # Собрать все книги в site/ (для локального просмотра)
+cargo xtask serve               # Собрать и запустить на http://localhost:3000
+cargo xtask deploy              # Собрать все книги в docs/ (для GitHub Pages)
+cargo xtask clean               # Удалить site/ и docs/
 ```
 
-To build or serve a single book:
+Чтобы собрать или запустить одну книгу:
 
 ```bash
 cd c-cpp-book && mdbook serve --open    # http://localhost:3000
 ```
 
-### Deployment
+### Публикация
 
-The site auto-deploys to GitHub Pages on push to `master` via `.github/workflows/pages.yml`. No manual steps needed.
+Сайт автоматически публикуется на GitHub Pages при push в `master` через `.github/workflows/pages.yml`. Никаких ручных действий не требуется.
 
 </details>
