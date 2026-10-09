@@ -1,58 +1,58 @@
-# Benchmarking — Measuring What Matters 🟡
+# Бенчмаркинг — измеряем то, что важно 🟡
 
-> **What you'll learn:**
-> - Why naive timing with `Instant::now()` produces unreliable results
-> - Statistical benchmarking with Criterion.rs and the lighter Divan alternative
-> - Profiling hot spots with `perf`, flamegraphs, and PGO
-> - Setting up continuous benchmarking in CI to catch regressions automatically
+> **Чему вы научитесь:**
+> - Почему наивный замер через `Instant::now()` даёт ненадёжные результаты
+> - Статистический бенчмаркинг с Criterion.rs и более лёгкой альтернативой — Divan
+> - Профилирование горячих точек с помощью `perf`, флеймграфов и PGO
+> - Настройка непрерывного бенчмаркинга в CI для автоматического обнаружения регрессий
 >
-> **Cross-references:** [Release Profiles](ch07-release-profiles-and-binary-size.md) — once you find the hot spot, optimize the binary · [CI/CD Pipeline](ch11-putting-it-all-together-a-production-cic.md) — benchmark job in the pipeline · [Code Coverage](ch04-code-coverage-seeing-what-tests-miss.md) — coverage tells you what's tested, benchmarks tell you what's fast
+> **Перекрёстные ссылки:** [Профили релиза](ch07-release-profiles-and-binary-size.md) — когда горячая точка найдена, оптимизируйте бинарник · [CI/CD-конвейер](ch11-putting-it-all-together-a-production-cic.md) — джоба с бенчмарками в конвейере · [Покрытие кода](ch04-code-coverage-seeing-what-tests-miss.md) — покрытие показывает, что протестировано, а бенчмарки — что работает быстро
 
-"We should forget about small efficiencies, say about 97% of the time: premature
-optimization is the root of all evil. Yet we should not pass up our opportunities
-in that critical 3%." — Donald Knuth
+«Мы должны забыть о мелкой эффективности примерно в 97% случаев: преждевременная
+оптимизация — корень всех зол. Однако не стоит упускать возможности в тех критических
+3%.» — Дональд Кнут
 
-The hard part isn't *writing* benchmarks — it's writing benchmarks that produce
-**meaningful, reproducible, actionable** numbers. This chapter covers the tools
-and techniques that get you from "it seems fast" to "we have statistical evidence
-that PR #347 regressed parsing throughput by 4.2%."
+Самое трудное — не *написать* бенчмарки, а написать такие, которые дают **осмысленные,
+воспроизводимые и пригодные для действий** числа. Эта глава описывает инструменты и приёмы,
+которые переводят вас от фразы «кажется, быстро» к «у нас есть статистическое подтверждение,
+что PR #347 снизил пропускную способность парсинга на 4,2%».
 
-### Why Not `std::time::Instant`?
+### Почему не `std::time::Instant`?
 
-The temptation:
+Соблазн:
 
 ```rust
-// ❌ Naive benchmarking — unreliable results
+// ❌ Наивный бенчмарк — ненадёжные результаты
 use std::time::Instant;
 
 fn main() {
     let start = Instant::now();
     let result = parse_device_query_output(&sample_data);
     let elapsed = start.elapsed();
-    println!("Parsing took {:?}", elapsed);
-    // Problem 1: Compiler may optimize away `result` (dead code elimination)
-    // Problem 2: Single sample — no statistical significance
-    // Problem 3: CPU frequency scaling, thermal throttling, other processes
-    // Problem 4: Cold cache vs warm cache not controlled
+    println!("Разбор занял {:?}", elapsed);
+    // Проблема 1: компилятор может оптимизировать `result` (исключение мёртвого кода)
+    // Проблема 2: одно измерение — нет статистической значимости
+    // Проблема 3: масштабирование частоты CPU, тепловое ограничение, другие процессы
+    // Проблема 4: холодный и горячий кеш не контролируются
 }
 ```
 
-Problems with manual timing:
-1. **Dead code elimination** — the compiler may skip the computation entirely if
-   the result isn't used.
-2. **No warm-up** — the first run includes cache misses, JIT effects (irrelevant
-   in Rust, but OS page faults apply), and lazy initialization.
-3. **No statistical analysis** — a single measurement tells you nothing about
-   variance, outliers, or confidence intervals.
-4. **No regression detection** — you can't compare against previous runs.
+Проблемы ручного замера:
+1. **Исключение мёртвого кода** — компилятор может вообще пропустить вычисление, если
+   результат не используется.
+2. **Нет прогрева** — первый запуск включает промахи кеша, ошибки страниц ОС и ленивую
+   инициализацию. (JIT-эффекты к Rust неприменимы, а вот ошибки страниц ОС — применимы.)
+3. **Нет статистического анализа** — одно измерение ничего не говорит о разбросе,
+   выбросах или доверительных интервалах.
+4. **Нет обнаружения регрессий** — нельзя сравнить с предыдущими запусками.
 
-### Criterion.rs — Statistical Benchmarking
+### Criterion.rs — статистический бенчмаркинг
 
-[Criterion.rs](https://bheisler.github.io/criterion.rs/book/) is the de facto
-standard for Rust micro-benchmarks. It uses statistical methods to produce
-reliable measurements and detects performance regressions automatically.
+[Criterion.rs](https://bheisler.github.io/criterion.rs/book/) — де-факто стандарт
+для микробенчмарков в Rust. Он использует статистические методы, чтобы получать надёжные
+измерения, и автоматически обнаруживает регрессии производительности.
 
-**Setup:**
+**Настройка:**
 
 ```toml
 # Cargo.toml
@@ -61,16 +61,16 @@ criterion = { version = "0.5", features = ["html_reports", "cargo_bench_support"
 
 [[bench]]
 name = "parsing_bench"
-harness = false  # Use Criterion's harness, not the built-in test harness
+harness = false  # Используем harness Criterion, а не встроенный тестовый harness
 ```
 
-**A complete benchmark:**
+**Полный бенчмарк:**
 
 ```rust
 // benches/parsing_bench.rs
 use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
 
-/// Data type for parsed GPU information
+/// Тип данных для разобранной информации о GPU
 #[derive(Debug, Clone)]
 struct GpuInfo {
     index: u32,
@@ -79,7 +79,7 @@ struct GpuInfo {
     power_w: f64,
 }
 
-/// The function under test — simulate parsing device-query CSV output
+/// Тестируемая функция — имитирует разбор CSV-вывода device-query
 fn parse_gpu_csv(input: &str) -> Vec<GpuInfo> {
     input
         .lines()
@@ -101,7 +101,7 @@ fn parse_gpu_csv(input: &str) -> Vec<GpuInfo> {
 }
 
 fn bench_parse_gpu_csv(c: &mut Criterion) {
-    // Representative test data
+    // Репрезентативные тестовые данные
     let small_input = "0, Acme Accel-V1-80GB, 32, 65.5\n\
                        1, Acme Accel-V1-80GB, 34, 67.2\n";
 
@@ -122,33 +122,33 @@ criterion_group!(benches, bench_parse_gpu_csv);
 criterion_main!(benches);
 ```
 
-**Running and reading results:**
+**Запуск и чтение результатов:**
 
 ```bash
-# Run all benchmarks
+# Запустить все бенчмарки
 cargo bench
 
-# Run a specific benchmark by name
+# Запустить конкретный бенчмарк по имени
 cargo bench -- parse_64
 
-# Output:
+# Вывод:
 # parse_2_gpus        time:   [1.2345 µs  1.2456 µs  1.2578 µs]
 #                      ▲            ▲           ▲
-#                      │       confidence interval
-#                   lower 95%    median    upper 95%
+#                      │       доверительный интервал
+#                   нижняя 95%   медиана   верхняя 95%
 #
 # parse_64_gpus       time:   [38.123 µs  38.456 µs  38.812 µs]
 #                     change: [-1.2345% -0.5678% +0.1234%] (p = 0.12 > 0.05)
 #                     No change in performance detected.
 ```
 
-**What `black_box()` does**: It's a compiler hint that prevents dead-code
-elimination and over-aggressive constant folding. The compiler cannot see
-through `black_box`, so it must actually compute the result.
+**Что делает `black_box()`**: это подсказка компилятору, которая не даёт исключить мёртвый
+код и слишком агрессивно сворачивать константы. Компилятор не может «заглянуть» сквозь
+`black_box`, поэтому ему приходится действительно вычислить результат.
 
-### Parameterized Benchmarks and Benchmark Groups
+### Параметризованные бенчмарки и группы бенчмарков
 
-Compare multiple implementations or input sizes:
+Сравнение нескольких реализаций или размеров входных данных:
 
 ```rust
 // benches/comparison_bench.rs
@@ -157,11 +157,11 @@ use criterion::{criterion_group, criterion_main, Criterion, BenchmarkId, Through
 fn bench_parsing_strategies(c: &mut Criterion) {
     let mut group = c.benchmark_group("csv_parsing");
 
-    // Test across different input sizes
+    // Тестируем на разных размерах входных данных
     for num_gpus in [1, 8, 32, 64, 128] {
         let input = generate_gpu_csv(num_gpus);
 
-        // Set throughput for bytes-per-second reporting
+        // Задаём пропускную способность для отчёта в байтах в секунду
         group.throughput(Throughput::Bytes(input.len() as u64));
 
         group.bench_with_input(
@@ -189,13 +189,13 @@ criterion_group!(benches, bench_parsing_strategies);
 criterion_main!(benches);
 ```
 
-**Output**: Criterion generates an HTML report at `target/criterion/report/index.html`
-with violin plots, comparison charts, and regression analysis — open in a browser.
+**Вывод**: Criterion создаёт HTML-отчёт `target/criterion/report/index.html` с violin-графиками,
+сравнительными диаграммами и анализом регрессий — откройте его в браузере.
 
-### Divan — A Lighter Alternative
+### Divan — более лёгкая альтернатива
 
-[Divan](https://github.com/nvzqz/divan) is a newer benchmarking framework that
-uses attribute macros instead of Criterion's macro DSL:
+[Divan](https://github.com/nvzqz/divan) — более новый фреймворк для бенчмаркинга, который
+использует атрибутные макросы вместо DSL-макросов Criterion:
 
 ```toml
 # Cargo.toml
@@ -235,140 +235,152 @@ fn parse_n_gpus(n: usize) -> Vec<GpuInfo> {
     parse_gpu_csv(black_box(&input))
 }
 
-// Divan output is a clean table:
+// Вывод Divan — аккуратная таблица:
 // ╰─ parse_2_gpus   fastest  │ slowest  │ median   │ mean     │ samples │ iters
 //                   1.234 µs │ 1.567 µs │ 1.345 µs │ 1.350 µs │ 100     │ 1600
 ```
 
-**When to choose Divan over Criterion:**
-- Simpler API (attribute macros, less boilerplate)
-- Faster compilation (fewer dependencies)
-- Good for quick perf checks during development
+**Когда выбирать Divan вместо Criterion:**
+- Проще API (атрибутные макросы, меньше шаблонного кода)
+- Быстрее компиляция (меньше зависимостей)
+- Хорошо подходит для быстрых проверок производительности во время разработки
 
-**When to choose Criterion:**
-- Statistical regression detection across runs
-- HTML reports with charts
-- Established ecosystem, more CI integrations
+**Когда выбирать Criterion:**
+- Статистическое обнаружение регрессий между запусками
+- HTML-отчёты с графиками
+- Устоявшаяся экосистема, больше интеграций с CI
 
-### Profiling with `perf` and Flamegraphs
+### Профилирование с `perf` и флеймграфами
 
-Benchmarks tell you *how fast* — profiling tells you *where the time goes*.
+Бенчмарки показывают *насколько быстро*, а профилирование — *куда уходит время*.
 
 ```bash
-# Step 1: Build with debug info (release speed, debug symbols)
+# Шаг 1: сборка с отладочной информацией (скорость release, отладочные символы)
 cargo build --release
-# Ensure debug info is available:
+# Убедитесь, что отладочная информация доступна:
 # [profile.release]
-# debug = true          # Add this temporarily for profiling
+# debug = true          # Добавьте временно для профилирования
 
-# Step 2: Record with perf
+# Шаг 2: запись с помощью perf
 perf record --call-graph=dwarf ./target/release/diag_tool --run-diagnostics
 
-# Step 3: Generate a flamegraph
-# Install: cargo install flamegraph
-# Install: cargo install addr2line --features=bin (optional, speedup cargo-flamegraph)
+# Шаг 3: построение флеймграфа
+# Установка: cargo install flamegraph
+# Установка: cargo install addr2line --features=bin (необязательно, ускоряет cargo-flamegraph)
 cargo flamegraph --root -- --run-diagnostics
-# Opens an interactive SVG flamegraph
+# Откроется интерактивный SVG-флеймграф
 
-# Alternative: use perf + inferno
+# Альтернатива: perf + inferno
 perf script | inferno-collapse-perf | inferno-flamegraph > flamegraph.svg
 ```
 
-**Reading a flamegraph:**
-- **Width** = time spent in that function (wider = slower)
-- **Height** = call stack depth (taller ≠ slower, just deeper)
-- **Bottom** = entry point, **Top** = leaf functions doing actual work
-- Look for wide plateaus at the top — those are your hot spots
+**Как читать флеймграф:**
+- **Ширина** = время, проведённое в функции (шире = медленнее)
+- **Высота** = глубина стека вызовов (выше ≠ медленнее, просто глубже)
+- **Низ** = точка входа, **верх** = листовые функции, которые выполняют реальную работу
+- Ищите широкие «плато» наверху — это и есть ваши горячие точки
 
-### Profile-Guided Optimization (PGO)
+### Оптимизация по профилю (PGO)
 
-Profile-Guided Optimization (PGO) is a compiler optimization technique for improving performance of CPU-intensive applications. The basic concept of PGO is to collect data about the typical execution of a program (e.g. which branches it is likely to take) and then use this data to inform optimizations such as inlining, machine-code layout, register allocation, etc.
+Profile-Guided Optimization (PGO) — техника оптимизации компилятора, которая повышает
+производительность приложений, интенсивно использующих процессор. Основная идея PGO — собрать
+данные о типичном выполнении программы (например, какие ветвления она выбирает чаще всего),
+а затем использовать эти данные для таких оптимизаций, как инлайнинг, размещение машинного
+кода, распределение регистров и т. д.
 
-There are different ways of collecting data about a program’s execution. One is to run the program inside a profiler (such as `perf`) and another is to create an instrumented binary, that is, a binary that has data collection built into it, and run that. The latter usually provides more accurate data and it is also what is supported by Rustc.
+Данные о выполнении программы можно собирать двумя способами. Первый — запустить программу
+под профилировщиком (например, `perf`). Второй — собрать инструментированный бинарник, то есть
+бинарник со встроенным сбором данных, и запустить его. Второй способ обычно даёт более точные
+данные, и именно он поддерживается rustc.
 
-Below there is an example of instrumentation-based PGO:
+Ниже приведён пример PGO на основе инструментирования:
 
 ```bash
-# Step 1: Build with instrumentation
+# Шаг 1: сборка с инструментированием
 RUSTFLAGS="-Cprofile-generate=/tmp/pgo-data" cargo build --release
 
-# Step 2: Run representative workloads
-./target/release/diag_tool --run-full   # generates profiling data
+# Шаг 2: запуск репрезентативных рабочих нагрузок
+./target/release/diag_tool --run-full   # генерирует данные профилирования
 
-# Step 3: Merge profiling data
-# Use the llvm-profdata that matches rustc's LLVM version:
+# Шаг 3: объединение данных профилирования
+# Используйте llvm-profdata, соответствующий версии LLVM в rustc:
 # $(rustc --print sysroot)/lib/rustlib/x86_64-unknown-linux-gnu/bin/llvm-profdata
-# Or if llvm-tools is installed: rustup component add llvm-tools
+# Или если установлен llvm-tools: rustup component add llvm-tools
 llvm-profdata merge -o /tmp/pgo-data/merged.profdata /tmp/pgo-data/
 
-# Step 4: Rebuild with profiling feedback
+# Шаг 4: пересборка с обратной связью от профилирования
 RUSTFLAGS="-Cprofile-use=/tmp/pgo-data/merged.profdata" cargo build --release
-# Typical improvement: 5-20% for compute-bound code (parsing, crypto, codegen).
-# I/O-bound or syscall-heavy code (like a large project) will see much less benefit
-# because the CPU is mostly waiting, not executing hot loops.
+# Типичный прирост: 5–20% для вычислительно нагруженного кода (парсинг, криптография, кодогенерация).
+# Код, ограниченный I/O или системными вызовами (как большой проект), получит гораздо
+# меньший выигрыш, потому что процессор в основном ждёт, а не выполняет горячие циклы.
 ```
 
-As an alternative to directly using the compiler for PGO, you may choose to go with [cargo-pgo](https://github.com/kobzol/cargo-pgo), which has an intuitive command-line API and saves you the trouble of doing all the manual work.
+Вместо прямого использования компилятора для PGO можно воспользоваться
+[cargo-pgo](https://github.com/kobzol/cargo-pgo) — у него интуитивный интерфейс командной
+строки, и он избавляет от всей ручной работы.
 
-With `cargo-pgo`, the optimization workflow from above can look like that:
+С `cargo-pgo` процесс оптимизации из примера выше выглядит так:
 
 ```bash
-# Step 1: Build with instrumentation
+# Шаг 1: сборка с инструментированием
 cargo pgo build
 
-# Step 2: Run representative workloads
+# Шаг 2: запуск репрезентативных рабочих нагрузок
 cargo pgo run -- --run-full
 
-# Step 3: Rebuild with profiling feedback
+# Шаг 3: пересборка с обратной связью от профилирования
 cargo pgo optimize
 ```
 
-Sampling PGO or SPGO is a more complicated way to perform PGO in a price of reduced runtime overhead compared to instrumentation-based PGO. For now, the best place to read about it is the Clang PGO [manual](https://clang.llvm.org/docs/UsersManual.html#using-sampling-profilers).
+Sampling PGO (SPGO) — более сложный способ выполнить PGO, зато с меньшими накладными
+расходами во время выполнения по сравнению с PGO на основе инструментирования. Пока лучшее
+место, чтобы почитать о нём, — [руководство по PGO для Clang](https://clang.llvm.org/docs/UsersManual.html#using-sampling-profilers).
 
-> **Tip**: Before spending time on PGO, ensure your [release profile](ch07-release-profiles-and-binary-size.md)
-> already has LTO enabled — it typically delivers a bigger win for less effort.
+> **Совет**: прежде чем тратить время на PGO, убедитесь, что в вашем
+> [профиле релиза](ch07-release-profiles-and-binary-size.md) уже включён LTO — обычно это
+> даёт больший эффект при меньших усилиях.
 
-Further reading:
+Дополнительная литература:
 
-* Official Rustc [guide](https://doc.rust-lang.org/rustc/profile-guided-optimization.html) about PGO.
-* [Awesome PGO](https://github.com/zamazan4ik/awesome-pgo) - a collection of PGO benchmarks for real applications, including PGO guides for different compilers (including Sampling PGO)
-* [LLVM BOLT](https://github.com/llvm/llvm-project/blob/main/bolt/README.md) - Post-Link Optimization (PLO) optimization technique. PLO can be used for performing additional optimizations even after applying PGO for getting better performance. `cargo-pgo` supports `llvm-bolt` too.
+* Официальное [руководство](https://doc.rust-lang.org/rustc/profile-guided-optimization.html) rustc по PGO.
+* [Awesome PGO](https://github.com/zamazan4ik/awesome-pgo) — коллекция бенчмарков PGO для реальных приложений, включая руководства по PGO для разных компиляторов (в том числе Sampling PGO)
+* [LLVM BOLT](https://github.com/llvm/llvm-project/blob/main/bolt/README.md) — оптимизация после линковки (Post-Link Optimization, PLO). PLO можно применять для дополнительных оптимизаций даже после PGO, чтобы получить ещё лучшую производительность. `cargo-pgo` также поддерживает `llvm-bolt`.
 
-### `hyperfine` — Quick End-to-End Timing
+### `hyperfine` — быстрый сквозной замер
 
-[`hyperfine`](https://github.com/sharkdp/hyperfine) benchmarks entire commands,
-not individual functions. It's perfect for measuring overall binary performance:
+[`hyperfine`](https://github.com/sharkdp/hyperfine) замеряет целые команды, а не отдельные
+функции. Он идеально подходит для измерения общей производительности бинарника:
 
 ```bash
-# Install
+# Установка
 cargo install hyperfine
-# Or: sudo apt install hyperfine  (Ubuntu 23.04+)
+# Или: sudo apt install hyperfine  (Ubuntu 23.04+)
 
-# Basic benchmark
+# Базовый бенчмарк
 hyperfine './target/release/diag_tool --run-diagnostics'
 
-# Compare two implementations
+# Сравнение двух реализаций
 hyperfine './target/release/diag_tool_v1 --run-diagnostics' \
           './target/release/diag_tool_v2 --run-diagnostics'
 
-# Warm-up runs + minimum iterations
+# Прогревочные запуски + минимальное количество итераций
 hyperfine --warmup 3 --min-runs 10 './target/release/diag_tool --run-all'
 
-# Export results as JSON for CI comparison
+# Экспорт результатов в JSON для сравнения в CI
 hyperfine --export-json bench.json './target/release/diag_tool --run-all'
 ```
 
-**When to use `hyperfine` vs Criterion:**
-- `hyperfine`: whole-binary timing, comparing before/after a refactor, I/O-bound workloads
-- Criterion: micro-benchmarks of individual functions, statistical regression detection
+**Когда использовать `hyperfine`, а когда Criterion:**
+- `hyperfine`: замер всего бинарника, сравнение до и после рефакторинга, нагрузки, ограниченные I/O
+- Criterion: микробенчмарки отдельных функций, статистическое обнаружение регрессий
 
-### Continuous Benchmarking in CI
+### Непрерывный бенчмаркинг в CI
 
-Detect performance regressions before they ship:
+Обнаруживайте регрессии производительности до того, как они попадут в релиз:
 
 ```yaml
 # .github/workflows/bench.yml
-name: Benchmarks
+name: Бенчмарки
 
 on:
   pull_request:
@@ -382,46 +394,46 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
-      - name: Run benchmarks
-        # Requires criterion = { features = ["cargo_bench_support"] } for --output-format
+      - name: Запуск бенчмарков
+        # Требуется criterion = { features = ["cargo_bench_support"] } для --output-format
         run: cargo bench -- --output-format bencher | tee bench_output.txt
 
-      - name: Store benchmark result
+      - name: Сохранение результата бенчмарка
         uses: benchmark-action/github-action-benchmark@v1
         with:
           tool: 'cargo'
           output-file-path: bench_output.txt
           github-token: ${{ secrets.GITHUB_TOKEN }}
           auto-push: true
-          alert-threshold: '120%'    # Alert if 20% slower
+          alert-threshold: '120%'    # Оповещать, если на 20% медленнее
           comment-on-alert: true
-          fail-on-alert: true        # Block PR if regression detected
+          fail-on-alert: true        # Блокировать PR при обнаружении регрессии
 ```
 
-**Key CI considerations:**
-- Use **dedicated benchmark runners** (not shared CI) for consistent results
-- Pin the runner to a specific machine type if using cloud CI
-- Store historical data to detect gradual regressions
-- Set thresholds based on your workload's tolerance (5% for hot paths, 20% for cold)
+**Ключевые моменты для CI:**
+- Используйте **выделенные раннеры для бенчмарков** (а не общий CI), чтобы результаты были стабильными
+- Закрепите раннер за конкретным типом машины, если используете облачный CI
+- Храните исторические данные, чтобы обнаруживать постепенные регрессии
+- Задавайте пороги исходя из допустимых отклонений вашей нагрузки (5% для горячих путей, 20% для холодных)
 
-### Application: Parsing Performance
+### Применение: производительность парсинга
 
-The project has several performance-sensitive parsing paths that
-would benefit from benchmarks:
+В проекте есть несколько чувствительных к производительности путей парсинга, которым
+пошли бы на пользу бенчмарки:
 
-| Parsing Hot Spot | Crate | Why It Matters |
-|------------------|-------|----------------|
-| accelerator-query CSV/XML output | `device_diag` | Called per-GPU, up to 8× per run |
-| Sensor event parsing | `event_log` | Thousands of records on busy servers |
-| PCIe topology JSON | `topology_lib` | Complex nested structures, golden-file validated |
-| Report JSON serialization | `diag_framework` | Final report output, size-sensitive |
-| Config JSON loading | `config_loader` | Startup latency |
+| Горячая точка парсинга | Крейт | Почему это важно |
+|------------------------|-------|------------------|
+| Вывод CSV/XML от accelerator-query | `device_diag` | Вызывается для каждого GPU, до 8× за запуск |
+| Разбор событий сенсоров | `event_log` | Тысячи записей на загруженных серверах |
+| JSON топологии PCIe | `topology_lib` | Сложные вложенные структуры, проверяются golden-файлами |
+| Сериализация JSON-отчёта | `diag_framework` | Итоговый вывод отчёта, чувствителен к размеру |
+| Загрузка JSON-конфигурации | `config_loader` | Задержка при запуске |
 
-**Recommended first benchmark** — the topology parser, which already has golden-file
-test data:
+**Рекомендуемый первый бенчмарк** — парсер топологии, у которого уже есть тестовые
+данные golden-файлов:
 
 ```rust
-// topology_lib/benches/parse_bench.rs (proposed)
+// topology_lib/benches/parse_bench.rs (предложено)
 use criterion::{criterion_group, criterion_main, Criterion, Throughput};
 use std::fs;
 
@@ -430,7 +442,7 @@ fn bench_topology_parse(c: &mut Criterion) {
 
     for golden_file in ["S2001", "S1015", "S1035", "S1080"] {
         let path = format!("tests/test_data/{golden_file}.json");
-        let data = fs::read_to_string(&path).expect("golden file not found");
+        let data = fs::read_to_string(&path).expect("golden-файл не найден");
         group.throughput(Throughput::Bytes(data.len() as u64));
 
         group.bench_function(golden_file, |b| {
@@ -448,34 +460,34 @@ criterion_group!(benches, bench_topology_parse);
 criterion_main!(benches);
 ```
 
-### Try It Yourself
+### Попробуйте сами
 
-1. **Write a Criterion benchmark**: Pick any parsing function in your codebase.
-   Create a `benches/` directory, set up a Criterion benchmark that measures
-   throughput in bytes/second. Run `cargo bench` and examine the HTML report.
+1. **Напишите бенчмарк Criterion**: выберите любую функцию парсинга в своей кодовой базе.
+   Создайте директорию `benches/`, настройте бенчмарк Criterion, который измеряет
+   пропускную способность в байтах в секунду. Запустите `cargo bench` и изучите HTML-отчёт.
 
-2. **Generate a flamegraph**: Build your project with `debug = true` in
-   `[profile.release]`, then run `cargo flamegraph -- <your-args>`. Identify
-   the three widest stacks at the top of the flamegraph — those are your hot spots.
+2. **Постройте флеймграф**: соберите проект с `debug = true` в `[profile.release]`, затем
+   запустите `cargo flamegraph -- <ваши аргументы>`. Определите три самых широких стека
+   наверху флеймграфа — это и есть ваши горячие точки.
 
-3. **Compare with `hyperfine`**: Install `hyperfine` and benchmark the overall
-   execution time of your binary with different flags. Compare it to the
-   per-function times from Criterion. Where does the time go that Criterion
-   doesn't see? (Answer: I/O, syscalls, process startup.)
+3. **Сравните с `hyperfine`**: установите `hyperfine` и замерьте общее время выполнения
+   бинарника с разными флагами. Сравните его с временами отдельных функций из Criterion.
+   Какое время уходит там, что Criterion не видит? (Ответ: I/O, системные вызовы,
+   запуск процесса.)
 
-### Benchmark Tool Selection
+### Выбор инструмента для бенчмарков
 
 ```mermaid
 flowchart TD
-    START["Want to measure performance?"] --> WHAT{"What level?"}
+    START["Хотите измерить производительность?"] --> WHAT{"Какой уровень?"}
 
-    WHAT -->|"Single function"| CRITERION["Criterion.rs<br/>Statistical, regression detection"]
-    WHAT -->|"Quick function check"| DIVAN["Divan<br/>Lighter, attribute macros"]
-    WHAT -->|"Whole binary"| HYPERFINE["hyperfine<br/>End-to-end, wall-clock"]
-    WHAT -->|"Find hot spots"| PERF["perf + flamegraph<br/>CPU sampling profiler"]
+    WHAT -->|"Отдельная функция"| CRITERION["Criterion.rs<br/>Статистика, обнаружение регрессий"]
+    WHAT -->|"Быстрая проверка функции"| DIVAN["Divan<br/>Легче, атрибутные макросы"]
+    WHAT -->|"Весь бинарник"| HYPERFINE["hyperfine<br/>Сквозной, реальное время"]
+    WHAT -->|"Поиск горячих точек"| PERF["perf + флеймграф<br/>Профилировщик с выборкой CPU"]
 
-    CRITERION --> CI_BENCH["Continuous benchmarking<br/>in GitHub Actions"]
-    PERF --> OPTIMIZE["Profile-Guided<br/>Optimization (PGO)"]
+    CRITERION --> CI_BENCH["Непрерывный бенчмаркинг<br/>в GitHub Actions"]
+    PERF --> OPTIMIZE["Оптимизация по профилю<br/>(PGO)"]
 
     style CRITERION fill:#91e5a3,color:#000
     style DIVAN fill:#91e5a3,color:#000
@@ -485,14 +497,16 @@ flowchart TD
     style OPTIMIZE fill:#ffd43b,color:#000
 ```
 
-### 🏋️ Exercises
+### 🏋️ Упражнения
 
-#### 🟢 Exercise 1: First Criterion Benchmark
+#### 🟢 Упражнение 1: первый бенчмарк Criterion
 
-Create a crate with a function that sorts a `Vec<u64>` of 10,000 random elements. Write a Criterion benchmark for it, then switch to `.sort_unstable()` and observe the performance difference in the HTML report.
+Создайте крейт с функцией, которая сортирует `Vec<u64>` из 10 000 случайных элементов.
+Напишите для неё бенчмарк Criterion, затем переключитесь на `.sort_unstable()` и посмотрите
+разницу в производительности в HTML-отчёте.
 
 <details>
-<summary>Solution</summary>
+<summary>Решение</summary>
 
 ```toml
 # Cargo.toml
@@ -547,33 +561,37 @@ open target/criterion/sort-10k/report/index.html
 ```
 </details>
 
-#### 🟡 Exercise 2: Flamegraph Hot Spot
+#### 🟡 Упражнение 2: горячая точка на флеймграфе
 
-Build a project with `debug = true` in `[profile.release]`, then generate a flamegraph. Identify the top 3 widest stacks.
+Соберите проект с `debug = true` в `[profile.release]`, затем постройте флеймграф.
+Определите три самых широких стека.
 
 <details>
-<summary>Solution</summary>
+<summary>Решение</summary>
 
 ```toml
 # Cargo.toml
 [profile.release]
-debug = true  # Keep symbols for flamegraph
+debug = true  # Сохраняем символы для флеймграфа
 ```
 
 ```bash
 cargo install flamegraph
-cargo flamegraph --release -- <your-args>
-# Opens flamegraph.svg in browser
-# The widest stacks at the top are your hot spots
+cargo flamegraph --release -- <ваши аргументы>
+# Откроет flamegraph.svg в браузере
+# Самые широкие стеки наверху — это и есть ваши горячие точки
 ```
 </details>
 
-### Key Takeaways
+### Ключевые выводы
 
-- Never benchmark with `Instant::now()` — use Criterion.rs for statistical rigor and regression detection
-- `black_box()` prevents the compiler from optimizing away your benchmark target
-- `hyperfine` measures wall-clock time for the whole binary; Criterion measures individual functions — use both
-- Flamegraphs show *where* time is spent; benchmarks show *how much* time is spent
-- Continuous benchmarking in CI catches performance regressions before they ship
+- Никогда не замеряйте бенчмарки через `Instant::now()` — используйте Criterion.rs для
+  статистической строгости и обнаружения регрессий
+- `black_box()` не даёт компилятору оптимизировать цель бенчмарка «в ничто»
+- `hyperfine` измеряет реальное время всего бинарника, а Criterion — отдельных функций:
+  используйте оба инструмента
+- Флеймграфы показывают, *где* тратится время; бенчмарки показывают, *сколько* времени
+  тратится
+- Непрерывный бенчмаркинг в CI ловит регрессии производительности до выпуска
 
 ---
