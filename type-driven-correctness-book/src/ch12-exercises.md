@@ -1,28 +1,28 @@
-# Exercises 🟡
+# Упражнения 🟡
 
-> **What you'll learn:** Hands-on practice applying correct-by-construction patterns to realistic hardware scenarios — NVMe admin commands, firmware update state machines, sensor pipelines, PCIe phantom types, multi-protocol health checks, and session-typed diagnostic protocols.
+> **Что вы узнаете:** практику применения паттернов корректности по построению к реалистичным сценариям аппаратного обеспечения: административные команды NVMe, автоматы состояний обновления прошивки, конвейеры обработки показаний датчиков, phantom-типы для PCIe, проверки здоровья по нескольким протоколам и диагностические протоколы с сессионными типами.
 >
-> **Cross-references:** [ch02](ch02-typed-command-interfaces-request-determi.md) (exercise 1), [ch05](ch05-protocol-state-machines-type-state-for-r.md) (exercise 2), [ch06](ch06-dimensional-analysis-making-the-compiler.md) (exercise 3), [ch09](ch09-phantom-types-for-resource-tracking.md) (exercise 4), [ch10](ch10-putting-it-all-together-a-complete-diagn.md) (exercise 5)
+> **Перекрёстные ссылки:** [гл. 02](ch02-typed-command-interfaces-request-determi.md) (упражнение 1), [гл. 05](ch05-protocol-state-machines-type-state-for-r.md) (упражнение 2), [гл. 06](ch06-dimensional-analysis-making-the-compiler.md) (упражнение 3), [гл. 09](ch09-phantom-types-for-resource-tracking.md) (упражнение 4), [гл. 10](ch10-putting-it-all-together-a-complete-diagn.md) (упражнение 5)
 
-## Practice Problems
+## Практические задачи
 
-### Exercise 1: NVMe Admin Command (Typed Commands)
+### Упражнение 1: команда администрирования NVMe (типизированные команды)
 
-Design a typed command interface for NVMe admin commands:
+Спроектируйте типизированный командный интерфейс для административных команд NVMe:
 
-- `Identify` → `IdentifyResponse` (model number, serial, firmware rev)
-- `GetLogPage` → `SmartLog` (temperature, available spare, data units read)
-- `GetFeature` → feature-specific response
+- `Identify` → `IdentifyResponse` (номер модели, серийный номер, версия прошивки)
+- `GetLogPage` → `SmartLog` (температура, доступный резерв, количество прочитанных единиц данных)
+- `GetFeature` → ответ, специфичный для функции
 
-Requirements:
-1. The command type determines the response type
-2. No runtime dispatch — static dispatch only
-3. Add a `NamespaceId` newtype that prevents mixing namespace IDs with other `u32`s
+Требования:
+1. Тип команды определяет тип ответа
+2. Никакой диспетчеризации во время выполнения, только статическая
+3. Добавьте newtype `NamespaceId`, который не даёт перепутать идентификаторы пространств имён с другими значениями `u32`
 
-**Hint:** Follow the `IpmiCmd` trait pattern from ch02, but use NVMe-specific constants.
+**Подсказка:** следуйте паттерну трейта `IpmiCmd` из гл. 02, но используйте константы, специфичные для NVMe.
 
 <details>
-<summary>Sample Solution (Exercise 1)</summary>
+<summary>Пример решения (упражнение 1)</summary>
 
 ```rust,ignore
 use std::io;
@@ -51,7 +51,7 @@ pub struct ArbitrationFeature {
     pub low_priority_weight: u8,
 }
 
-/// The core pattern: associated type pins each command's response.
+/// Ключевой паттерн: ассоциированный тип фиксирует ответ каждой команды.
 pub trait NvmeAdminCmd {
     type Response;
     fn opcode(&self) -> u8;
@@ -67,7 +67,7 @@ impl NvmeAdminCmd for Identify {
     fn nsid(&self) -> Option<NamespaceId> { Some(self.nsid) }
     fn parse_response(&self, raw: &[u8]) -> io::Result<IdentifyResponse> {
         if raw.len() < 12 {
-            return Err(io::Error::new(io::ErrorKind::InvalidData, "too short"));
+            return Err(io::Error::new(io::ErrorKind::InvalidData, "слишком коротко"));
         }
         Ok(IdentifyResponse {
             model: String::from_utf8_lossy(&raw[0..4]).trim().to_string(),
@@ -85,7 +85,7 @@ impl NvmeAdminCmd for GetLogPage {
     fn nsid(&self) -> Option<NamespaceId> { None }
     fn parse_response(&self, raw: &[u8]) -> io::Result<SmartLog> {
         if raw.len() < 11 {
-            return Err(io::Error::new(io::ErrorKind::InvalidData, "too short"));
+            return Err(io::Error::new(io::ErrorKind::InvalidData, "слишком коротко"));
         }
         Ok(SmartLog {
             temperature_kelvin: u16::from_le_bytes([raw[0], raw[1]]),
@@ -103,7 +103,7 @@ impl NvmeAdminCmd for GetFeature {
     fn nsid(&self) -> Option<NamespaceId> { None }
     fn parse_response(&self, raw: &[u8]) -> io::Result<ArbitrationFeature> {
         if raw.len() < 3 {
-            return Err(io::Error::new(io::ErrorKind::InvalidData, "too short"));
+            return Err(io::Error::new(io::ErrorKind::InvalidData, "слишком коротко"));
         }
         Ok(ArbitrationFeature {
             high_priority_weight: raw[0],
@@ -113,34 +113,34 @@ impl NvmeAdminCmd for GetFeature {
     }
 }
 
-/// Static dispatch — the compiler monomorphises per command type.
+/// Статическая диспетчеризация: компилятор мономорфизирует код для каждого типа команды.
 pub struct NvmeController;
 
 impl NvmeController {
     pub fn execute<C: NvmeAdminCmd>(&self, cmd: &C) -> io::Result<C::Response> {
-        // Build SQE from cmd.opcode()/cmd.nsid(),
-        // submit to SQ, wait for CQ, then:
+        // Собираем SQE из cmd.opcode()/cmd.nsid(),
+        // отправляем в SQ, ждём CQ, затем:
         let raw = self.submit_and_read(cmd.opcode())?;
         cmd.parse_response(&raw)
     }
 
     fn submit_and_read(&self, _opcode: u8) -> io::Result<Vec<u8>> {
-        // Real implementation talks to /dev/nvme0
+        // Реальная реализация обращается к /dev/nvme0
         Ok(vec![0; 512])
     }
 }
 ```
 
-**Key points:**
-- `NamespaceId(u32)` prevents mixing namespace IDs with arbitrary `u32` values.
-- `NvmeAdminCmd::Response` is the "type index" — `execute()` returns exactly `C::Response`.
-- Fully static dispatch: no `Box<dyn …>`, no runtime downcasting.
+**Ключевые моменты:**
+- `NamespaceId(u32)` не даёт смешивать идентификаторы пространств имён с произвольными значениями `u32`.
+- `NvmeAdminCmd::Response` — это «индекс типа»: `execute()` возвращает ровно `C::Response`.
+- Полностью статическая диспетчеризация: никаких `Box<dyn …>` и никакого динамического приведения типов во время выполнения.
 
 </details>
 
-### Exercise 2: Firmware Update State Machine (Type-State)
+### Упражнение 2: автомат состояний обновления прошивки (typestate)
 
-Model a BMC firmware update lifecycle:
+Смоделируйте жизненный цикл обновления прошивки BMC:
 
 ```mermaid
 stateDiagram-v2
@@ -149,44 +149,44 @@ stateDiagram-v2
     Uploading --> Uploading : send_chunk(data)
     Uploading --> Verifying : finish_upload()
     Uploading --> Idle : abort()
-    Verifying --> Applying : verify() ✅ + VerifiedImage token
-    Verifying --> Idle : verify() ❌ or abort()
+    Verifying --> Applying : verify() ✅ + токен VerifiedImage
+    Verifying --> Idle : verify() ❌ или abort()
     Applying --> Rebooting : apply(token)
     Rebooting --> Complete : reboot_complete()
     Complete --> [*]
 
-    note right of Applying : No abort() — irreversible
-    note right of Verifying : VerifiedImage is a proof token
+    note right of Applying : нет abort(): необратимо
+    note right of Verifying : VerifiedImage — токен-доказательство
 ```
 
-Requirements:
-1. Each state is a distinct type
-2. Upload can only begin from Idle
-3. Verification requires upload to be complete
-4. Apply can only happen after successful verification — take a `VerifiedImage` proof token
-5. Reboot is the only option after applying
-6. Add an `abort()` method available in Uploading and Verifying (but not Applying — too late)
+Требования:
+1. Каждое состояние — отдельный тип
+2. Загрузка может начинаться только из `Idle`
+3. Проверка требует завершённой загрузки
+4. Применение возможно только после успешной проверки: примите токен-доказательство `VerifiedImage`
+5. Перезагрузка — единственный вариант после применения
+6. Добавьте метод `abort()`, доступный в `Uploading` и `Verifying` (но не в `Applying`: уже поздно)
 
-**Hint:** Combine type-state (ch05) with capability tokens (ch04).
+**Подсказка:** совместите typestate (гл. 05) с capability-токенами (гл. 04).
 
 <details>
-<summary>Sample Solution (Exercise 2)</summary>
+<summary>Пример решения (упражнение 2)</summary>
 
 ```rust,ignore
-// --- State types ---
-// Design choice: here we store state inline (`_state: S`) rather than using
-// `PhantomData<S>` (ch05's approach). This lets states carry data —
-// e.g., `Uploading { bytes_sent: usize }` tracks progress. Use `PhantomData`
-// when states are pure markers (zero-sized); use inline storage when
-// states carry meaningful runtime data.
+// --- Типы состояний ---
+// Проектное решение: здесь состояние хранится непосредственно (`_state: S`), а не через
+// `PhantomData<S>` (подход гл. 05). Это позволяет состояниям нести данные: например,
+// `Uploading { bytes_sent: usize }` отслеживает прогресс. Используйте `PhantomData`,
+// когда состояния — чистые маркеры (нулевого размера); храните состояние в структуре,
+// когда состояния несут значимые данные времени выполнения.
 pub struct Idle;
-pub struct Uploading { bytes_sent: usize }  // not ZST — carries progress data
+pub struct Uploading { bytes_sent: usize }  // не ZST: несёт данные о прогрессе
 pub struct Verifying;
 pub struct Applying;
 pub struct Rebooting;
 pub struct Complete;
 
-/// Proof token: only constructed inside verify().
+/// Токен-доказательство: создаётся только внутри verify().
 pub struct VerifiedImage { _private: () }
 
 pub struct FwUpdate<S> {
@@ -211,31 +211,31 @@ impl FwUpdate<Uploading> {
     pub fn finish_upload(self) -> FwUpdate<Verifying> {
         FwUpdate { bmc_addr: self.bmc_addr, _state: Verifying }
     }
-    /// Abort available during upload — returns to Idle.
+    /// Abort доступен во время загрузки: возврат в Idle.
     pub fn abort(self) -> FwUpdate<Idle> {
         FwUpdate { bmc_addr: self.bmc_addr, _state: Idle }
     }
 }
 
 impl FwUpdate<Verifying> {
-    /// On success, returns the next state AND a VerifiedImage proof token.
+    /// При успехе возвращает следующее состояние И токен-доказательство VerifiedImage.
     pub fn verify(self) -> Result<(FwUpdate<Applying>, VerifiedImage), FwUpdate<Idle>> {
-        // Real: check CRC, signature, compatibility
+        // Реально: проверяем CRC, подпись, совместимость
         let token = VerifiedImage { _private: () };
         Ok((
             FwUpdate { bmc_addr: self.bmc_addr, _state: Applying },
             token,
         ))
     }
-    /// Abort available during verification.
+    /// Abort доступен во время проверки.
     pub fn abort(self) -> FwUpdate<Idle> {
         FwUpdate { bmc_addr: self.bmc_addr, _state: Idle }
     }
 }
 
 impl FwUpdate<Applying> {
-    /// Consumes the VerifiedImage proof — can't apply without verification.
-    /// Note: NO abort() method here — once flashing starts, it's too dangerous.
+    /// Потребляет токен-доказательство VerifiedImage: без проверки применить нельзя.
+    /// Примечание: метода abort() здесь НЕТ, потому что после начала записи это слишком опасно.
     pub fn apply(self, _proof: VerifiedImage) -> FwUpdate<Rebooting> {
         FwUpdate { bmc_addr: self.bmc_addr, _state: Rebooting }
     }
@@ -251,39 +251,37 @@ impl FwUpdate<Complete> {
     pub fn version(&self) -> &str { "2.1.0" }
 }
 
-// Usage:
+// Использование:
 // let fw = FwUpdate::new("192.168.1.100")
 //     .begin_upload()
 //     .send_chunk(b"image_data")
 //     .finish_upload();
-// let (fw, proof) = fw.verify().map_err(|_| "verify failed")?;
+// let (fw, proof) = fw.verify().map_err(|_| "проверка не пройдена")?;
 // let fw = fw.apply(proof).wait_for_reboot();
-// println!("New version: {}", fw.version());
+// println!("Новая версия: {}", fw.version());
 ```
 
-**Key points:**
-- `abort()` exists only on `FwUpdate<Uploading>` and `FwUpdate<Verifying>` — calling
-  it on `FwUpdate<Applying>` is a **compile error**, not a runtime check.
-- `VerifiedImage` has a private field, so only `verify()` can create one.
-- `apply()` consumes the proof token — you can't skip verification.
+**Ключевые моменты:**
+- `abort()` существует только у `FwUpdate<Uploading>` и `FwUpdate<Verifying>`: вызов его у `FwUpdate<Applying>` — **ошибка компиляции**, а не проверка во время выполнения.
+- `VerifiedImage` имеет приватное поле, поэтому создать его может только `verify()`.
+- `apply()` потребляет токен-доказательство: пропустить проверку нельзя.
 
 </details>
 
-### Exercise 3: Sensor Reading Pipeline (Dimensional Analysis)
+### Упражнение 3: конвейер показаний датчиков (анализ размерностей)
 
-Build a complete sensor pipeline:
+Постройте полный конвейер обработки показаний датчиков:
 
-1. Define newtypes: `RawAdc`, `Celsius`, `Fahrenheit`, `Volts`, `Millivolts`, `Watts`
-2. Implement `From<Celsius> for Fahrenheit` and vice versa
-3. Create `impl Mul<Volts, Output=Watts> for Amperes` (P = V × I)
-4. Build a `Threshold<T>` generic checker
-5. Write a pipeline: ADC → calibration → threshold check → result
+1. Определите newtype: `RawAdc`, `Celsius`, `Fahrenheit`, `Volts`, `Millivolts`, `Watts`
+2. Реализуйте `From<Celsius> for Fahrenheit` и наоборот
+3. Создайте `impl Mul<Volts, Output=Watts> for Amperes` (P = V × I)
+4. Постройте обобщённый проверщик порогов `Threshold<T>`
+5. Напишите конвейер: АЦП → калибровка → проверка порога → результат
 
-The compiler should reject: comparing `Celsius` to `Volts`, adding `Watts` to `Rpm`,
-passing `Millivolts` where `Volts` is expected.
+Компилятор должен отвергать: сравнение `Celsius` с `Volts`, сложение `Watts` с `Rpm`, передачу `Millivolts` там, где ожидаются `Volts`.
 
 <details>
-<summary>Sample Solution (Exercise 3)</summary>
+<summary>Пример решения (упражнение 3)</summary>
 
 ```rust,ignore
 use std::ops::{Add, Sub, Mul};
@@ -309,7 +307,7 @@ pub struct Amperes(pub f64);
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub struct Watts(pub f64);
 
-// --- Safe conversions ---
+// --- Безопасные преобразования ---
 impl From<Celsius> for Fahrenheit {
     fn from(c: Celsius) -> Self { Fahrenheit(c.0 * 9.0 / 5.0 + 32.0) }
 }
@@ -323,10 +321,9 @@ impl From<Volts> for Millivolts {
     fn from(v: Volts) -> Self { Millivolts(v.0 * 1000.0) }
 }
 
-// --- Arithmetic on same-unit types ---
-// NOTE: Adding absolute temperatures (25°C + 30°C) is physically
-// questionable — see ch06's discussion of ΔT newtypes for a more
-// rigorous approach.  Here we keep it simple for the exercise.
+// --- Арифметика для величин одной единицы ---
+// ПРИМЕЧАНИЕ: сложение абсолютных температур (25°C + 30°C) физически сомнительно.
+// См. в гл. 06 обсуждение newtype для ΔT: там подход строже. Здесь для упражнения оставим всё просто.
 impl Add for Celsius {
     type Output = Celsius;
     fn add(self, rhs: Self) -> Celsius { Celsius(self.0 + rhs.0) }
@@ -336,16 +333,16 @@ impl Sub for Celsius {
     fn sub(self, rhs: Self) -> Celsius { Celsius(self.0 - rhs.0) }
 }
 
-// P = V × I  (cross-unit multiplication)
+// P = V × I  (умножение разных единиц)
 impl Mul<Amperes> for Volts {
     type Output = Watts;
     fn mul(self, rhs: Amperes) -> Watts { Watts(self.0 * rhs.0) }
 }
 
-// --- Generic threshold checker ---
-// Exercise 3 extends ch06's Threshold with a generic ThresholdResult<T>
-// that carries the triggering reading — an evolution of ch06's simpler
-// ThresholdResult { Normal, Warning, Critical } enum.
+// --- Обобщённый проверщик порогов ---
+// Упражнение 3 расширяет Threshold из гл. 06 обобщённым ThresholdResult<T>,
+// который несёт показание, вызвавшее срабатывание. Это развитие более простого
+// enum ThresholdResult { Normal, Warning, Critical } из гл. 06.
 pub enum ThresholdResult<T> {
     Normal(T),
     Warning(T),
@@ -357,7 +354,7 @@ pub struct Threshold<T> {
     pub critical: T,
 }
 
-// Generic impl — works for any unit type that supports PartialOrd.
+// Обобщённая реализация: работает для любого типа единиц, поддерживающего PartialOrd.
 impl<T: PartialOrd + Copy> Threshold<T> {
     pub fn check(&self, reading: T) -> ThresholdResult<T> {
         if reading >= self.critical {
@@ -369,12 +366,12 @@ impl<T: PartialOrd + Copy> Threshold<T> {
         }
     }
 }
-// Now `Threshold<Rpm>`, `Threshold<Volts>`, etc. all work automatically.
+// Теперь `Threshold<Rpm>`, `Threshold<Volts>` и т. д. работают автоматически.
 
-// --- Pipeline: ADC → calibration → threshold → result ---
+// --- Конвейер: АЦП → калибровка → порог → результат ---
 pub struct CalibrationParams {
-    pub scale: f64,  // ADC counts per °C
-    pub offset: f64, // °C at ADC 0
+    pub scale: f64,  // отсчётов АЦП на °C
+    pub offset: f64, // °C при АЦП 0
 }
 
 pub fn calibrate(raw: RawAdc, params: &CalibrationParams) -> Celsius {
@@ -390,51 +387,50 @@ pub fn sensor_pipeline(
     threshold.check(temp)
 }
 
-// Compile-time safety — these would NOT compile:
-// let _ = Celsius(25.0) + Volts(12.0);   // ERROR: mismatched types
-// let _: Millivolts = Volts(1.0);         // ERROR: no implicit coercion
-// let _ = Watts(100.0) + Rpm(3000);       // ERROR: mismatched types
+// Проверка на этапе компиляции: эти строки НЕ скомпилируются:
+// let _ = Celsius(25.0) + Volts(12.0);   // ОШИБКА: mismatched types
+// let _: Millivolts = Volts(1.0);         // ОШИБКА: no implicit coercion
+// let _ = Watts(100.0) + Rpm(3000);       // ОШИБКА: mismatched types
 ```
 
-**Key points:**
-- Each physical unit is a distinct type — no accidental mixing.
-- `Mul<Amperes> for Volts` yields `Watts`, encoding P = V × I in the type system.
-- Explicit `From` conversions for related units (mV ↔ V, °C ↔ °F).
-- `Threshold<Celsius>` only accepts `Celsius` — can't accidentally threshold-check RPM.
+**Ключевые моменты:**
+- Каждая физическая величина — отдельный тип: случайного смешивания не происходит.
+- `Mul<Amperes> for Volts` даёт `Watts`, кодируя P = V × I в системе типов.
+- Явные преобразования `From` для связанных единиц (мВ ↔ В, °C ↔ °F).
+- `Threshold<Celsius>` принимает только `Celsius`: нельзя случайно проверить порог для об/мин.
 
 </details>
 
-### Exercise 4: PCIe Capability Walk (Phantom Types + Validated Boundary)
+### Упражнение 4: обход возможностей PCIe (phantom-типы + проверенная граница)
 
-Model the PCIe capability linked list:
+Смоделируйте связный список возможностей PCIe:
 
-1. `RawCapability` — unvalidated bytes from config space
-2. `ValidCapability` — parsed and validated (via TryFrom)
-3. Each capability type (MSI, MSI-X, PCIe Express, Power Management) has its own
-   phantom-typed register layout
-4. Walking the list returns an iterator of `ValidCapability` values
+1. `RawCapability`: непроверенные байты из конфигурационного пространства
+2. `ValidCapability`: разобранная и проверенная (через TryFrom)
+3. Каждый тип возможности (MSI, MSI-X, PCI Express, Power Management) имеет собственную раскладку регистров с phantom-типом
+4. Обход списка возвращает итератор значений `ValidCapability`
 
-**Hint:** Combine validated boundaries (ch07) with phantom types (ch09).
+**Подсказка:** совместите проверенные границы (гл. 07) с phantom-типами (гл. 09).
 
 <details>
-<summary>Sample Solution (Exercise 4)</summary>
+<summary>Пример решения (упражнение 4)</summary>
 
 ```rust,ignore
 use std::marker::PhantomData;
 
-// --- Phantom markers for capability types ---
+// --- Phantom-маркеры для типов возможностей ---
 pub struct Msi;
 pub struct MsiX;
 pub struct PciExpress;
 pub struct PowerMgmt;
 
-// PCI capability IDs from the spec
+// Идентификаторы возможностей PCI из спецификации
 const CAP_ID_PM:   u8 = 0x01;
 const CAP_ID_MSI:  u8 = 0x05;
 const CAP_ID_PCIE: u8 = 0x10;
 const CAP_ID_MSIX: u8 = 0x11;
 
-/// Unvalidated bytes — may be garbage.
+/// Непроверенные байты: могут быть мусором.
 #[derive(Debug)]
 pub struct RawCapability {
     pub id: u8,
@@ -442,7 +438,7 @@ pub struct RawCapability {
     pub data: Vec<u8>,
 }
 
-/// Validated and type-tagged capability.
+/// Проверенная и помеченная типом возможность.
 #[derive(Debug)]
 pub struct ValidCapability<Kind> {
     id: u8,
@@ -451,12 +447,12 @@ pub struct ValidCapability<Kind> {
     _kind: PhantomData<Kind>,
 }
 
-// --- TryFrom: parse-don't-validate boundary ---
+// --- TryFrom: граница parse-don't-validate ---
 impl TryFrom<RawCapability> for ValidCapability<PowerMgmt> {
     type Error = &'static str;
     fn try_from(raw: RawCapability) -> Result<Self, Self::Error> {
-        if raw.id != CAP_ID_PM { return Err("not a PM capability"); }
-        if raw.data.len() < 2 { return Err("PM data too short"); }
+        if raw.id != CAP_ID_PM { return Err("не возможность PM"); }
+        if raw.data.len() < 2 { return Err("данные PM слишком короткие"); }
         Ok(ValidCapability {
             id: raw.id, next_ptr: raw.next_ptr,
             data: raw.data, _kind: PhantomData,
@@ -467,8 +463,8 @@ impl TryFrom<RawCapability> for ValidCapability<PowerMgmt> {
 impl TryFrom<RawCapability> for ValidCapability<Msi> {
     type Error = &'static str;
     fn try_from(raw: RawCapability) -> Result<Self, Self::Error> {
-        if raw.id != CAP_ID_MSI { return Err("not an MSI capability"); }
-        if raw.data.len() < 6 { return Err("MSI data too short"); }
+        if raw.id != CAP_ID_MSI { return Err("не возможность MSI"); }
+        if raw.data.len() < 6 { return Err("данные MSI слишком короткие"); }
         Ok(ValidCapability {
             id: raw.id, next_ptr: raw.next_ptr,
             data: raw.data, _kind: PhantomData,
@@ -476,9 +472,9 @@ impl TryFrom<RawCapability> for ValidCapability<Msi> {
     }
 }
 
-// (Similar TryFrom impls for MsiX, PciExpress — omitted for brevity)
+// (Аналогичные реализации TryFrom для MsiX и PciExpress опущены для краткости)
 
-// --- Type-safe accessors: only available on the correct capability ---
+// --- Типобезопасные методы доступа: доступны только для правильной возможности ---
 impl ValidCapability<PowerMgmt> {
     pub fn pm_control(&self) -> u16 {
         u16::from_le_bytes([self.data[0], self.data[1]])
@@ -500,7 +496,7 @@ impl ValidCapability<MsiX> {
     }
 }
 
-// --- Capability walker: iterates the linked list ---
+// --- Обходчик возможностей: проходит по связному списку ---
 pub struct CapabilityWalker<'a> {
     config_space: &'a [u8],
     next_ptr: u8,
@@ -508,7 +504,7 @@ pub struct CapabilityWalker<'a> {
 
 impl<'a> CapabilityWalker<'a> {
     pub fn new(config_space: &'a [u8]) -> Self {
-        // Capability pointer lives at offset 0x34 in PCI config space
+        // Указатель на первую возможность находится по смещению 0x34 в конфигурационном пространстве PCI
         let first_ptr = if config_space.len() > 0x34 {
             config_space[0x34]
         } else { 0 };
@@ -533,41 +529,39 @@ impl<'a> Iterator for CapabilityWalker<'a> {
     }
 }
 
-// Usage:
+// Использование:
 // for raw_cap in CapabilityWalker::new(&config_space) {
 //     if let Ok(pm) = ValidCapability::<PowerMgmt>::try_from(raw_cap) {
-//         println!("PM control: 0x{:04X}", pm.pm_control());
+//         println!("Управление PM: 0x{:04X}", pm.pm_control());
 //     }
 // }
 ```
 
-**Key points:**
-- `RawCapability` → `ValidCapability<Kind>` is the parse-don't-validate boundary.
-- `pm_control()` only exists on `ValidCapability<PowerMgmt>` — calling it on an MSI
-  capability is a compile error.
-- The `CapabilityWalker` iterator yields raw capabilities; the caller validates
-  the ones they care about with `TryFrom`.
+**Ключевые моменты:**
+- `RawCapability` → `ValidCapability<Kind>` — граница parse-don't-validate.
+- `pm_control()` существует только у `ValidCapability<PowerMgmt>`: вызов его у возможности MSI — **ошибка компиляции**.
+- Итератор `CapabilityWalker` выдаёт сырые возможности; вызывающий код проверяет нужные ему через `TryFrom`.
 
 </details>
 
-### Exercise 5: Multi-Protocol Health Check (Capability Mixins)
+### Упражнение 5: проверка здоровья по нескольким протоколам (capability-миксины)
 
-Create a health-check framework:
+Создайте фреймворк проверки здоровья:
 
-1. Define ingredient traits: `HasIpmi`, `HasRedfish`, `HasNvmeCli`, `HasGpio`
-2. Create mixin traits:
-   - `ThermalHealthMixin` (requires HasIpmi + HasGpio) — reads temps, checks alerts
-   - `StorageHealthMixin` (requires HasNvmeCli) — SMART data checks
-   - `BmcHealthMixin` (requires HasIpmi + HasRedfish) — cross-validates BMC data
-3. Build a `FullPlatformController` that implements all ingredient traits
-4. Build a `StorageOnlyController` that only implements `HasNvmeCli`
-5. Verify that `StorageOnlyController` gets `StorageHealthMixin` but NOT the others
+1. Определите трейты-ингредиенты: `HasIpmi`, `HasRedfish`, `HasNvmeCli`, `HasGpio`
+2. Создайте трейты-миксины:
+   - `ThermalHealthMixin` (требует HasIpmi + HasGpio): читает температуры, проверяет сигналы тревоги
+   - `StorageHealthMixin` (требует HasNvmeCli): проверки данных SMART
+   - `BmcHealthMixin` (требует HasIpmi + HasRedfish): перекрёстная проверка данных BMC
+3. Постройте `FullPlatformController`, который реализует все трейты-ингредиенты
+4. Постройте `StorageOnlyController`, который реализует только `HasNvmeCli`
+5. Убедитесь, что `StorageOnlyController` получает `StorageHealthMixin`, но НЕ остальные
 
 <details>
-<summary>Sample Solution (Exercise 5)</summary>
+<summary>Пример решения (упражнение 5)</summary>
 
 ```rust,ignore
-// --- Ingredient traits ---
+// --- Трейты-ингредиенты ---
 pub trait HasIpmi {
     fn ipmi_read_sensor(&self, id: u8) -> f64;
 }
@@ -586,7 +580,7 @@ pub struct SmartData {
     pub spare_pct: u8,
 }
 
-// --- Mixin traits with blanket impls ---
+// --- Трейты-миксины с blanket impl ---
 pub trait ThermalHealthMixin: HasIpmi + HasGpio {
     fn thermal_check(&self) -> ThermalStatus {
         let temp = self.ipmi_read_sensor(0x01);
@@ -620,7 +614,7 @@ pub struct ThermalStatus { pub temperature: f64, pub alert_active: bool }
 pub struct StorageStatus { pub temperature_ok: bool, pub spare_ok: bool }
 pub struct BmcStatus { pub ipmi_temp: f64, pub redfish_temp: String, pub consistent: bool }
 
-// --- Full platform: all ingredients → all three mixins for free ---
+// --- Полная платформа: все ингредиенты → все три миксина бесплатно ---
 pub struct FullPlatformController;
 
 impl HasIpmi for FullPlatformController {
@@ -638,7 +632,7 @@ impl HasGpio for FullPlatformController {
     fn gpio_read_alert(&self, _pin: u8) -> bool { false }
 }
 
-// --- Storage-only: only HasNvmeCli → only StorageHealthMixin ---
+// --- Только хранилище: только HasNvmeCli → только StorageHealthMixin ---
 pub struct StorageOnlyController;
 
 impl HasNvmeCli for StorageOnlyController {
@@ -647,43 +641,39 @@ impl HasNvmeCli for StorageOnlyController {
     }
 }
 
-// StorageOnlyController automatically gets storage_check().
-// Calling thermal_check() or bmc_health() on it is a COMPILE ERROR.
+// StorageOnlyController автоматически получает storage_check().
+// Вызов thermal_check() или bmc_health() у него — ОШИБКА КОМПИЛЯЦИИ.
 ```
 
-**Key points:**
-- Blanket `impl<T: HasIpmi + HasGpio> ThermalHealthMixin for T {}` — any type that
-  implements both ingredients automatically gets the mixin.
-- `StorageOnlyController` only implements `HasNvmeCli`, so the compiler grants it
-  `StorageHealthMixin` but rejects `thermal_check()` and `bmc_health()` — zero
-  runtime checks needed.
-- Adding a new mixin (e.g., `NetworkHealthMixin: HasRedfish + HasGpio`) is one trait
-  + one blanket impl — existing controllers pick it up automatically if they qualify.
+**Ключевые моменты:**
+- Blanket `impl<T: HasIpmi + HasGpio> ThermalHealthMixin for T {}`: любой тип, реализующий оба ингредиента, автоматически получает миксин.
+- `StorageOnlyController` реализует только `HasNvmeCli`, поэтому компилятор даёт ему `StorageHealthMixin`, но отвергает `thermal_check()` и `bmc_health()`: никаких проверок во время выполнения не нужно.
+- Добавление нового миксина (например, `NetworkHealthMixin: HasRedfish + HasGpio`) — это один трейт и одна blanket impl: существующие контроллеры получат его автоматически, если подходят.
 
 </details>
 
-### Exercise 6: Session-Typed Diagnostic Protocol (Single-Use + Type-State)
+### Упражнение 6: диагностический протокол с сессионными типами (одноразовые типы + typestate)
 
-Design a diagnostic session with single-use test execution tokens:
+Спроектируйте диагностическую сессию с одноразовыми токенами выполнения тестов:
 
-1. `DiagSession` starts in `Setup` state
-2. Transition to `Running` state — issues `N` execution tokens (one per test case)
-3. Each `TestToken` is consumed when the test runs — prevents running the same test twice
-4. After all tokens are consumed, transition to `Complete` state
-5. Generate a report (only in `Complete` state)
+1. `DiagSession` начинает в состоянии `Setup`
+2. Переход в состояние `Running` выдаёт `N` токенов выполнения (по одному на каждый тестовый случай)
+3. Каждый `TestToken` потребляется при запуске теста, что исключает повторный запуск одного и того же теста
+4. Когда все токены потреблены, переход в состояние `Complete`
+5. Формирование отчёта (только в состоянии `Complete`)
 
-**Advanced:** Use a const generic `N` to track how many tests remain at the type level.
+**Продвинутый вариант:** используйте const-обобщение `N`, чтобы отслеживать на уровне типов, сколько тестов осталось.
 
 <details>
-<summary>Sample Solution (Exercise 6)</summary>
+<summary>Пример решения (упражнение 6)</summary>
 
 ```rust,ignore
-// --- State types ---
+// --- Типы состояний ---
 pub struct Setup;
 pub struct Running;
 pub struct Complete;
 
-/// Single-use test token. NOT Clone, NOT Copy — consumed on use.
+/// Одноразовый токен теста. НЕ Clone, НЕ Copy: потребляется при использовании.
 pub struct TestToken {
     test_name: String,
 }
@@ -709,7 +699,7 @@ impl DiagSession<Setup> {
         }
     }
 
-    /// Transition to Running — issues one token per test case.
+    /// Переход в Running: выдаёт по одному токену на каждый тестовый случай.
     pub fn start(self, test_names: &[&str]) -> (DiagSession<Running>, Vec<TestToken>) {
         let tokens = test_names.iter()
             .map(|n| TestToken { test_name: n.to_string() })
@@ -726,9 +716,9 @@ impl DiagSession<Setup> {
 }
 
 impl DiagSession<Running> {
-    /// Consume a token to run one test. The move prevents double-running.
+    /// Потребляет токен для запуска одного теста. Перемещение исключает двойной запуск.
     pub fn run_test(mut self, token: TestToken) -> Self {
-        let passed = true; // real code runs actual diagnostics here
+        let passed = true; // реальный код здесь запускает настоящую диагностику
         self.results.push(TestResult {
             test_name: token.test_name,
             passed,
@@ -736,14 +726,13 @@ impl DiagSession<Running> {
         self
     }
 
-    /// Transition to Complete.
+    /// Переход в Complete.
     ///
-    /// **Note:** This solution does NOT enforce that all tokens have been
-    /// consumed — `finish()` can be called with tokens still outstanding.
-    /// The tokens will simply be dropped (they're not `#[must_use]`).
-    /// For full compile-time enforcement, use the const-generic variant
-    /// described in the "Advanced" note below, where `finish()` is only
-    /// available on `DiagSession<Running, 0>`.
+    /// **Примечание:** это решение НЕ обеспечивает, что все токены потреблены:
+    /// `finish()` можно вызвать, когда токены ещё остались. Такие токены просто
+    /// уничтожатся (они не помечены `#[must_use]`). Для полной проверки на этапе компиляции
+    /// используйте вариант с const-обобщением из примечания «Продвинутый» ниже, где
+    /// `finish()` доступен только у `DiagSession<Running, 0>`.
     pub fn finish(self) -> DiagSession<Complete> {
         DiagSession {
             name: self.name,
@@ -754,46 +743,41 @@ impl DiagSession<Running> {
 }
 
 impl DiagSession<Complete> {
-    /// Report is ONLY available in Complete state.
+    /// Отчёт доступен ТОЛЬКО в состоянии Complete.
     pub fn report(&self) -> String {
         let total = self.results.len();
         let passed = self.results.iter().filter(|r| r.passed).count();
-        format!("{}: {}/{} passed", self.name, passed, total)
+        format!("{}: пройдено {}/{}", self.name, passed, total)
     }
 }
 
-// Usage:
-// let session = DiagSession::new("GPU stress");
+// Использование:
+// let session = DiagSession::new("стресс-тест GPU");
 // let (mut session, tokens) = session.start(&["vram", "compute", "thermal"]);
 // for token in tokens {
 //     session = session.run_test(token);
 // }
 // let session = session.finish();
-// println!("{}", session.report());  // "GPU stress: 3/3 passed"
+// println!("{}", session.report());  // "стресс-тест GPU: пройдено 3/3"
 //
-// // These would NOT compile:
-// // session.run_test(used_token);  →  ERROR: use of moved value
-// // running_session.report();      →  ERROR: no method `report` on DiagSession<Running>
+// // Это НЕ скомпилируется:
+// // session.run_test(used_token);  →  ОШИБКА: use of moved value
+// // running_session.report();      →  ОШИБКА: no method `report` on DiagSession<Running>
 ```
 
-**Key points:**
-- `TestToken` is not `Clone` or `Copy` — consuming it via `run_test(token)` moves it,
-  so re-running the same test is a compile error.
-- `report()` only exists on `DiagSession<Complete>` — calling it mid-run is impossible.
-- The **Advanced** variant would use `DiagSession<Running, N>` with const generics
-  where `run_test` returns `DiagSession<Running, {N-1}>` and `finish` is only
-  available on `DiagSession<Running, 0>` — that ensures *all* tokens are consumed
-  before finishing.
+**Ключевые моменты:**
+- `TestToken` не реализует `Clone` и `Copy`: потребление через `run_test(token)` перемещает его, поэтому повторный запуск того же теста — ошибка компиляции.
+- `report()` существует только у `DiagSession<Complete>`: вызвать его в процессе выполнения невозможно.
+- **Продвинутый** вариант использовал бы `DiagSession<Running, N>` с const-обобщениями, где `run_test` возвращает `DiagSession<Running, {N-1}>`, а `finish` доступен только у `DiagSession<Running, 0>`. Это гарантирует, что *все* токены потреблены до завершения.
 
 </details>
 
-## Key Takeaways
+## Ключевые выводы
 
-1. **Practice with realistic protocols** — NVMe, firmware update, sensor pipelines, PCIe are all real-world targets for these patterns.
-2. **Each exercise maps to a core chapter** — use the cross-references to review the pattern before attempting.
-3. **Solutions use expandable details** — try each exercise before revealing the solution.
-4. **Compose patterns in exercise 5** — multi-protocol health checks combine typed commands, dimensional types, and validated boundaries.
-5. **Session types (exercise 6) are the frontier** — they enforce message ordering across channels, extending type-state to distributed systems.
+1. **Практикуйтесь на реалистичных протоколах**: NVMe, обновление прошивки, конвейеры датчиков и PCIe — реальные цели для этих паттернов.
+2. **Каждое упражнение соответствует основной главе**: используйте перекрёстные ссылки, чтобы повторить паттерн перед попыткой.
+3. **Решения спрятаны в раскрывающихся блоках**: попробуйте каждое упражнение, прежде чем открывать решение.
+4. **Сочетайте паттерны в упражнении 5**: проверки здоровья по нескольким протоколам объединяют типизированные команды, размерные типы и проверенные границы.
+5. **Сессионные типы (упражнение 6) — передний край**: они обеспечивают порядок сообщений в каналах, распространяя typestate на распределённые системы.
 
 ---
-

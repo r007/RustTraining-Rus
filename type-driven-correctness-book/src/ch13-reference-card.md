@@ -1,119 +1,118 @@
-# Reference Card
+# Краткая шпаргалка
 
-> **Quick-reference for all 14+ correct-by-construction patterns** with selection flowchart, pattern catalogue, composition rules, crate mapping, and Curry-Howard cheat sheet.
+> **Краткая справка по всем 14+ паттернам корректности по построению** с блок-схемой выбора, каталогом паттернов, правилами композиции, сопоставлением с крейтами и шпаргалкой по соответствию Карри — Говарда.
 >
-> **Cross-references:** Every chapter — this is the lookup table for the entire book.
+> **Перекрёстные ссылки:** все главы: это таблица для поиска по всей книге.
 
-## Quick Reference: Correct-by-Construction Patterns
+## Краткая справка: паттерны корректности по построению
 
-### Pattern Selection Guide
-
-```text
-Is the bug catastrophic if missed?
-├── Yes → Can it be encoded in types?
-│         ├── Yes → USE CORRECT-BY-CONSTRUCTION
-│         └── No  → Runtime check + extensive testing
-└── No  → Runtime check is fine
-```
-
-### Pattern Catalogue
-
-| # | Pattern | Key Trait/Type | Prevents | Runtime Cost | Chapter |
-|---|---------|---------------|----------|:------:|---------|
-| 1 | Typed Commands | `trait IpmiCmd { type Response; }` | Wrong response type | Zero | ch02 |
-| 2 | Single-Use Types | `struct Nonce` (not Clone/Copy) | Nonce/key reuse | Zero | ch03 |
-| 3 | Capability Tokens | `struct AdminToken { _private: () }` | Unauthorised access | Zero | ch04 |
-| 4 | Type-State | `Session<Active>` | Protocol violations | Zero | ch05 |
-| 5 | Dimensional Types | `struct Celsius(f64)` | Unit confusion | Zero | ch06 |
-| 6 | Validated Boundaries | `struct ValidFru` (via TryFrom) | Unvalidated data use | Parse once | ch07 |
-| 7 | Capability Mixins | `trait FanDiagMixin: HasSpi + HasI2c` | Missing bus access | Zero | ch08 |
-| 8 | Phantom Types | `Register<Width16>` | Width/direction mismatch | Zero | ch09 |
-| 9 | Sentinel → Option | `Option<u8>` (not `0xFF`) | Sentinel-as-value bugs | Zero | ch11 |
-| 10 | Sealed Traits | `trait Cmd: private::Sealed` | Unsound external impls | Zero | ch11 |
-| 11 | Non-Exhaustive Enums | `#[non_exhaustive] enum Sku` | Silent match fallthrough | Zero | ch11 |
-| 12 | Typestate Builder | `DerBuilder<Set, Missing>` | Incomplete construction | Zero | ch11 |
-| 13 | FromStr Validation | `impl FromStr for DiagLevel` | Unvalidated string input | Parse once | ch11 |
-| 14 | Const-Generic Size | `RegisterBank<const N: usize>` | Buffer size mismatch | Zero | ch11 |
-| 15 | Safe `unsafe` Wrapper | `MmioRegion::read_u32()` | Unchecked MMIO/FFI | Zero | ch11 |
-| 16 | Async Type-State | `AsyncSession<Active>` | Async protocol violations | Zero | ch11 |
-| 17 | Const Assertions | `SdrSensorId<const N: u8>` | Invalid compile-time IDs | Zero | ch11 |
-| 18 | Session Types | `Chan<SendRequest>` | Out-of-order channel ops | Zero | ch11 |
-| 19 | Pin Self-Referential | `Pin<Box<StreamParser>>` | Dangling intra-struct pointer | Zero | ch11 |
-| 20 | RAII / Drop | `impl Drop for Session` | Resource leak on any exit path | Zero | ch11 |
-| 21 | Error Type Hierarchy | `#[derive(Error)] enum DiagError` | Silent error swallowing | Zero | ch11 |
-| 22 | `#[must_use]` | `#[must_use] struct Token` | Silently dropped values | Zero | ch11 |
-
-### Composition Rules
+### Руководство по выбору паттерна
 
 ```text
-Capability Token + Type-State = Authorised state transitions
-Typed Command + Dimensional Type = Physically-typed responses
-Validated Boundary + Phantom Type = Typed register access on validated config
-Capability Mixin + Typed Command = Bus-aware typed operations
-Single-Use Type + Type-State = Consume-on-transition protocols
-Sealed Trait + Typed Command = Closed, sound command set
-Sentinel → Option + Validated Boundary = Clean parse-once pipeline
-Typestate Builder + Capability Token = Proof-of-complete construction
-FromStr + #[non_exhaustive] = Evolvable, fail-fast enum parsing
-Const-Generic Size + Validated Boundary = Sized, validated protocol buffers
-Safe unsafe Wrapper + Phantom Type = Typed, safe MMIO access
-Async Type-State + Capability Token = Authorised async transitions
-Session Types + Typed Command = Fully-typed request-response channels
-Pin + Type-State = Self-referential state machines that can't move
-RAII (Drop) + Type-State = State-dependent cleanup guarantees
-Error Hierarchy + Validated Boundary = Typed parse errors with exhaustive handling
-#[must_use] + Single-Use Type = Hard-to-ignore, hard-to-reuse tokens
+Ошибка катастрофична, если её пропустить?
+├── Да → Её можно закодировать в типах?
+│         ├── Да → ИСПОЛЬЗУЙТЕ КОРРЕКТНОСТЬ ПО ПОСТРОЕНИЮ
+│         └── Нет → Проверка во время выполнения + обширное тестирование
+└── Нет → Проверка во время выполнения подойдёт
 ```
 
-### Anti-Patterns to Avoid
+### Каталог паттернов
 
-| Anti-Pattern | Why It's Wrong | Correct Alternative |
-|-------------|---------------|-------------------|
-| `fn read_sensor() -> f64` | Unitless — could be °C, °F, or RPM | `fn read_sensor() -> Celsius` |
-| `fn encrypt(nonce: &[u8; 12])` | Nonce can be reused (borrow) | `fn encrypt(nonce: Nonce)` (move) |
-| `fn admin_op(is_admin: bool)` | Caller can lie (`true`) | `fn admin_op(_: &AdminToken)` |
-| `fn send(session: &Session)` | No state guarantee | `fn send(session: &Session<Active>)` |
-| `fn process(data: &[u8])` | Not validated | `fn process(data: &ValidFru)` |
-| `Clone` on ephemeral keys | Defeats single-use guarantee | Don't derive Clone |
-| `let vendor_id: u16 = 0xFFFF` | Sentinel carried internally | `let vendor_id: Option<u16> = None` |
-| `fn route(level: &str)` with fallback | Typos silently default | `let level: DiagLevel = s.parse()?` |
-| `Builder::new().finish()` without fields | Incomplete object constructed | Typestate builder: `finish()` gated on `Set` |
-| `let buf: Vec<u8>` for fixed-size HW buffer | Size only checked at runtime | `RegisterBank<4096>` (const generic) |
-| Raw `unsafe { ptr::read(...) }` scattered | UB risk, unauditable | `MmioRegion::read_u32()` safe wrapper |
-| `async fn transition(&mut self)` | Mutable borrows don't enforce state | `async fn transition(self) -> NextState` |
-| `fn cleanup()` called manually | Forgotten on early return / panic | `impl Drop` — compiler inserts call |
-| `fn op() -> Result<T, String>` | Opaque error, no variant matching | `fn op() -> Result<T, DiagError>` enum |
+| № | Паттерн | Ключевой трейт/тип | Предотвращает | Стоимость во время выполнения | Глава |
+|---|---------|--------------------|---------------|:-----------------------------:|-------|
+| 1 | Типизированные команды | `trait IpmiCmd { type Response; }` | Неверный тип ответа | Нулевая | гл. 02 |
+| 2 | Одноразовые типы | `struct Nonce` (не Clone/Copy) | Повторное использование nonce/ключа | Нулевая | гл. 03 |
+| 3 | Capability-токены | `struct AdminToken { _private: () }` | Несанкционированный доступ | Нулевая | гл. 04 |
+| 4 | Typestate | `Session<Active>` | Нарушения протокола | Нулевая | гл. 05 |
+| 5 | Размерные типы | `struct Celsius(f64)` | Путаница единиц | Нулевая | гл. 06 |
+| 6 | Проверенные границы | `struct ValidFru` (через TryFrom) | Использование непроверенных данных | Разбор один раз | гл. 07 |
+| 7 | Capability-миксины | `trait FanDiagMixin: HasSpi + HasI2c` | Отсутствие доступа к шине | Нулевая | гл. 08 |
+| 8 | Phantom-типы | `Register<Width16>` | Несоответствие ширины/направления | Нулевая | гл. 09 |
+| 9 | Sentinel → Option | `Option<u8>` (не `0xFF`) | Ошибки «sentinel как значение» | Нулевая | гл. 11 |
+| 10 | Sealed-трейты | `trait Cmd: private::Sealed` | Небезопасные внешние реализации | Нулевая | гл. 11 |
+| 11 | Non-exhaustive enum | `#[non_exhaustive] enum Sku` | Тихое проваливание в match | Нулевая | гл. 11 |
+| 12 | Билдер с typestate | `DerBuilder<Set, Missing>` | Неполное создание объекта | Нулевая | гл. 11 |
+| 13 | Валидация через FromStr | `impl FromStr for DiagLevel` | Непроверенный строковый ввод | Разбор один раз | гл. 11 |
+| 14 | Размер через const-обобщения | `RegisterBank<const N: usize>` | Несоответствие размера буфера | Нулевая | гл. 11 |
+| 15 | Безопасная обёртка `unsafe` | `MmioRegion::read_u32()` | Непроверенный MMIO/FFI | Нулевая | гл. 11 |
+| 16 | Async typestate | `AsyncSession<Active>` | Нарушения async-протокола | Нулевая | гл. 11 |
+| 17 | Const-утверждения | `SdrSensorId<const N: u8>` | Недопустимые ID на этапе компиляции | Нулевая | гл. 11 |
+| 18 | Сессионные типы | `Chan<SendRequest>` | Операции с каналом не по порядку | Нулевая | гл. 11 |
+| 19 | Самоссылочный Pin | `Pin<Box<StreamParser>>` | Висячий внутренний указатель | Нулевая | гл. 11 |
+| 20 | RAII / Drop | `impl Drop for Session` | Утечка ресурса при любом пути выхода | Нулевая | гл. 11 |
+| 21 | Иерархия типов ошибок | `#[derive(Error)] enum DiagError` | Тихое проглатывание ошибок | Нулевая | гл. 11 |
+| 22 | `#[must_use]` | `#[must_use] struct Token` | Тихо отброшенные значения | Нулевая | гл. 11 |
 
-### Mapping to a Diagnostics Codebase
+### Правила композиции
 
-| Module | Applicable Pattern(s) |
-|---------------------|----------------------|
-| `protocol_lib` | Typed commands, type-state sessions |
-| `thermal_diag` | Capability mixins, dimensional types |
-| `accel_diag` | Validated boundaries, phantom registers |
-| `network_diag` | Type-state (link training), capability tokens |
-| `pci_topology` | Phantom types (register width), validated config, sentinel → Option |
-| `event_handler` | Single-use audit tokens, capability tokens, FromStr (Component) |
-| `event_log` | Validated boundaries (SEL record parsing) |
-| `compute_diag` | Dimensional types (temperature, frequency) |
-| `memory_diag` | Validated boundaries (SPD data), dimensional types |
-| `switch_diag` | Type-state (port enumeration), phantom types |
+```text
+Capability-токен + Typestate = Авторизованные переходы состояний
+Типизированная команда + Размерный тип = Физически типизированные ответы
+Проверенная граница + Phantom-тип = Типизированный доступ к регистрам по проверенной конфигурации
+Capability-миксин + Типизированная команда = Типизированные операции с учётом шин
+Одноразовый тип + Typestate = Протоколы «потребляется при переходе»
+Sealed-трейт + Типизированная команда = Закрытый, корректный набор команд
+Sentinel → Option + Проверенная граница = Чистый конвейер «разбор один раз»
+Билдер с typestate + Capability-токен = Доказательство полного создания
+FromStr + #[non_exhaustive] = Развиваемый разбор enum с быстрым отказом
+Размер через const-обобщения + Проверенная граница = Размерные, проверенные протокольные буферы
+Безопасная обёртка unsafe + Phantom-тип = Типизированный и безопасный доступ к MMIO
+Async typestate + Capability-токен = Авторизованные async-переходы
+Сессионные типы + Типизированная команда = Полностью типизированные каналы «запрос — ответ»
+Pin + Typestate = Самоссылочные автоматы состояний, которые не могут переместиться
+RAII (Drop) + Typestate = Гарантии очистки, зависящей от состояния
+Иерархия ошибок + Проверенная граница = Типизированные ошибки разбора с исчерпывающей обработкой
+#[must_use] + Одноразовый тип = Токены, которые трудно игнорировать и трудно переиспользовать
+```
+
+### Антипаттерны, которых следует избегать
+
+| Антипаттерн | Почему это неверно | Правильная альтернатива |
+|-------------|--------------------|-------------------------|
+| `fn read_sensor() -> f64` | Без единиц: может быть °C, °F или об/мин | `fn read_sensor() -> Celsius` |
+| `fn encrypt(nonce: &[u8; 12])` | Nonce можно переиспользовать (заимствование) | `fn encrypt(nonce: Nonce)` (перемещение) |
+| `fn admin_op(is_admin: bool)` | Вызывающий может соврать (`true`) | `fn admin_op(_: &AdminToken)` |
+| `fn send(session: &Session)` | Нет гарантии состояния | `fn send(session: &Session<Active>)` |
+| `fn process(data: &[u8])` | Не проверено | `fn process(data: &ValidFru)` |
+| `Clone` для эфемерных ключей | Сводит на нет гарантию одноразовости | Не выводите Clone |
+| `let vendor_id: u16 = 0xFFFF` | Sentinel хранится внутри | `let vendor_id: Option<u16> = None` |
+| `fn route(level: &str)` с запасным вариантом | Опечатки тихо заменяются значением по умолчанию | `let level: DiagLevel = s.parse()?` |
+| `Builder::new().finish()` без полей | Создаётся неполный объект | Билдер с typestate: `finish()` открывается при `Set` |
+| `let buf: Vec<u8>` для аппаратного буфера фиксированного размера | Размер проверяется только во время выполнения | `RegisterBank<4096>` (const-обобщение) |
+| Разбросанный сырой `unsafe { ptr::read(...) }` | Риск UB, не поддаётся аудиту | `MmioRegion::read_u32()`: безопасная обёртка |
+| `async fn transition(&mut self)` | Изменяемые заимствования не обеспечивают состояние | `async fn transition(self) -> NextState` |
+| `fn cleanup()`, вызываемая вручную | Забывается при раннем возврате или панике | `impl Drop`: компилятор вставляет вызов |
+| `fn op() -> Result<T, String>` | Непрозрачная ошибка, нельзя сопоставить варианты | `fn op() -> Result<T, DiagError>`: enum |
+
+### Сопоставление с кодовой базой диагностики
+
+| Модуль | Применимые паттерны |
+|--------|---------------------|
+| `protocol_lib` | Типизированные команды, сессии с typestate |
+| `thermal_diag` | Capability-миксины, размерные типы |
+| `accel_diag` | Проверенные границы, phantom-регистры |
+| `network_diag` | Typestate (обучение линка), capability-токены |
+| `pci_topology` | Phantom-типы (ширина регистра), проверенная конфигурация, sentinel → Option |
+| `event_handler` | Одноразовые токены аудита, capability-токены, FromStr (Component) |
+| `event_log` | Проверенные границы (разбор записей SEL) |
+| `compute_diag` | Размерные типы (температура, частота) |
+| `memory_diag` | Проверенные границы (данные SPD), размерные типы |
+| `switch_diag` | Typestate (перечисление портов), phantom-типы |
 | `config_loader` | FromStr (DiagLevel, FaultStatus, DiagAction) |
-| `log_analyzer` | Validated boundaries (CompiledPatterns) |
-| `diag_framework` | Typestate builder (DerBuilder), session types (orchestrator↔worker) |
-| `topology_lib` | Const-generic register banks, safe MMIO wrappers |
+| `log_analyzer` | Проверенные границы (CompiledPatterns) |
+| `diag_framework` | Билдер с typestate (DerBuilder), сессионные типы (оркестратор ↔ воркер) |
+| `topology_lib` | Const-обобщённые банки регистров, безопасные обёртки MMIO |
 
-### Curry-Howard Cheat Sheet
+### Шпаргалка по соответствию Карри — Говарда
 
-| Logic Concept | Rust Equivalent | Example |
-|--------------|----------------|---------|
-| Proposition | Type | `AdminToken` |
-| Proof | Value of that type | `let tok = authenticate()?;` |
-| Implication (A → B) | Function `fn(A) -> B` | `fn activate(AdminToken) -> Session<Active>` |
-| Conjunction (A ∧ B) | Tuple `(A, B)` or multi-param | `fn op(a: &AdminToken, b: &LinkTrained)` |
-| Disjunction (A ∨ B) | `enum { A(A), B(B) }` or `Result<A, B>` | `Result<Session<Active>, Error>` |
-| True | `()` (unit type) | Always constructible |
-| False | `!` (never type) or `enum Void {}` | Can never be constructed |
+| Логическое понятие | Эквивалент в Rust | Пример |
+|--------------------|-------------------|--------|
+| Высказывание | Тип | `AdminToken` |
+| Доказательство | Значение этого типа | `let tok = authenticate()?;` |
+| Импликация (A → B) | Функция `fn(A) -> B` | `fn activate(AdminToken) -> Session<Active>` |
+| Конъюнкция (A ∧ B) | Кортеж `(A, B)` или несколько параметров | `fn op(a: &AdminToken, b: &LinkTrained)` |
+| Дизъюнкция (A ∨ B) | `enum { A(A), B(B) }` или `Result<A, B>` | `Result<Session<Active>, Error>` |
+| Истина | `()` (тип unit) | Всегда конструируется |
+| Ложь | `!` (тип never) или `enum Void {}` | Никогда не может быть сконструирована |
 
 ---
-

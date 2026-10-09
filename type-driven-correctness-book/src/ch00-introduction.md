@@ -1,92 +1,91 @@
-# Type-Driven Correctness in Rust
+# Корректность на уровне типов в Rust
 
-## Speaker Intro
+## Об авторе
 
-- Principal Firmware Architect in Microsoft SCHIE (Silicon and Cloud Hardware Infrastructure Engineering) team
-- Industry veteran with expertise in security, systems programming (firmware, operating systems, hypervisors), CPU and platform architecture, and C++ systems
-- Started programming in Rust in 2017 (@AWS EC2), and have been in love with the language ever since
+- Главный архитектор по прошивкам в команде Microsoft SCHIE (Silicon and Cloud Hardware Infrastructure Engineering).
+- Инженер с многолетним опытом в области безопасности, системного программирования (прошивки, операционные системы, гипервизоры), архитектуры процессоров и платформ, а также больших систем на C++.
+- Пишет на Rust с 2017 года, со времен AWS EC2, и с тех пор остается убежденным сторонником этого языка.
 
 ---
 
-A practical guide to using Rust's type system to make entire classes of bugs **impossible to compile**. While the companion [Rust Patterns](../rust-patterns-book/index.html) book covers the mechanics (traits, associated types, type-state), this guide shows how to **apply** those mechanics to real-world domains — hardware diagnostics, cryptography, protocol validation, and embedded systems.
+Это практическое руководство по использованию системы типов Rust, чтобы целые классы ошибок становились **невозможными для компиляции**. Сопутствующая книга [Паттерны Rust](../rust-patterns-book/index.html) объясняет механику (трейты, ассоциированные типы, typestate), а это руководство показывает, как **применять** эту механику к реальным задачам: диагностике аппаратного обеспечения, криптографии, валидации протоколов и встраиваемым системам.
 
-Every pattern here follows one principle: **push invariants from runtime checks into the type system so the compiler enforces them.**
+Все паттерны здесь следуют одному принципу: **переносите инварианты из проверок во время выполнения в систему типов, чтобы компилятор обеспечивал их соблюдение.**
 
-## How to Use This Book
+## Как работать с книгой
 
-### Difficulty Legend
+### Уровни сложности
 
-| Symbol | Level | Audience |
-|:------:|-------|----------|
-| 🟢 | Introductory | Comfortable with ownership + traits |
-| 🟡 | Intermediate | Familiar with generics + associated types |
-| 🔴 | Advanced | Ready for type-state, phantom types, and session types |
+| Символ | Уровень | Для кого |
+|:------:|---------|----------|
+| 🟢 | Вводный | Уверенно владеете владением и трейтами |
+| 🟡 | Средний | Знакомы с обобщениями и ассоциированными типами |
+| 🔴 | Продвинутый | Готовы к typestate, phantom-типам и сессионным типам |
 
-### Pacing Guide
+### Рекомендации по темпу
 
-| Goal | Path | Time |
-|------|------|------|
-| **Quick overview** | ch01, ch13 (reference card) | 30 min |
-| **IPMI / BMC developer** | ch02, ch05, ch07, ch10, ch17 | 2.5 hrs |
-| **GPU / PCIe developer** | ch02, ch06, ch09, ch10, ch15 | 2.5 hrs |
-| **Redfish implementer** | ch02, ch05, ch07, ch08, ch17, ch18 | 3 hrs |
-| **Framework / infrastructure** | ch04, ch08, ch11, ch14, ch18 | 2.5 hrs |
-| **New to correct-by-construction** | ch01 → ch10 in order, then ch12 exercises | 4 hrs |
-| **Full deep dive** | All chapters sequentially | 7 hrs |
+| Цель | Маршрут | Время |
+|------|---------|-------|
+| **Быстрый обзор** | гл. 01, гл. 13 (шпаргалка) | 30 мин |
+| **Разработчик IPMI / BMC** | гл. 02, 05, 07, 10, 17 | 2,5 ч |
+| **Разработчик GPU / PCIe** | гл. 02, 06, 09, 10, 15 | 2,5 ч |
+| **Реализация Redfish** | гл. 02, 05, 07, 08, 17, 18 | 3 ч |
+| **Фреймворки и инфраструктура** | гл. 04, 08, 11, 14, 18 | 2,5 ч |
+| **Новичок в корректности по построению** | гл. 01 → 10 по порядку, затем упражнения гл. 12 | 4 ч |
+| **Полное погружение** | Все главы по порядку | 7 ч |
 
-### Annotated Table of Contents
+### Аннотированное оглавление
 
-| Ch | Title | Difficulty | Key Idea |
-|----|-------|:----------:|----------|
-| 1 | The Philosophy — Why Types Beat Tests | 🟢 | Three levels of correctness; Curry-Howard intuition |
-| 2 | Typed Command Interfaces | 🟡 | Associated types bind request → response |
-| 3 | Single-Use Types | 🟡 | Move semantics as linear types for crypto |
-| 4 | Capability Tokens | 🟡 | Zero-sized proof-of-authority tokens |
-| 5 | Protocol State Machines | 🔴 | Type-state for IPMI sessions + PCIe LTSSM |
-| 6 | Dimensional Analysis | 🟢 | Newtype wrappers prevent unit mix-ups |
-| 7 | Validated Boundaries | 🟡 | Parse once at the edge, carry proof in types |
-| 8 | Capability Mixins | 🟡 | Ingredient traits + blanket impls |
-| 9 | Phantom Types | 🟡 | PhantomData for register width, DMA direction |
-| 10 | Putting It All Together | 🟡 | All 7 patterns in one diagnostic platform |
-| 11 | Fourteen Tricks from the Trenches | 🟡 | Sentinel→Option, sealed traits, builders, etc. |
-| 12 | Exercises | 🟡 | Six capstone problems with solutions |
-| 13 | Reference Card | — | Pattern catalogue + decision flowchart |
-| 14 | Testing Type-Level Guarantees | 🟡 | trybuild, proptest, cargo-show-asm |
-| 15 | Const Fn | 🟠 | Compile-time proofs for memory maps, registers, bitfields |
-| 16 | Send & Sync | 🟠 | Compile-time concurrency proofs |
-| 17 | Redfish Client Walkthrough | 🟡 | Eight patterns composed into a type-safe Redfish client |
-| 18 | Redfish Server Walkthrough | 🟡 | Builder type-state, source tokens, health rollup, mixins |
+| Гл. | Название | Сложность | Ключевая идея |
+|:---:|----------|:---------:|---------------|
+| 1 | Философия: почему типы лучше тестов | 🟢 | Три уровня корректности; интуиция соответствия Карри — Говарда |
+| 2 | Типизированные командные интерфейсы | 🟡 | Ассоциированные типы связывают запрос с ответом |
+| 3 | Одноразовые типы | 🟡 | Семантика перемещения как линейные типы для криптографии |
+| 4 | Capability-токены | 🟡 | Токены-доказательства полномочий нулевого размера |
+| 5 | Автоматы состояний протоколов | 🔴 | Typestate для сессий IPMI и LTSSM в PCIe |
+| 6 | Анализ размерностей | 🟢 | Обёртки newtype не дают перепутать единицы измерения |
+| 7 | Проверенные границы | 🟡 | Разбор данных один раз на границе, доказательство хранится в типах |
+| 8 | Capability-миксины | 🟡 | Трейты-ингредиенты и blanket impl |
+| 9 | Phantom-типы | 🟡 | PhantomData для ширины регистров и направления DMA |
+| 10 | Собираем всё вместе | 🟡 | Все 7 паттернов в одной платформе диагностики |
+| 11 | Четырнадцать проверенных приёмов | 🟡 | Sentinel → Option, sealed-трейты, билдеры и др. |
+| 12 | Упражнения | 🟡 | Шесть итоговых задач с решениями |
+| 13 | Краткая шпаргалка | — | Каталог паттернов и блок-схема выбора |
+| 14 | Тестирование гарантий на уровне типов | 🟡 | trybuild, proptest, cargo-show-asm |
+| 15 | Const fn: доказательства корректности на этапе компиляции | 🟠 | Карты памяти, регистры и битовые поля |
+| 16 | Send и Sync: доказательства корректности конкурентности | 🟠 | Проверки конкурентности на этапе компиляции |
+| 17 | Пошаговый разбор: клиент Redfish | 🟡 | Восемь паттернов в типобезопасном клиенте Redfish |
+| 18 | Пошаговый разбор: сервер Redfish | 🟡 | Typestate билдера, токены источников, агрегация состояния здоровья, миксины |
 
-## Prerequisites
+## Что желательно знать заранее
 
-| Concept | Where to learn it |
-|---------|-------------------|
-| Ownership and borrowing | [Rust Patterns](../rust-patterns-book/index.html), ch01 |
-| Traits and associated types | [Rust Patterns](../rust-patterns-book/index.html), ch02 |
-| Newtypes and type-state | [Rust Patterns](../rust-patterns-book/index.html), ch03 |
-| PhantomData | [Rust Patterns](../rust-patterns-book/index.html), ch04 |
-| Generics and trait bounds | [Rust Patterns](../rust-patterns-book/index.html), ch01 |
+| Концепция | Где изучить |
+|-----------|-------------|
+| Владение и заимствование | [Паттерны Rust](../rust-patterns-book/index.html), гл. 01 |
+| Трейты и ассоциированные типы | [Паттерны Rust](../rust-patterns-book/index.html), гл. 02 |
+| Newtype и typestate | [Паттерны Rust](../rust-patterns-book/index.html), гл. 03 |
+| PhantomData | [Паттерны Rust](../rust-patterns-book/index.html), гл. 04 |
+| Обобщения и ограничения трейтов | [Паттерны Rust](../rust-patterns-book/index.html), гл. 01 |
 
-## The Correct-by-Construction Spectrum
+## Спектр корректности по построению
 
 ```text
-← Less Safe                                                    More Safe →
+← Менее безопасно                                             Более безопасно →
 
-Runtime checks      Unit tests        Property tests      Correct by Construction
-─────────────       ──────────        ──────────────      ──────────────────────
+Проверки в рантайме  Модульные тесты   Property-тесты        Корректность по построению
+───────────────────  ────────────────  ──────────────        ──────────────────────────
 
-if temp > 100 {     #[test]           proptest! {         struct Celsius(f64);
-  panic!("too       fn test_temp() {    |t in 0..200| {   // Can't confuse with Rpm
-  hot");              assert!(          assert!(...)       // at the type level
-}                     check(42));     }
-                    }                 }
-                                                          Invalid program?
-Invalid program?    Invalid program?  Invalid program?    Won't compile.
-Crashes in prod.    Fails in CI.      Fails in CI         Never exists.
-                                      (probabilistic).
+if temp > 100 {      #[test]           proptest! {           struct Celsius(f64);
+  panic!("слишком    fn test_temp() {    |t in 0..200| {     // Нельзя перепутать с Rpm
+  жарко");               assert!(          assert!(...)       // на уровне типов
+}                      check(42));     }
+                     }                 }
+                                                            Некорректная программа?
+Неверный код?        Неверный код?     Неверный код?         Не скомпилируется.
+Падает в проде.      Падает в CI.      Падает в CI           Её не существует.
+                                       (вероятностно).
 ```
 
-This guide operates at the rightmost position — where bugs don't exist because the type system **cannot express them**.
+Это руководство работает в самой правой позиции — там, где ошибок не бывает, потому что система типов **не может их выразить**.
 
 ---
-

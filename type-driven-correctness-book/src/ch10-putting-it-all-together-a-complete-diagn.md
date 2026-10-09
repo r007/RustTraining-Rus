@@ -1,26 +1,25 @@
-# Putting It All Together — A Complete Diagnostic Platform 🟡
+# Собираем всё вместе: полная платформа диагностики 🟡
 
-> **What you'll learn:** How all seven core patterns (ch02–ch09) compose into a single diagnostic workflow — authentication, sessions, typed commands, audit tokens, dimensional results, validated data, and phantom-typed registers — with zero total runtime overhead.
+> **Что вы узнаете:** как все семь основных паттернов (гл. 02–09) объединяются в единый диагностический сценарий: аутентификация, сессии, типизированные команды, токены аудита, размерные результаты, проверенные данные и регистры с phantom-типами. Суммарные накладные расходы во время выполнения при этом равны нулю.
 >
-> **Cross-references:** Every core pattern chapter (ch02–ch09), [ch14](ch14-testing-type-level-guarantees.md) (testing these guarantees)
+> **Перекрёстные ссылки:** каждая глава с основными паттернами (гл. 02–09), [гл. 14](ch14-testing-type-level-guarantees.md) (тестирование этих гарантий)
 
-## Goal
+## Цель
 
-This chapter combines **seven patterns** from chapters 2–9 into a single, realistic
-diagnostic workflow. We'll build a server health check that:
+Эта глава объединяет **семь паттернов** из глав 2–9 в единый реалистичный диагностический сценарий. Мы построим проверку состояния сервера, которая:
 
-1. **Authenticates** (capability token — ch04)
-2. **Opens an IPMI session** (type-state — ch05)
-3. **Sends typed commands** (typed commands — ch02)
-4. **Uses single-use tokens** for audit logging (single-use types — ch03)
-5. **Returns dimensional results** (dimensional analysis — ch06)
-6. **Validates FRU data** (validated boundaries — ch07)
-7. **Reads typed registers** (phantom types — ch09)
+1. **Проходит аутентификацию** (capability-токен, гл. 04)
+2. **Открывает сессию IPMI** (typestate, гл. 05)
+3. **Отправляет типизированные команды** (типизированные команды, гл. 02)
+4. **Использует одноразовые токены** для журнала аудита (одноразовые типы, гл. 03)
+5. **Возвращает размерные результаты** (анализ размерностей, гл. 06)
+6. **Проверяет данные FRU** (проверенные границы, гл. 07)
+7. **Читает типизированные регистры** (phantom-типы, гл. 09)
 
 ```rust,ignore
 use std::marker::PhantomData;
 use std::io;
-// ──── Pattern 1: Dimensional Types (ch06) ────
+// ──── Паттерн 1: размерные типы (гл. 06) ────
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub struct Celsius(pub f64);
@@ -31,11 +30,11 @@ pub struct Rpm(pub f64);
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub struct Volts(pub f64);
 
-// ──── Pattern 2: Typed Commands (ch02) ────
+// ──── Паттерн 2: типизированные команды (гл. 02) ────
 
-/// Same trait shape as ch02, using methods (not associated constants)
-/// for consistency. Associated constants (`const NETFN: u8`) are an
-/// equally valid alternative when the value is truly fixed per type.
+/// Та же форма трейта, что в гл. 02; здесь используются методы (а не ассоциированные
+/// константы) для единообразия. Ассоциированные константы (`const NETFN: u8`) — равноценная
+/// альтернатива, если значение действительно фиксировано для типа.
 pub trait IpmiCmd {
     type Response;
     fn net_fn(&self) -> u8;
@@ -46,13 +45,13 @@ pub trait IpmiCmd {
 
 pub struct ReadTemp { pub sensor_id: u8 }
 impl IpmiCmd for ReadTemp {
-    type Response = Celsius;   // ← dimensional type!
+    type Response = Celsius;   // ← размерный тип!
     fn net_fn(&self) -> u8 { 0x04 }
     fn cmd_byte(&self) -> u8 { 0x2D }
     fn payload(&self) -> Vec<u8> { vec![self.sensor_id] }
     fn parse_response(&self, raw: &[u8]) -> io::Result<Celsius> {
         if raw.is_empty() {
-            return Err(io::Error::new(io::ErrorKind::InvalidData, "empty"));
+            return Err(io::Error::new(io::ErrorKind::InvalidData, "пустой ответ"));
         }
         Ok(Celsius(raw[0] as f64))
     }
@@ -66,13 +65,13 @@ impl IpmiCmd for ReadFanSpeed {
     fn payload(&self) -> Vec<u8> { vec![self.fan_id] }
     fn parse_response(&self, raw: &[u8]) -> io::Result<Rpm> {
         if raw.len() < 2 {
-            return Err(io::Error::new(io::ErrorKind::InvalidData, "need 2 bytes"));
+            return Err(io::Error::new(io::ErrorKind::InvalidData, "нужно 2 байта"));
         }
         Ok(Rpm(u16::from_le_bytes([raw[0], raw[1]]) as f64))
     }
 }
 
-// ──── Pattern 3: Capability Token (ch04) ────
+// ──── Паттерн 3: capability-токен (гл. 04) ────
 
 pub struct AdminToken { _private: () }
 
@@ -80,11 +79,11 @@ pub fn authenticate(user: &str, pass: &str) -> Result<AdminToken, &'static str> 
     if user == "admin" && pass == "secret" {
         Ok(AdminToken { _private: () })
     } else {
-        Err("authentication failed")
+        Err("аутентификация не пройдена")
     }
 }
 
-// ──── Pattern 4: Type-State Session (ch05) ────
+// ──── Паттерн 4: сессия с typestate (гл. 05) ────
 
 pub struct Idle;
 pub struct Active;
@@ -101,32 +100,32 @@ impl Session<Idle> {
 
     pub fn activate(
         self,
-        _admin: &AdminToken,  // ← requires capability token
+        _admin: &AdminToken,  // ← требует capability-токен
     ) -> Result<Session<Active>, String> {
-        println!("Session activated on {}", self.host);
+        println!("Сессия активирована на {}", self.host);
         Ok(Session { host: self.host, _state: PhantomData })
     }
 }
 
 impl Session<Active> {
-    /// Execute a typed command — only available on Active sessions.
-    /// Returns io::Result to propagate transport errors (consistent with ch02).
+    /// Выполняет типизированную команду — доступно только для активных сессий.
+    /// Возвращает io::Result, чтобы пробрасывать ошибки транспорта (согласованно с гл. 02).
     pub fn execute<C: IpmiCmd>(&mut self, cmd: &C) -> io::Result<C::Response> {
         let raw_response = self.raw_send(cmd.net_fn(), cmd.cmd_byte(), &cmd.payload())?;
         cmd.parse_response(&raw_response)
     }
 
     fn raw_send(&self, _nf: u8, _cmd: u8, _data: &[u8]) -> io::Result<Vec<u8>> {
-        Ok(vec![42, 0x1E]) // stub: raw IPMI response
+        Ok(vec![42, 0x1E]) // заглушка: сырой ответ IPMI
     }
 
-    pub fn close(self) { println!("Session closed"); }
+    pub fn close(self) { println!("Сессия закрыта"); }
 }
 
-// ──── Pattern 5: Single-Use Audit Token (ch03) ────
+// ──── Паттерн 5: одноразовый токен аудита (гл. 03) ────
 
-/// Each diagnostic run gets a unique audit token.
-/// Not Clone, not Copy — ensures each audit entry is unique.
+/// Каждый запуск диагностики получает уникальный токен аудита.
+/// Не Clone, не Copy: гарантирует, что каждая запись аудита уникальна.
 pub struct AuditToken {
     run_id: u64,
 }
@@ -136,16 +135,16 @@ impl AuditToken {
         AuditToken { run_id }
     }
 
-    /// Consume the token to write an audit log entry.
+    /// Потребляет токен для записи в журнал аудита.
     pub fn log(self, message: &str) {
-        println!("[AUDIT run_id={}] {}", self.run_id, message);
-        // token is consumed — can't log the same run_id twice
+        println!("[АУДИТ run_id={}] {}", self.run_id, message);
+        // токен потреблён — нельзя записать один и тот же run_id дважды
     }
 }
 
-// ──── Pattern 6: Validated Boundary (ch07) ────
-// Simplified from ch07's full ValidFru — only the fields needed for this
-// composite example.  See ch07 for the complete TryFrom<RawFruData> version.
+// ──── Паттерн 6: проверенная граница (гл. 07) ────
+// Упрощено по сравнению с полным ValidFru из гл. 07: только поля, нужные для этого
+// составного примера. Полную версию TryFrom<RawFruData> см. в гл. 07.
 
 pub struct ValidFru {
     pub board_serial: String,
@@ -154,22 +153,22 @@ pub struct ValidFru {
 
 impl ValidFru {
     pub fn parse(raw: &[u8]) -> Result<Self, &'static str> {
-        if raw.len() < 8 { return Err("FRU too short"); }
-        if raw[0] != 0x01 { return Err("bad FRU version"); }
+        if raw.len() < 8 { return Err("FRU слишком короткий"); }
+        if raw[0] != 0x01 { return Err("неверная версия FRU"); }
         Ok(ValidFru {
-            board_serial: "SN12345".to_string(),  // stub
+            board_serial: "SN12345".to_string(),  // заглушка
             product_name: "ServerX".to_string(),
         })
     }
 }
 
-// ──── Pattern 7: Phantom-Typed Registers (ch09) ────
+// ──── Паттерн 7: регистры с phantom-типом (гл. 09) ────
 
 pub struct Width16;
 pub struct Reg<W> { offset: u16, _w: PhantomData<W> }
 
 impl Reg<Width16> {
-    pub fn read(&self) -> u16 { 0x8086 } // stub
+    pub fn read(&self) -> u16 { 0x8086 } // заглушка
 }
 
 pub struct PcieDev {
@@ -186,82 +185,80 @@ impl PcieDev {
     }
 }
 
-// ──── Composite Workflow ────
+// ──── Составной сценарий ────
 
 fn full_diagnostic() -> Result<(), String> {
-    // 1. Authenticate → get capability token
+    // 1. Аутентификация → получаем capability-токен
     let admin = authenticate("admin", "secret")
         .map_err(|e| e.to_string())?;
 
-    // 2. Connect and activate session (type-state: Idle → Active)
+    // 2. Подключение и активация сессии (typestate: Idle → Active)
     let session = Session::connect("192.168.1.100");
-    let mut session = session.activate(&admin)?;  // requires AdminToken
+    let mut session = session.activate(&admin)?;  // требует AdminToken
 
-    // 3. Send typed commands (response type matches command)
+    // 3. Отправляем типизированные команды (тип ответа соответствует команде)
     let temp: Celsius = session.execute(&ReadTemp { sensor_id: 0 })
         .map_err(|e| e.to_string())?;
     let fan: Rpm = session.execute(&ReadFanSpeed { fan_id: 1 })
         .map_err(|e| e.to_string())?;
 
-    // Type mismatch would be caught:
+    // Несоответствие типов будет поймано:
     // let wrong: Volts = session.execute(&ReadTemp { sensor_id: 0 })?;
-    //  ❌ ERROR: expected Celsius, found Volts
+    //  ❌ ОШИБКА: expected Celsius, found Volts
 
-    // 4. Read phantom-typed PCIe registers
+    // 4. Читаем регистры PCIe с phantom-типом
     let pcie = PcieDev::new();
-    let vid: u16 = pcie.vendor_id.read();  // guaranteed u16
+    let vid: u16 = pcie.vendor_id.read();  // гарантированно u16
 
-    // 5. Validate FRU data at the boundary
+    // 5. Проверяем данные FRU на границе
     let raw_fru = vec![0x01, 0x00, 0x00, 0x01, 0x01, 0x00, 0x00, 0xFD];
     let fru = ValidFru::parse(&raw_fru)
         .map_err(|e| e.to_string())?;
 
-    // 6. Issue single-use audit token
+    // 6. Выдаём одноразовый токен аудита
     let audit = AuditToken::issue(1001);
 
-    // 7. Generate report (all data is typed and validated)
+    // 7. Формируем отчёт (все данные типизированы и проверены)
     let report = format!(
-        "Server: {} (SN: {}), VID: 0x{:04X}, CPU: {:?}, Fan: {:?}",
+        "Сервер: {} (SN: {}), VID: 0x{:04X}, CPU: {:?}, Вентилятор: {:?}",
         fru.product_name, fru.board_serial, vid, temp, fan,
     );
 
-    // 8. Consume audit token — can't log twice
+    // 8. Потребляем токен аудита — записать дважды нельзя
     audit.log(&report);
-    // audit.log("oops");  // ❌ use of moved value
+    // audit.log("повтор");  // ❌ use of moved value
 
-    // 9. Close session (type-state: Active → dropped)
+    // 9. Закрываем сессию (typestate: Active → уничтожена)
     session.close();
 
     Ok(())
 }
 ```
 
-### What the Compiler Proves
+### Что доказывает компилятор
 
-| Bug class | How it's prevented | Pattern |
-|-----------|-------------------|---------|
-| Unauthenticated access | `activate()` requires `&AdminToken` | Capability token |
-| Command in wrong session state | `execute()` only exists on `Session<Active>` | Type-state |
-| Wrong response type | `ReadTemp::Response = Celsius`, fixed by trait | Typed commands |
-| Unit confusion (°C vs RPM) | `Celsius` ≠ `Rpm` ≠ `Volts` | Dimensional types |
-| Register width mismatch | `Reg<Width16>` returns `u16` | Phantom types |
-| Processing unvalidated data | Must call `ValidFru::parse()` first | Validated boundary |
-| Duplicate audit entries | `AuditToken` is consumed on log | Single-use type |
-| Out-of-order power sequencing | Each step requires previous token | Capability tokens (ch04) |
+| Класс ошибки | Как это предотвращается | Паттерн |
+|--------------|-------------------------|---------|
+| Доступ без аутентификации | `activate()` требует `&AdminToken` | Capability-токен |
+| Команда в неверном состоянии сессии | `execute()` существует только у `Session<Active>` | Typestate |
+| Неверный тип ответа | `ReadTemp::Response = Celsius`, фиксируется трейтом | Типизированные команды |
+| Путаница единиц (°C и об/мин) | `Celsius` ≠ `Rpm` ≠ `Volts` | Размерные типы |
+| Несоответствие ширины регистра | `Reg<Width16>` возвращает `u16` | Phantom-типы |
+| Обработка непроверенных данных | Сначала нужно вызвать `ValidFru::parse()` | Проверенная граница |
+| Дублирование записей аудита | `AuditToken` потребляется при записи в журнал | Одноразовый тип |
+| Нарушение порядка подачи питания | Каждый шаг требует токен предыдущего | Capability-токены (гл. 04) |
 
-**Total runtime overhead of ALL these guarantees: zero.**
+**Суммарные накладные расходы во время выполнения от ВСЕХ этих гарантий: ноль.**
 
-Every check happens at compile time. The generated assembly is identical to
-hand-written C code with no checks at all — but **C can have bugs, this can't**.
+Каждая проверка происходит на этапе компиляции. Сгенерированный ассемблер идентичен рукописному коду на C без единой проверки, но **в C могут быть ошибки, а здесь — нет**.
 
-## Key Takeaways
+## Ключевые выводы
 
-1. **Seven patterns compose seamlessly** — capability tokens, type-state, typed commands, single-use types, dimensional types, validated boundaries, and phantom types all work together.
-2. **The compiler proves eight bug classes impossible** — see the "What the Compiler Proves" table above.
-3. **Zero total runtime overhead** — the generated assembly is identical to unchecked C code.
-4. **Each pattern is independently useful** — you don't need all seven; adopt them incrementally.
-5. **The integration chapter is a design template** — use it as a starting point for your own typed diagnostic workflows.
-6. **From IPMI to Redfish at scale** — ch17 and ch18 apply these same seven patterns (plus capability mixins from ch08) to a full Redfish client and server. The IPMI workflow here is the foundation; the Redfish walkthroughs show how the composition scales to production systems with multiple data sources and schema-version constraints.
+1. **Семь паттернов сочетаются без швов**: capability-токены, typestate, типизированные команды, одноразовые типы, размерные типы, проверенные границы и phantom-типы работают вместе.
+2. **Компилятор доказывает невозможность восьми классов ошибок**: см. таблицу «Что доказывает компилятор» выше.
+3. **Нулевые суммарные накладные расходы во время выполнения**: сгенерированный ассемблер идентичен коду на C без проверок.
+4. **Каждый паттерн полезен сам по себе**: не обязательно использовать все семь; внедряйте их постепенно.
+5. **Глава с интеграцией — это шаблон проектирования**: используйте её как отправную точку для собственных типизированных диагностических сценариев.
+6. **От IPMI к Redfish в масштабе**: гл. 17 и 18 применяют эти же семь паттернов (плюс capability-миксины из гл. 08) к полному клиенту и серверу Redfish. Сценарий IPMI здесь — основа; пошаговые разборы Redfish показывают, как композиция масштабируется до производственных систем с несколькими источниками данных и ограничениями версий схем.
 
 ---
-

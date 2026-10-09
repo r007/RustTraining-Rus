@@ -1,67 +1,65 @@
-# Typed Command Interfaces — Request Determines Response 🟡
+# Типизированные командные интерфейсы: запрос определяет ответ 🟡
 
-> **What you'll learn:** How associated types on a command trait create a compile-time binding between request and response, eliminating mismatched parsing, unit confusion, and silent type coercion across IPMI, Redfish, and NVMe protocols.
+> **Что вы узнаете:** как ассоциированные типы в трейте команды создают связь между запросом и ответом на этапе компиляции, устраняя рассогласованный разбор данных, путаницу единиц измерения и тихое приведение типов в протоколах IPMI, Redfish и NVMe.
 >
-> **Cross-references:** [ch01](ch01-the-philosophy-why-types-beat-tests.md) (philosophy), [ch06](ch06-dimensional-analysis-making-the-compiler.md) (dimensional types), [ch07](ch07-validated-boundaries-parse-dont-validate.md) (validated boundaries), [ch10](ch10-putting-it-all-together-a-complete-diagn.md) (integration)
+> **Перекрёстные ссылки:** [гл. 01](ch01-the-philosophy-why-types-beat-tests.md) (философия), [гл. 06](ch06-dimensional-analysis-making-the-compiler.md) (размерные типы), [гл. 07](ch07-validated-boundaries-parse-dont-validate.md) (проверенные границы), [гл. 10](ch10-putting-it-all-together-a-complete-diagn.md) (интеграция)
 
-## The Untyped Swamp
+## Неструктурированное болото
 
-Most hardware management stacks — IPMI, Redfish, NVMe Admin, PLDM — start life as
-`raw bytes in → raw bytes out`. This creates a category of bugs that tests can only
-partially find:
+Большинство стеков управления аппаратным обеспечением — IPMI, Redfish, NVMe Admin, PLDM — начинаются с модели `сырые байты на входе → сырые байты на выходе`. Это порождает класс ошибок, которые тесты могут найти лишь частично:
 
 ```rust,ignore
 use std::io;
 
-struct BmcRaw { /* ipmitool handle */ }
+struct BmcRaw { /* дескриптор ipmitool */ }
 
 impl BmcRaw {
     fn raw_command(&self, net_fn: u8, cmd: u8, data: &[u8]) -> io::Result<Vec<u8>> {
-        // ... shells out to ipmitool ...
-        Ok(vec![0x00, 0x19, 0x00]) // stub
+        // ... вызывает ipmitool ...
+        Ok(vec![0x00, 0x19, 0x00]) // заглушка
     }
 }
 
 fn diagnose_thermal(bmc: &BmcRaw) -> io::Result<()> {
     let raw = bmc.raw_command(0x04, 0x2D, &[0x20])?;
-    let cpu_temp = raw[0] as f64;        // 🤞 is byte 0 the reading?
+    let cpu_temp = raw[0] as f64;        // 🤞 а байт 0 — точно показание?
 
     let raw = bmc.raw_command(0x04, 0x2D, &[0x30])?;
-    let fan_rpm = raw[0] as u32;         // 🐛 fan speed is 2 bytes LE
+    let fan_rpm = raw[0] as u32;         // 🐛 скорость вентилятора — 2 байта, little-endian
 
     let raw = bmc.raw_command(0x04, 0x2D, &[0x40])?;
-    let voltage = raw[0] as f64;         // 🐛 need to divide by 1000
+    let voltage = raw[0] as f64;         // 🐛 нужно поделить на 1000
 
-    if cpu_temp > fan_rpm as f64 {       // 🐛 comparing °C to RPM
-        println!("uh oh");
+    if cpu_temp > fan_rpm as f64 {       // 🐛 сравниваем °C с об/мин
+        println!("упс");
     }
 
-    log_temp(voltage);                   // 🐛 passing Volts as temperature
+    log_temp(voltage);                   // 🐛 передаём вольты как температуру
     Ok(())
 }
 
-fn log_temp(t: f64) { println!("Temp: {t}°C"); }
+fn log_temp(t: f64) { println!("Температура: {t}°C"); }
 ```
 
-| # | Bug | Discovered |
-|---|-----|------------|
-| 1 | Fan RPM parsed as 1 byte instead of 2 | Production, 3 AM |
-| 2 | Voltage not scaled | Every PSU flagged as overvoltage |
-| 3 | Comparing °C to RPM | Maybe never |
-| 4 | Volts passed to temp logger | 6 months later, reading historical data |
+| № | Ошибка | Когда обнаружена |
+|---|--------|------------------|
+| 1 | Скорость вентилятора разобрана как 1 байт вместо 2 | В продакшене, в 3 часа ночи |
+| 2 | Напряжение не масштабировано | Каждый блок питания помечен как перенапряжение |
+| 3 | Сравнение °C с об/мин | Возможно, никогда |
+| 4 | Вольты переданы в логгер температуры | Через полгода, при чтении исторических данных |
 
-**Root cause:** Everything is `Vec<u8>` → `f64` → pray.
+**Первопричина:** всё превращено в `Vec<u8>` → `f64` → и молимся.
 
-## The Typed Command Pattern
+## Паттерн типизированной команды
 
-### Step 1 — Domain newtypes
+### Шаг 1 — Доменные newtype
 
 ```rust,ignore
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub struct Celsius(pub f64);
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
-pub struct Rpm(pub u32);  // u32: raw IPMI sensor value (integer RPM)
+pub struct Rpm(pub u32);  // u32: сырое целочисленное показание датчика IPMI (об/мин)
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub struct Volts(pub f64);
@@ -70,43 +68,31 @@ pub struct Volts(pub f64);
 pub struct Watts(pub f64);
 ```
 
-> **Note on `Rpm(u32)` vs `Rpm(f64)`:** In this chapter the inner type is `u32`
-> because IPMI sensor readings are integer values. In ch06 (Dimensional Analysis),
-> `Rpm` uses `f64` to support arithmetic operations (averaging, scaling). Both
-> are valid — the newtype prevents cross-unit confusion regardless of inner type.
+> **Примечание о `Rpm(u32)` и `Rpm(f64)`:** в этой главе внутренний тип — `u32`, потому что показания датчиков IPMI — целые значения. В гл. 06 (анализ размерностей) `Rpm` использует `f64`, чтобы поддерживать арифметические операции (усреднение, масштабирование). Оба варианта допустимы: newtype предотвращает путаницу между единицами независимо от внутреннего типа.
 
-### Step 2 — The command trait (type-indexed dispatch)
+### Шаг 2 — Трейт команды (диспетчеризация по индексу типа)
 
-> **Background: GADTs in one paragraph.**
-> In Haskell and similar languages, a *Generalised Algebraic Data Type*
-> ([GADT](https://wiki.haskell.org/GADTs_for_dummies)) lets each constructor of a
-> data type fix the type parameter to something specific.  For example,
-> `ReadTemp :: SensorId -> Cmd Celsius` says "constructing a `ReadTemp` value
-> produces a `Cmd` whose type parameter is always `Celsius`."
-> Rust achieves the same thing differently: an **associated type** on a trait
-> lets each implementing struct pin the response type at compile time.
-> You don't need to know Haskell to use this pattern — the Rust version is
-> self-contained.
+> **Справочно: GADT за один абзац.**
+> В Haskell и похожих языках *обобщённый алгебраический тип данных* ([GADT](https://wiki.haskell.org/GADTs_for_dummies)) позволяет каждому конструктору зафиксировать параметр типа конкретным значением. Например, `ReadTemp :: SensorId -> Cmd Celsius` означает: «создание значения `ReadTemp` даёт `Cmd`, параметр типа которого всегда `Celsius`».
+> В Rust то же самое достигается иначе: **ассоциированный тип** трейта позволяет каждой реализующей структуре зафиксировать тип ответа на этапе компиляции. Знать Haskell для использования этого паттерна не нужно — версия на Rust самодостаточна.
 
-The associated type `Response` is the key — it binds each command struct to its
-return type.  Each implementing struct pins `Response` to a specific domain type,
-so `execute()` always returns exactly the right type:
+Ассоциированный тип `Response` — ключевой элемент: он связывает каждую структуру команды с её возвращаемым типом. Каждая реализующая структура фиксирует `Response` на конкретном доменном типе, поэтому `execute()` всегда возвращает ровно нужный тип:
 
 ```rust,ignore
 pub trait IpmiCmd {
-    /// The "type index" — determines what execute() returns.
+    /// «Индекс типа» — определяет, что возвращает execute().
     type Response;
 
     fn net_fn(&self) -> u8;
     fn cmd_byte(&self) -> u8;
     fn payload(&self) -> Vec<u8>;
 
-    /// Parsing encapsulated here — each command knows its own byte layout.
+    /// Разбор инкапсулирован здесь — каждая команда знает свою раскладку байтов.
     fn parse_response(&self, raw: &[u8]) -> io::Result<Self::Response>;
 }
 ```
 
-### Step 3 — One struct per command
+### Шаг 3 — Одна структура на команду
 
 ```rust,ignore
 pub struct ReadTemp { pub sensor_id: u8 }
@@ -117,15 +103,15 @@ impl IpmiCmd for ReadTemp {
     fn payload(&self) -> Vec<u8> { vec![self.sensor_id] }
     fn parse_response(&self, raw: &[u8]) -> io::Result<Celsius> {
         if raw.is_empty() {
-            return Err(io::Error::new(io::ErrorKind::InvalidData, "empty response"));
+            return Err(io::Error::new(io::ErrorKind::InvalidData, "пустой ответ"));
         }
-        // Note: ch01's untyped example uses `raw[0] as i8 as f64` (signed)
-        // because that function was demonstrating generic parsing without
-        // SDR metadata. Here we use unsigned (`as f64`) because the SDR
-        // linearization formula in IPMI spec §35.5 converts the unsigned
-        // raw reading to a calibrated value. In production, apply the
-        // full SDR formula: result = (M × raw + B) × 10^(R_exp).
-        Ok(Celsius(raw[0] as f64))  // unsigned raw byte, converted per SDR formula
+        // Примечание: нетипизированный пример из гл. 01 использует `raw[0] as i8 as f64`
+        // (со знаком), потому что та функция демонстрировала обобщённый разбор без
+        // метаданных SDR. Здесь мы используем беззнаковое значение (`as f64`), так как
+        // формула линеаризации SDR из раздела 35.5 спецификации IPMI преобразует
+        // беззнаковое сырое показание в калиброванное значение. В продакшене примените
+        // полную формулу SDR: result = (M × raw + B) × 10^(R_exp).
+        Ok(Celsius(raw[0] as f64))  // беззнаковый сырой байт, преобразуется по формуле SDR
     }
 }
 
@@ -138,7 +124,7 @@ impl IpmiCmd for ReadFanSpeed {
     fn parse_response(&self, raw: &[u8]) -> io::Result<Rpm> {
         if raw.len() < 2 {
             return Err(io::Error::new(io::ErrorKind::InvalidData,
-                format!("fan speed needs 2 bytes, got {}", raw.len())));
+                format!("для скорости вентилятора нужно 2 байта, получено {}", raw.len())));
         }
         Ok(Rpm(u16::from_le_bytes([raw[0], raw[1]]) as u32))
     }
@@ -153,14 +139,14 @@ impl IpmiCmd for ReadVoltage {
     fn parse_response(&self, raw: &[u8]) -> io::Result<Volts> {
         if raw.len() < 2 {
             return Err(io::Error::new(io::ErrorKind::InvalidData,
-                format!("voltage needs 2 bytes, got {}", raw.len())));
+                format!("для напряжения нужно 2 байта, получено {}", raw.len())));
         }
         Ok(Volts(u16::from_le_bytes([raw[0], raw[1]]) as f64 / 1000.0))
     }
 }
 ```
 
-### Step 4 — The executor (zero `dyn`, monomorphised)
+### Шаг 4 — Исполнитель (без `dyn`, мономорфизированный)
 
 ```rust,ignore
 pub struct BmcConnection { pub timeout_secs: u32 }
@@ -172,12 +158,12 @@ impl BmcConnection {
     }
 
     fn raw_send(&self, _nf: u8, _cmd: u8, _data: &[u8]) -> io::Result<Vec<u8>> {
-        Ok(vec![0x19, 0x00]) // stub
+        Ok(vec![0x19, 0x00]) // заглушка
     }
 }
 ```
 
-### Step 5 — All four bugs become compile errors
+### Шаг 5 — Все четыре ошибки становятся ошибками компиляции
 
 ```rust,ignore
 fn diagnose_thermal_typed(bmc: &BmcConnection) -> io::Result<()> {
@@ -185,30 +171,30 @@ fn diagnose_thermal_typed(bmc: &BmcConnection) -> io::Result<()> {
     let fan_rpm:  Rpm     = bmc.execute(&ReadFanSpeed { fan_id: 0x30 })?;
     let voltage:  Volts   = bmc.execute(&ReadVoltage { rail: 0x40 })?;
 
-    // Bug #1 — IMPOSSIBLE: parsing lives in ReadFanSpeed::parse_response
-    // Bug #2 — IMPOSSIBLE: unit scaling lives in ReadVoltage::parse_response
+    // Ошибка №1 — НЕВОЗМОЖНА: разбор находится в ReadFanSpeed::parse_response
+    // Ошибка №2 — НЕВОЗМОЖНА: масштабирование единиц находится в ReadVoltage::parse_response
 
-    // Bug #3 — COMPILE ERROR:
+    // Ошибка №3 — ОШИБКА КОМПИЛЯЦИИ:
     // if cpu_temp > fan_rpm { }
-    //    ^^^^^^^^   ^^^^^^^ Celsius vs Rpm → "mismatched types" ❌
+    //    ^^^^^^^^   ^^^^^^^ Celsius и Rpm → "mismatched types" ❌
 
-    // Bug #4 — COMPILE ERROR:
+    // Ошибка №4 — ОШИБКА КОМПИЛЯЦИИ:
     // log_temperature(voltage);
-    //                 ^^^^^^^ Volts, expected Celsius ❌
+    //                 ^^^^^^^ Volts, ожидается Celsius ❌
 
-    if cpu_temp > Celsius(85.0) { println!("CPU overheating: {:?}", cpu_temp); }
-    if fan_rpm < Rpm(4000)      { println!("Fan too slow: {:?}", fan_rpm); }
+    if cpu_temp > Celsius(85.0) { println!("Перегрев CPU: {:?}", cpu_temp); }
+    if fan_rpm < Rpm(4000)      { println!("Вентилятор слишком медленный: {:?}", fan_rpm); }
 
     Ok(())
 }
 
-fn log_temperature(t: Celsius) { println!("Temp: {:?}", t); }
-fn log_voltage(v: Volts)       { println!("Voltage: {:?}", v); }
+fn log_temperature(t: Celsius) { println!("Температура: {:?}", t); }
+fn log_voltage(v: Volts)       { println!("Напряжение: {:?}", v); }
 ```
 
-## IPMI: Sensor Reads That Can't Be Confused
+## IPMI: показания датчиков, которые нельзя перепутать
 
-Adding a new sensor is one struct + one impl — no scattered parsing:
+Добавление нового датчика — это одна структура и одна реализация, без разбросанного по коду разбора:
 
 ```rust,ignore
 pub struct ReadPowerDraw { pub domain: u8 }
@@ -220,17 +206,17 @@ impl IpmiCmd for ReadPowerDraw {
     fn parse_response(&self, raw: &[u8]) -> io::Result<Watts> {
         if raw.len() < 2 {
             return Err(io::Error::new(io::ErrorKind::InvalidData,
-                format!("power draw needs 2 bytes, got {}", raw.len())));
+                format!("для потребляемой мощности нужно 2 байта, получено {}", raw.len())));
         }
         Ok(Watts(u16::from_le_bytes([raw[0], raw[1]]) as f64))
     }
 }
 
-// Every caller that uses bmc.execute(&ReadPowerDraw { domain: 0 })
-// automatically gets Watts back — no parsing code elsewhere
+// Любой вызов bmc.execute(&ReadPowerDraw { domain: 0 }) автоматически возвращает Watts —
+// никакого кода разбора в других местах
 ```
 
-### Testing Each Command in Isolation
+### Тестирование каждой команды изолированно
 
 ```rust,ignore
 #[cfg(test)]
@@ -245,7 +231,7 @@ mod tests {
         fn execute<C: IpmiCmd>(&self, cmd: &C) -> io::Result<C::Response> {
             let key = cmd.payload()[0];
             let raw = self.responses.get(&key)
-                .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "no stub"))?;
+                .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "нет заглушки"))?;
             cmd.parse_response(raw)
         }
     }
@@ -253,7 +239,7 @@ mod tests {
     #[test]
     fn read_temp_parses_raw_byte() {
         let bmc = StubBmc {
-            responses: [(0x20, vec![0x19])].into(), // 25 decimal = 0x19
+            responses: [(0x20, vec![0x19])].into(), // 25 в десятичной = 0x19
         };
         let temp = bmc.execute(&ReadTemp { sensor_id: 0x20 }).unwrap();
         assert_eq!(temp, Celsius(25.0));
@@ -271,7 +257,7 @@ mod tests {
     #[test]
     fn read_voltage_scales_millivolts() {
         let bmc = StubBmc {
-            responses: [(0x40, vec![0xE8, 0x2E])].into(), // 0x2EE8 = 12008 mV
+            responses: [(0x40, vec![0xE8, 0x2E])].into(), // 0x2EE8 = 12008 мВ
         };
         let v = bmc.execute(&ReadVoltage { rail: 0x40 }).unwrap();
         assert!((v.0 - 12.008).abs() < 0.001);
@@ -279,9 +265,9 @@ mod tests {
 }
 ```
 
-## Redfish: Schema-Typed REST Endpoints
+## Redfish: REST-эндпоинты с типизированной схемой
 
-Redfish is an even better fit — each endpoint returns a DMTF-defined JSON schema:
+Redfish подходит ещё лучше: каждый эндпоинт возвращает JSON-схему, определённую DMTF:
 
 ```rust,ignore
 use serde::Deserialize;
@@ -362,7 +348,7 @@ pub struct RedfishHealth {
     pub health: Option<String>,
 }
 
-/// Typed Redfish endpoint — each knows its response type.
+/// Типизированный эндпоинт Redfish — каждый знает тип своего ответа.
 pub trait RedfishEndpoint {
     type Response: serde::de::DeserializeOwned;
     fn method(&self) -> &'static str;
@@ -410,11 +396,11 @@ impl RedfishClient {
     }
 
     fn http_request(&self, _method: &str, _url: &str) -> io::Result<Vec<u8>> {
-        Ok(vec![]) // stub — real impl uses reqwest/hyper
+        Ok(vec![]) // заглушка — реальная реализация использует reqwest/hyper
     }
 }
 
-// Usage — fully typed, self-documenting
+// Использование — полностью типизировано, код говорит сам за себя
 fn redfish_pre_flight(client: &RedfishClient) -> io::Result<()> {
     let thermal: ThermalResponse = client.execute(&GetThermal {
         chassis_id: "1".into(),
@@ -423,13 +409,13 @@ fn redfish_pre_flight(client: &RedfishClient) -> io::Result<()> {
         chassis_id: "1".into(),
     })?;
 
-    // ❌ Compile error — can't pass PowerResponse to a thermal check:
+    // ❌ Ошибка компиляции — нельзя передать PowerResponse в проверку температуры:
     // check_thermals(&power);  → "expected ThermalResponse, found PowerResponse"
 
     for temp in &thermal.temperatures {
         if let Some(crit) = temp.critical_hi {
             if temp.reading > crit {
-                println!("CRITICAL: {} at {}°C (threshold: {}°C)",
+                println!("КРИТИЧНО: {} при {}°C (порог: {}°C)",
                     temp.name, temp.reading, crit);
             }
         }
@@ -438,16 +424,14 @@ fn redfish_pre_flight(client: &RedfishClient) -> io::Result<()> {
 }
 ```
 
-## NVMe Admin: Identify Doesn't Return Log Pages
+## NVMe Admin: Identify не возвращает журнальные страницы
 
-NVMe admin commands follow the same shape. The controller distinguishes command
-opcodes, but in C the caller must know which struct to overlay on the 4 KB
-completion buffer. The typed-command pattern makes this impossible to get wrong:
+Команды NVMe Admin устроены так же. Контроллер различает коды команд (opcode), но в C вызывающий код должен знать, какую структуру наложить на 4-килобайтный буфер завершения. Паттерн типизированной команды делает такую ошибку невозможной:
 
 ```rust,ignore
 use std::io;
 
-/// The NVMe Admin command trait — same shape as IpmiCmd.
+/// Трейт команды NVMe Admin — той же формы, что IpmiCmd.
 pub trait NvmeAdminCmd {
     type Response;
     fn opcode(&self) -> u8;
@@ -458,14 +442,14 @@ pub trait NvmeAdminCmd {
 
 #[derive(Debug, Clone)]
 pub struct IdentifyResponse {
-    pub model_number: String,   // bytes 24–63
-    pub serial_number: String,  // bytes 4–23
-    pub firmware_rev: String,   // bytes 64–71
+    pub model_number: String,   // байты 24–63
+    pub serial_number: String,  // байты 4–23
+    pub firmware_rev: String,   // байты 64–71
     pub total_capacity_gb: u64,
 }
 
 pub struct Identify {
-    pub nsid: u32, // 0 = controller, >0 = namespace
+    pub nsid: u32, // 0 = контроллер, >0 = пространство имён
 }
 
 impl NvmeAdminCmd for Identify {
@@ -473,7 +457,7 @@ impl NvmeAdminCmd for Identify {
     fn opcode(&self) -> u8 { 0x06 }
     fn parse_completion(&self, data: &[u8]) -> io::Result<IdentifyResponse> {
         if data.len() < 4096 {
-            return Err(io::Error::new(io::ErrorKind::InvalidData, "short identify"));
+            return Err(io::Error::new(io::ErrorKind::InvalidData, "короткий ответ identify"));
         }
         Ok(IdentifyResponse {
             serial_number: String::from_utf8_lossy(&data[4..24]).trim().to_string(),
@@ -505,7 +489,7 @@ impl NvmeAdminCmd for GetLogPage {
     fn opcode(&self) -> u8 { 0x02 }
     fn parse_completion(&self, data: &[u8]) -> io::Result<SmartLog> {
         if data.len() < 512 {
-            return Err(io::Error::new(io::ErrorKind::InvalidData, "short log page"));
+            return Err(io::Error::new(io::ErrorKind::InvalidData, "короткая страница журнала"));
         }
         Ok(SmartLog {
             critical_warning: data[0],
@@ -516,9 +500,9 @@ impl NvmeAdminCmd for GetLogPage {
     }
 }
 
-// ── Executor ──
+// ── Исполнитель ──
 
-pub struct NvmeController { /* fd, BAR, etc. */ }
+pub struct NvmeController { /* дескриптор, BAR и т. д. */ }
 
 impl NvmeController {
     pub fn admin_cmd<C: NvmeAdminCmd>(&self, cmd: &C) -> io::Result<C::Response> {
@@ -527,20 +511,20 @@ impl NvmeController {
     }
 
     fn submit_and_wait(&self, _opcode: u8) -> io::Result<Vec<u8>> {
-        Ok(vec![0u8; 4096]) // stub — real impl issues doorbell + waits for CQ entry
+        Ok(vec![0u8; 4096]) // заглушка — реальная реализация записывает doorbell и ждёт запись в CQ
     }
 }
 
-// ── Usage ──
+// ── Использование ──
 
 fn nvme_health_check(ctrl: &NvmeController) -> io::Result<()> {
     let id: IdentifyResponse = ctrl.admin_cmd(&Identify { nsid: 0 })?;
     let smart: SmartLog = ctrl.admin_cmd(&GetLogPage { log_id: 0x02 })?;
 
-    // ❌ Compile error — Identify returns IdentifyResponse, not SmartLog:
+    // ❌ Ошибка компиляции: Identify возвращает IdentifyResponse, а не SmartLog:
     // let smart: SmartLog = ctrl.admin_cmd(&Identify { nsid: 0 })?;
 
-    println!("{} (FW {}): {}°C, {}% spare",
+    println!("{} (FW {}): {}°C, {}% резерва",
         id.model_number, id.firmware_rev,
         smart.temperature_kelvin.saturating_sub(273),
         smart.available_spare_pct);
@@ -549,19 +533,18 @@ fn nvme_health_check(ctrl: &NvmeController) -> io::Result<()> {
 }
 ```
 
-The three-protocol progression now follows a **graduated arc** (the same technique
-ch07 uses for validated boundaries):
+Трёхпротокольная прогрессия теперь следует **постепенной дуге** (та же техника, что в гл. 07 для проверенных границ):
 
-| Beat | Protocol | Complexity | What it adds |
-|:----:|----------|-----------|--------------|
-| 1 | IPMI | Simple: sensor ID → reading | Core pattern: `trait + associated type` |
-| 2 | Redfish | REST: endpoint → typed JSON | Serde integration, schema-typed responses |
-| 3 | NVMe | Binary: opcode → 4 KB struct overlay | Raw buffer parsing, multi-struct completion data |
+| Этап | Протокол | Сложность | Что добавляет |
+|:----:|----------|-----------|---------------|
+| 1 | IPMI | Просто: ID датчика → показание | Базовый паттерн: `trait + associated type` |
+| 2 | Redfish | REST: эндпоинт → типизированный JSON | Интеграция с serde, типизированные ответы по схеме |
+| 3 | NVMe | Бинарный: код операции → наложение структуры на 4 КБ | Разбор сырого буфера, данные завершения из нескольких структур |
 
-## Extension: Macro DSL for Command Scripts
+## Расширение: макро-DSL для сценариев команд
 
 ```rust,ignore
-/// Execute a series of typed IPMI commands, returning a tuple of results.
+/// Выполняет серию типизированных команд IPMI и возвращает кортеж результатов.
 macro_rules! diag_script {
     ($bmc:expr; $($cmd:expr),+ $(,)?) => {{
         ( $( $bmc.execute(&$cmd)?, )+ )
@@ -574,17 +557,17 @@ fn full_pre_flight(bmc: &BmcConnection) -> io::Result<()> {
         ReadFanSpeed { fan_id:    0x30 },
         ReadVoltage  { rail:      0x40 },
     );
-    // Type: (Celsius, Rpm, Volts) — fully inferred, swap = compile error
-    assert!(temp  < Celsius(95.0), "CPU too hot");
-    assert!(rpm   > Rpm(3000),     "Fan too slow");
-    assert!(volts > Volts(11.4),   "12V rail sagging");
+    // Тип: (Celsius, Rpm, Volts) — выводится полностью; перестановка даёт ошибку компиляции
+    assert!(temp  < Celsius(95.0), "ЦП слишком горячий");
+    assert!(rpm   > Rpm(3000),     "Вентилятор слишком медленный");
+    assert!(volts > Volts(11.4),   "Линия 12 В просела");
     Ok(())
 }
 ```
 
-## Extension: Enum Dispatch for Dynamic Scripts
+## Расширение: диспетчеризация через enum для динамических сценариев
 
-When commands come from JSON config at runtime:
+Когда команды приходят из JSON-конфигурации во время выполнения:
 
 ```rust,ignore
 pub enum AnyReading {
@@ -617,29 +600,28 @@ fn run_dynamic_script(bmc: &BmcConnection, script: &[AnyCmd]) -> io::Result<Vec<
 }
 ```
 
-## The Pattern Family
+## Семейство паттернов
 
-This pattern applies to **every** hardware management protocol:
+Этот паттерн применим к **каждому** протоколу управления аппаратным обеспечением:
 
-| Protocol | Request Type | Response Type |
-|----------|-------------|---------------|
-| IPMI Sensor Reading | `ReadTemp` | `Celsius` |
+| Протокол | Тип запроса | Тип ответа |
+|----------|-------------|------------|
+| Показание датчика IPMI | `ReadTemp` | `Celsius` |
 | Redfish REST | `GetThermal` | `ThermalResponse` |
 | NVMe Admin | `Identify` | `IdentifyResponse` |
 | PLDM | `GetFwParams` | `FwParamsResponse` |
 | MCTP | `GetEid` | `EidResponse` |
-| PCIe Config Space | `ReadCapability` | `CapabilityHeader` |
+| Конфигурационное пространство PCIe | `ReadCapability` | `CapabilityHeader` |
 | SMBIOS/DMI | `ReadType17` | `MemoryDeviceInfo` |
 
-The request type **determines** the response type — the compiler enforces it everywhere.
+Тип запроса **определяет** тип ответа — компилятор обеспечивает это везде.
 
-### Aside: How This Compares to Haskell GADTs
+### Отступление: сравнение с GADT в Haskell
 
-If you've seen Haskell GADTs before, here is the direct mapping.  If you haven't,
-feel free to skip this table — the Rust version above is the complete picture.
+Если вы уже встречали GADT в Haskell, вот прямое соответствие. Если нет, можете пропустить эту таблицу: версия на Rust выше полностью описывает паттерн.
 
 ```text
-Haskell GADT                         Rust Equivalent
+GADT в Haskell                       Эквивалент в Rust
 ────────────────                     ───────────────────────
 data Cmd a where                     trait IpmiCmd {
   ReadTemp :: Id -> Cmd Celsius          type Response;
@@ -650,19 +632,19 @@ eval :: Cmd a -> IO a                fn execute<C: IpmiCmd>(&self, cmd: &C)
                                          -> io::Result<C::Response>
 ```
 
-Both guarantee: **the command determines the return type**.
+Оба варианта гарантируют: **команда определяет тип возвращаемого значения**.
 
-## Typed Command Flow
+## Поток типизированных команд
 
 ```mermaid
 flowchart LR
-    subgraph "Compile Time"
+    subgraph "Этап компиляции"
         RT["ReadTemp"] -->|"type Response = Celsius"| C[Celsius]
         RF["ReadFanSpeed"] -->|"type Response = Rpm"| R[Rpm]
         RV["ReadVoltage"] -->|"type Response = Volts"| V[Volts]
     end
-    subgraph "Runtime"
-        E["bmc.execute(&cmd)"] -->|"monomorphised"| P["cmd.parse_response(raw)"]
+    subgraph "Рантайм"
+        E["bmc.execute(&cmd)"] -->|"мономорфизировано"| P["cmd.parse_response(raw)"]
     end
     style RT fill:#e1f5fe,color:#000
     style RF fill:#e1f5fe,color:#000
@@ -674,16 +656,16 @@ flowchart LR
     style P fill:#fff3e0,color:#000
 ```
 
-## Exercise: PLDM Typed Commands
+## Упражнение: типизированные команды PLDM
 
-Design a `PldmCmd` trait (same shape as `IpmiCmd`) for two PLDM commands:
+Спроектируйте трейт `PldmCmd` (той же формы, что `IpmiCmd`) для двух команд PLDM:
 - `GetFwParams` → `FwParamsResponse { active_version: String, pending_version: Option<String> }`
 - `QueryDeviceIds` → `DeviceIdResponse { descriptors: Vec<Descriptor> }`
 
-Requirements: static dispatch, `parse_response` returns `io::Result<Self::Response>`.
+Требования: статическая диспетчеризация, `parse_response` возвращает `io::Result<Self::Response>`.
 
 <details>
-<summary>Solution</summary>
+<summary>Решение</summary>
 
 ```rust,ignore
 use std::io;
@@ -704,12 +686,12 @@ pub struct FwParamsResponse {
 pub struct GetFwParams;
 impl PldmCmd for GetFwParams {
     type Response = FwParamsResponse;
-    fn pldm_type(&self) -> u8 { 0x05 } // Firmware Update
+    fn pldm_type(&self) -> u8 { 0x05 } // Обновление прошивки
     fn command_code(&self) -> u8 { 0x02 }
     fn parse_response(&self, raw: &[u8]) -> io::Result<FwParamsResponse> {
-        // Simplified — real impl decodes PLDM FW Update spec fields
+        // Упрощённо — реальная реализация декодирует поля спецификации PLDM FW Update
         if raw.len() < 4 {
-            return Err(io::Error::new(io::ErrorKind::InvalidData, "too short"));
+            return Err(io::Error::new(io::ErrorKind::InvalidData, "слишком коротко"));
         }
         Ok(FwParamsResponse {
             active_version: String::from_utf8_lossy(&raw[..4]).to_string(),
@@ -730,21 +712,20 @@ impl PldmCmd for QueryDeviceIds {
     fn pldm_type(&self) -> u8 { 0x05 }
     fn command_code(&self) -> u8 { 0x04 }
     fn parse_response(&self, raw: &[u8]) -> io::Result<DeviceIdResponse> {
-        Ok(DeviceIdResponse { descriptors: vec![] }) // stub
+        Ok(DeviceIdResponse { descriptors: vec![] }) // заглушка
     }
 }
 ```
 
 </details>
 
-## Key Takeaways
+## Ключевые выводы
 
-1. **Associated type = compile-time contract** — `type Response` on the command trait locks each request to exactly one response type.
-2. **Parsing is encapsulated** — byte-layout knowledge lives in `parse_response`, not scattered across callers.
-3. **Zero-cost dispatch** — generic `execute<C: IpmiCmd>` monomorphises to direct calls with no vtable.
-4. **One pattern, many protocols** — IPMI, Redfish, NVMe, PLDM, MCTP all fit the same `trait Cmd { type Response; }` shape.
-5. **Enum dispatch bridges static and dynamic** — wrap typed commands in an enum for runtime-driven scripts without losing type safety inside each arm.
-6. **Graduated complexity strengthens intuition** — IPMI (sensor ID → reading), Redfish (endpoint → JSON schema), and NVMe (opcode → 4 KB struct overlay) all use the same trait shape, but each beat adds a layer of parsing complexity.
+1. **Ассоциированный тип — это контракт на этапе компиляции** — `type Response` в трейте команды жёстко связывает каждый запрос ровно с одним типом ответа.
+2. **Разбор инкапсулирован** — знание о раскладке байтов живёт в `parse_response`, а не разбросано по вызывающему коду.
+3. **Диспетчеризация без накладных расходов** — обобщённая функция `execute<C: IpmiCmd>` мономорфизируется в прямые вызовы без vtable.
+4. **Один паттерн, много протоколов** — IPMI, Redfish, NVMe, PLDM и MCTP укладываются в одну и ту же форму `trait Cmd { type Response; }`.
+5. **Диспетчеризация через enum связывает статику и динамику** — оборачивайте типизированные команды в enum для сценариев, управляемых во время выполнения, не теряя типобезопасности внутри каждой ветки.
+6. **Постепенное усложнение укрепляет интуицию** — IPMI (ID датчика → показание), Redfish (эндпоинт → JSON-схема) и NVMe (код операции → наложение структуры на 4 КБ) используют одну и ту же форму трейта, но каждый этап добавляет ещё один слой сложности разбора.
 
 ---
-

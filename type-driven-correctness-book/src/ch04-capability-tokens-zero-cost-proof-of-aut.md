@@ -1,54 +1,51 @@
-# Capability Tokens — Zero-Cost Proof of Authority 🟡
+# Capability-токены: доказательство полномочий без накладных расходов 🟡
 
-> **What you'll learn:** How zero-sized types (ZSTs) act as compile-time proof tokens, enforcing privilege hierarchies, power sequencing, and revocable authority — all at zero runtime cost.
+> **Что вы узнаете:** как типы нулевого размера (ZST) выступают токенами-доказательствами на этапе компиляции и обеспечивают иерархию привилегий, порядок подачи питания и отзываемые полномочия, причём без накладных расходов во время выполнения.
 >
-> **Cross-references:** [ch03](ch03-single-use-types-cryptographic-guarantee.md) (single-use types), [ch05](ch05-protocol-state-machines-type-state-for-r.md) (type-state), [ch08](ch08-capability-mixins-compile-time-hardware-.md) (mixins), [ch10](ch10-putting-it-all-together-a-complete-diagn.md) (integration)
+> **Перекрёстные ссылки:** [гл. 03](ch03-single-use-types-cryptographic-guarantee.md) (одноразовые типы), [гл. 05](ch05-protocol-state-machines-type-state-for-r.md) (typestate), [гл. 08](ch08-capability-mixins-compile-time-hardware-.md) (миксины), [гл. 10](ch10-putting-it-all-together-a-complete-diagn.md) (интеграция)
 
-## The Problem: Who Is Allowed to Do What?
+## Проблема: кому что разрешено?
 
-In hardware diagnostics, some operations are **dangerous**:
+В аппаратной диагностике некоторые операции **опасны**:
 
-- Programming BMC firmware
-- Resetting PCIe links
-- Writing OTP fuses
-- Enabling high-voltage test modes
+- Прошивка BMC
+- Сброс линков PCIe
+- Запись OTP-предохранителей
+- Включение тестовых режимов с высоким напряжением
 
-In C/C++, these are guarded by runtime checks:
+В C/C++ такие операции защищают проверками во время выполнения:
 
 ```c
-// C — runtime permission check
+// C — проверка прав во время выполнения
 int reset_pcie_link(bmc_handle_t bmc, int slot) {
-    if (!bmc->is_admin) {        // runtime check
+    if (!bmc->is_admin) {        // проверка во время выполнения
         return -EPERM;
     }
-    if (!bmc->link_trained) {    // another runtime check
+    if (!bmc->link_trained) {    // ещё одна проверка во время выполнения
         return -EINVAL;
     }
-    // ... do the dangerous thing ...
+    // ... выполняем опасное действие ...
     return 0;
 }
 ```
 
-Every function that does something dangerous must repeat these checks. Forget one,
-and you have a privilege escalation bug.
+Каждая функция, которая делает что-то опасное, должна повторять эти проверки. Забудьте одну — и у вас ошибка эскалации привилегий.
 
-## Zero-Sized Types as Proof Tokens
+## Типы нулевого размера как токены-доказательства
 
-A **capability token** is a zero-sized type (ZST) that proves the caller has
-the authority to perform an action. It costs **zero bytes** at runtime — it exists
-only in the type system:
+**Capability-токен** — это тип нулевого размера (ZST), который доказывает, что у вызывающего кода есть полномочия на действие. Во время выполнения он не занимает **ни одного байта**: он существует только в системе типов:
 
 ```rust,ignore
 use std::marker::PhantomData;
 
-/// Proof that the caller has admin privileges.
-/// Zero-sized — compiles away completely.
-/// Not Clone, not Copy — must be explicitly passed.
+/// Доказательство того, что вызывающий обладает правами администратора.
+/// Нулевой размер — полностью исчезает при компиляции.
+/// Не Clone, не Copy — должен передаваться явно.
 pub struct AdminToken {
-    _private: (),   // prevents construction outside this module
+    _private: (),   // запрещает создание вне этого модуля
 }
 
-/// Proof that the PCIe link is trained and ready.
+/// Доказательство того, что линк PCIe обучен и готов.
 pub struct LinkTrainedToken {
     _private: (),
 }
@@ -56,78 +53,74 @@ pub struct LinkTrainedToken {
 pub struct BmcController { /* ... */ }
 
 impl BmcController {
-    /// Authenticate as admin — returns a capability token.
-    /// This is the ONLY way to create an AdminToken.
+    /// Аутентификация как администратор — возвращает capability-токен.
+    /// Это ЕДИНСТВЕННЫЙ способ создать AdminToken.
     pub fn authenticate_admin(
         &mut self,
         credentials: &[u8],
     ) -> Result<AdminToken, &'static str> {
-        // ... validate credentials ...
+        // ... проверяем учётные данные ...
         # let valid = true;
         if valid {
             Ok(AdminToken { _private: () })
         } else {
-            Err("authentication failed")
+            Err("аутентификация не пройдена")
         }
     }
 
-    /// Train the PCIe link — returns proof that it's trained.
+    /// Обучает линк PCIe — возвращает доказательство того, что он обучен.
     pub fn train_link(&mut self) -> Result<LinkTrainedToken, &'static str> {
-        // ... perform link training ...
+        // ... выполняем обучение линка ...
         Ok(LinkTrainedToken { _private: () })
     }
 
-    /// Reset a PCIe link — requires BOTH admin + link-trained proof.
-    /// No runtime checks needed — the tokens ARE the proof.
+    /// Сбрасывает линк PCIe — требует ОБА доказательства: администратора и обученного линка.
+    /// Никаких проверок во время выполнения не нужно: сами токены и есть доказательство.
     pub fn reset_pcie_link(
         &mut self,
-        _admin: &AdminToken,         // zero-cost proof of authority
-        _trained: &LinkTrainedToken,  // zero-cost proof of state
+        _admin: &AdminToken,         // zero-cost доказательство полномочий
+        _trained: &LinkTrainedToken,  // zero-cost доказательство состояния
         slot: u32,
     ) -> Result<(), &'static str> {
-        println!("Resetting PCIe link on slot {slot}");
+        println!("Сброс линка PCIe в слоте {slot}");
         Ok(())
     }
 }
 ```
 
-Usage — the type system enforces the workflow:
+Использование: система типов обеспечивает соблюдение порядка действий:
 
 ```rust,ignore
 fn maintenance_workflow(bmc: &mut BmcController) -> Result<(), &'static str> {
-    // Step 1: Authenticate — get admin proof
+    // Шаг 1: аутентификация — получаем доказательство администратора
     let admin = bmc.authenticate_admin(b"secret")?;
 
-    // Step 2: Train link — get trained proof
+    // Шаг 2: обучение линка — получаем доказательство обучения
     let trained = bmc.train_link()?;
 
-    // Step 3: Reset — compiler requires both tokens
+    // Шаг 3: сброс — компилятор требует оба токена
     bmc.reset_pcie_link(&admin, &trained, 0)?;
 
     Ok(())
 }
 
-// This WON'T compile:
+// Это НЕ скомпилируется:
 fn unprivileged_attempt(bmc: &mut BmcController) -> Result<(), &'static str> {
     let trained = bmc.train_link()?;
     // bmc.reset_pcie_link(???, &trained, 0)?;
-    //                     ^^^ no AdminToken — can't call this
+    //                     ^^^ нет AdminToken — вызвать эту функцию нельзя
     Ok(())
 }
 ```
 
-The `AdminToken` and `LinkTrainedToken` are **zero bytes** in the compiled binary.
-They exist only during type-checking. The function signature `fn reset_pcie_link(&mut self, _admin: &AdminToken, ...)` is a **proof obligation** — "you may only
-call this if you can produce an `AdminToken`" — and the only way to produce one is
-through `authenticate_admin()`.
+`AdminToken` и `LinkTrainedToken` занимают **ноль байт** в скомпилированном бинарнике. Они существуют только во время проверки типов. Сигнатура `fn reset_pcie_link(&mut self, _admin: &AdminToken, ...)` — это **обязательство доказательства** («вызвать эту функцию можно, только если вы можете получить `AdminToken`»), а получить его можно только через `authenticate_admin()`.
 
-## Power Sequencing Authority
+## Полномочия на управление питанием
 
-Server power sequencing has strict ordering: standby → auxiliary → main → CPU.
-Reversing the sequence can damage hardware. Capability tokens enforce ordering:
+Последовательность подачи питания на сервере строго определена: дежурное питание → вспомогательное → основное → CPU. Нарушение порядка может повредить аппаратуру. Capability-токены обеспечивают соблюдение порядка:
 
 ```rust,ignore
-/// State tokens — each one proves the previous step completed.
+/// Токены состояния — каждый доказывает, что предыдущий шаг завершён.
 pub struct StandbyOn { _p: () }
 pub struct AuxiliaryOn { _p: () }
 pub struct MainOn { _p: () }
@@ -136,36 +129,36 @@ pub struct CpuPowered { _p: () }
 pub struct PowerController { /* ... */ }
 
 impl PowerController {
-    /// Step 1: Enable standby power. No precondition.
+    /// Шаг 1: включить дежурное питание. Предусловий нет.
     pub fn enable_standby(&mut self) -> Result<StandbyOn, &'static str> {
-        println!("Standby power ON");
+        println!("Дежурное питание ВКЛ");
         Ok(StandbyOn { _p: () })
     }
 
-    /// Step 2: Enable auxiliary — requires standby proof.
+    /// Шаг 2: включить вспомогательное питание — требует доказательство дежурного.
     pub fn enable_auxiliary(
         &mut self,
         _standby: &StandbyOn,
     ) -> Result<AuxiliaryOn, &'static str> {
-        println!("Auxiliary power ON");
+        println!("Вспомогательное питание ВКЛ");
         Ok(AuxiliaryOn { _p: () })
     }
 
-    /// Step 3: Enable main — requires auxiliary proof.
+    /// Шаг 3: включить основное питание — требует доказательство вспомогательного.
     pub fn enable_main(
         &mut self,
         _aux: &AuxiliaryOn,
     ) -> Result<MainOn, &'static str> {
-        println!("Main power ON");
+        println!("Основное питание ВКЛ");
         Ok(MainOn { _p: () })
     }
 
-    /// Step 4: Power CPU — requires main proof.
+    /// Шаг 4: подать питание на CPU — требует доказательство основного питания.
     pub fn power_cpu(
         &mut self,
         _main: &MainOn,
     ) -> Result<CpuPowered, &'static str> {
-        println!("CPU powered ON");
+        println!("Питание CPU ВКЛ");
         Ok(CpuPowered { _p: () })
     }
 }
@@ -178,30 +171,29 @@ fn power_on_sequence(ctrl: &mut PowerController) -> Result<CpuPowered, &'static 
     Ok(cpu)
 }
 
-// Trying to skip a step:
+// Попытка пропустить шаг:
 // fn wrong_order(ctrl: &mut PowerController) {
-//     ctrl.power_cpu(???);  // ❌ can't produce MainOn without enable_main()
+//     ctrl.power_cpu(???);  // ❌ нельзя получить MainOn без enable_main()
 // }
 ```
 
-## Hierarchical Capabilities
+## Иерархические полномочия
 
-Real systems have **hierarchies** — an admin can do everything a user can do,
-plus more. Model this with a trait hierarchy:
+В реальных системах есть **иерархии**: администратор может всё, что может пользователь, и даже больше. Смоделируем это иерархией трейтов:
 
 ```rust,ignore
-/// Base capability — anyone who is authenticated.
+/// Базовое полномочие — любой прошедший аутентификацию.
 pub trait Authenticated {
     fn token_id(&self) -> u64;
 }
 
-/// Operator can read sensors and run non-destructive diagnostics.
+/// Оператор может читать датчики и запускать неразрушающую диагностику.
 pub trait Operator: Authenticated {}
 
-/// Admin can do everything an operator can, plus destructive operations.
+/// Администратор может всё, что оператор, плюс разрушающие операции.
 pub trait Admin: Operator {}
 
-// Concrete tokens:
+// Конкретные токены:
 pub struct UserToken { id: u64 }
 pub struct OperatorToken { id: u64 }
 pub struct AdminCapToken { id: u64 }
@@ -216,35 +208,32 @@ impl Admin for AdminCapToken {}
 pub struct Bmc { /* ... */ }
 
 impl Bmc {
-    /// Anyone authenticated can read sensors.
+    /// Любой аутентифицированный может читать датчики.
     pub fn read_sensor(&self, _who: &impl Authenticated, id: u32) -> f64 {
-        42.0 // stub
+        42.0 // заглушка
     }
 
-    /// Only operators and above can run diagnostics.
+    /// Запускать диагностику могут только операторы и выше.
     pub fn run_diag(&mut self, _who: &impl Operator, test: &str) -> bool {
-        true // stub
+        true // заглушка
     }
 
-    /// Only admins can flash firmware.
+    /// Прошивать прошивку могут только администраторы.
     pub fn flash_firmware(&mut self, _who: &impl Admin, image: &[u8]) -> Result<(), &'static str> {
-        Ok(()) // stub
+        Ok(()) // заглушка
     }
 }
 ```
 
-An `AdminCapToken` can be passed to any function — it satisfies `Authenticated`,
-`Operator`, and `Admin`. A `UserToken` can only call `read_sensor()`. The compiler
-enforces the entire privilege model **at zero runtime cost**.
+`AdminCapToken` можно передать в любую функцию: он удовлетворяет `Authenticated`, `Operator` и `Admin`. `UserToken` может вызывать только `read_sensor()`. Компилятор обеспечивает всю модель привилегий **без накладных расходов во время выполнения**.
 
-## Lifetime-Bounded Capability Tokens
+## Capability-токены, ограниченные временем жизни
 
-Sometimes a capability should be **scoped** — valid only within a certain lifetime.
-Rust's borrow checker handles this naturally:
+Иногда полномочие должно быть **ограниченным по области действия**, то есть действительным только в пределах определённого времени жизни. Borrow checker решает эту задачу естественным образом:
 
 ```rust,ignore
-/// A scoped admin session. The token borrows the session,
-/// so it cannot outlive it.
+/// Ограниченная административная сессия. Токен заимствует сессию,
+/// поэтому он не может её пережить.
 pub struct AdminSession {
     _active: bool,
 }
@@ -255,11 +244,11 @@ pub struct ScopedAdminToken<'session> {
 
 impl AdminSession {
     pub fn begin(credentials: &[u8]) -> Result<Self, &'static str> {
-        // ... authenticate ...
+        // ... аутентификация ...
         Ok(AdminSession { _active: true })
     }
 
-    /// Create a scoped token — lives only as long as the session.
+    /// Создаёт ограниченный токен — он живёт ровно столько, сколько сессия.
     pub fn token(&self) -> ScopedAdminToken<'_> {
         ScopedAdminToken { _session: self }
     }
@@ -269,52 +258,52 @@ fn scoped_example() -> Result<(), &'static str> {
     let session = AdminSession::begin(b"credentials")?;
     let token = session.token();
 
-    // Use token within this scope...
-    // When session drops, token is invalidated by the borrow checker.
-    // No need for runtime expiry checks.
+    // Используем токен в этой области видимости...
+    // Когда session уничтожается, токен становится недействительным благодаря borrow checker.
+    // Проверки истечения срока во время выполнения не нужны.
 
     // drop(session);
-    // ❌ ERROR: cannot move out of `session` because it is borrowed
-    //    (by `token`, which holds &session)
+    // ❌ Ошибка компилятора: cannot move out of `session` because it is borrowed
+    //    (by `token`, который хранит &session)
     //
-    // Even if we skip drop() and just try to use `token` after
-    // session goes out of scope — same error: lifetime mismatch.
+    // Даже если пропустить drop() и попытаться использовать `token` после того, как
+    // session выйдет из области видимости, — будет та же ошибка: несоответствие времён жизни.
 
     Ok(())
 }
 ```
 
-### When to Use Capability Tokens
+### Когда использовать capability-токены
 
-| Scenario | Pattern |
+| Сценарий | Паттерн |
 |----------|---------|
-| Privileged hardware operations | ZST proof token (AdminToken) |
-| Multi-step sequencing | Chain of state tokens (StandbyOn → AuxiliaryOn → ...) |
-| Role-based access control | Trait hierarchy (Authenticated → Operator → Admin) |
-| Time-limited privileges | Lifetime-bounded tokens (`ScopedAdminToken<'a>`) |
-| Cross-module authority | Public token type, private constructor |
+| Привилегированные операции с аппаратурой | ZST-токен-доказательство (AdminToken) |
+| Многошаговая последовательность | Цепочка токенов состояния (StandbyOn → AuxiliaryOn → ...) |
+| Управление доступом на основе ролей (RBAC) | Иерархия трейтов (Authenticated → Operator → Admin) |
+| Привилегии с ограничением по времени | Токены с ограниченным временем жизни (`ScopedAdminToken<'a>`) |
+| Полномочия между модулями | Публичный тип токена, приватный конструктор |
 
-### Cost Summary
+### Сводка по стоимости
 
-| What | Runtime cost |
-|------|:------:|
-| ZST token in memory | 0 bytes |
-| Token parameter passing | Optimised away by LLVM |
-| Trait hierarchy dispatch | Static dispatch (monomorphised) |
-| Lifetime enforcement | Compile-time only |
+| Что | Стоимость во время выполнения |
+|-----|:------:|
+| ZST-токен в памяти | 0 байт |
+| Передача токена как параметра | Оптимизируется LLVM |
+| Диспетчеризация по иерархии трейтов | Статическая (мономорфизация) |
+| Проверка времени жизни | Только на этапе компиляции |
 
-**Total runtime overhead: zero.** The privilege model exists only in the type system.
+**Итоговые накладные расходы во время выполнения: ноль.** Модель привилегий существует только в системе типов.
 
-## Capability Token Hierarchy
+## Иерархия capability-токенов
 
 ```mermaid
 flowchart TD
-    AUTH["authenticate(user, pass)"] -->|returns| AT["AdminToken"]
+    AUTH["authenticate(user, pass)"] -->|возвращает| AT["AdminToken"]
     AT -->|"&AdminToken"| FW["firmware_update()"]
     AT -->|"&AdminToken"| RST["reset_pcie_link()"]
-    AT -->|downgrade| OP["OperatorToken"]
+    AT -->|понижение| OP["OperatorToken"]
     OP -->|"&OperatorToken"| RD["read_sensors()"]
-    OP -.->|"attempt firmware_update"| ERR["❌ Compile Error"]
+    OP -.->|"попытка firmware_update"| ERR["❌ Ошибка компиляции"]
     style AUTH fill:#e1f5fe,color:#000
     style AT fill:#c8e6c9,color:#000
     style OP fill:#fff3e0,color:#000
@@ -324,24 +313,24 @@ flowchart TD
     style ERR fill:#ffcdd2,color:#000
 ```
 
-## Exercise: Tiered Diagnostic Permissions
+## Упражнение: многоуровневые диагностические полномочия
 
-Design a three-tier capability system: `ViewerToken`, `TechToken`, `EngineerToken`.
-- Viewers can call `read_status()`
-- Techs can also call `run_quick_diag()`
-- Engineers can also call `flash_firmware()`
-- Higher tiers can do everything lower tiers can (use trait bounds or token conversion).
+Спроектируйте трёхуровневую систему capability: `ViewerToken`, `TechToken`, `EngineerToken`.
+- Наблюдатели могут вызывать `read_status()`
+- Техники могут также вызывать `run_quick_diag()`
+- Инженеры могут также вызывать `flash_firmware()`
+- Более высокие уровни могут делать всё, что могут низшие (используйте ограничения трейтов или преобразование токенов).
 
 <details>
-<summary>Solution</summary>
+<summary>Решение</summary>
 
 ```rust,ignore
-// Tokens — zero-sized, private constructors
+// Токены — нулевого размера, с приватными конструкторами
 pub struct ViewerToken { _private: () }
 pub struct TechToken { _private: () }
 pub struct EngineerToken { _private: () }
 
-// Capability traits — hierarchical
+// Трейты capability — иерархические
 pub trait CanView {}
 pub trait CanDiag: CanView {}
 pub trait CanFlash: CanDiag {}
@@ -354,27 +343,26 @@ impl CanDiag for EngineerToken {}
 impl CanFlash for EngineerToken {}
 
 pub fn read_status(_tok: &impl CanView) -> String {
-    "status: OK".into()
+    "статус: OK".into()
 }
 
 pub fn run_quick_diag(_tok: &impl CanDiag) -> String {
-    "diag: PASS".into()
+    "диагностика: PASS".into()
 }
 
 pub fn flash_firmware(_tok: &impl CanFlash, _image: &[u8]) {
-    // Only engineers reach here
+    // Сюда попадают только инженеры
 }
 ```
 
 </details>
 
-## Key Takeaways
+## Ключевые выводы
 
-1. **ZST tokens cost zero bytes** — they exist only in the type system; LLVM optimises them away completely.
-2. **Private constructors = unforgeable** — only your module's `authenticate()` can mint a token.
-3. **Trait hierarchies model permission levels** — `CanFlash: CanDiag: CanView` mirrors real RBAC.
-4. **Lifetime-bounded tokens revoke automatically** — `ScopedAdminToken<'session>` can't outlive the session.
-5. **Combine with type-state (ch05)** for protocols that require authentication *and* sequenced operations.
+1. **ZST-токены не занимают байтов** — они существуют только в системе типов; LLVM полностью их оптимизирует.
+2. **Приватные конструкторы делают токены неподделываемыми** — токен может создать только `authenticate()` вашего модуля.
+3. **Иерархии трейтов моделируют уровни разрешений** — `CanFlash: CanDiag: CanView` повторяет реальный RBAC.
+4. **Токены с ограниченным временем жизни отзываются автоматически** — `ScopedAdminToken<'session>` не может пережить сессию.
+5. **Сочетайте с typestate (гл. 05)** для протоколов, которые требуют одновременно аутентификации и упорядоченных операций.
 
 ---
-

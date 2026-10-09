@@ -1,63 +1,57 @@
-# Applied Walkthrough — Type-Safe Redfish Server 🟡
+# Пошаговый разбор: типобезопасный сервер Redfish 🟡
 
-> **What you'll learn:** How to compose response builder type-state, source-availability tokens, dimensional serialization, health rollup, schema versioning, and typed action dispatch into a Redfish server that **cannot produce a schema-non-compliant response** — the mirror of the client walkthrough in [ch17](ch17-redfish-applied-walkthrough.md).
+> **Что вы узнаете:** как скомпоновать typestate билдера ответа, токены доступности источников, размерную сериализацию, агрегацию здоровья, версионирование схем и типизированную диспетчеризацию действий в сервер Redfish, который **не может выдать ответ, не соответствующий схеме**. Это зеркало пошагового разбора клиента из [гл. 17](ch17-redfish-applied-walkthrough.md).
 >
-> **Cross-references:** [ch02](ch02-typed-command-interfaces-request-determi.md) (typed commands — inverted for action dispatch), [ch04](ch04-capability-tokens-zero-cost-proof-of-aut.md) (capability tokens — source availability), [ch06](ch06-dimensional-analysis-making-the-compiler.md) (dimensional types — serialization side), [ch07](ch07-validated-boundaries-parse-dont-validate.md) (validated boundaries — inverted: "construct, don't serialize"), [ch09](ch09-phantom-types-for-resource-tracking.md) (phantom types — schema versioning), [ch11](ch11-fourteen-tricks-from-the-trenches.md) (trick 3 — `#[non_exhaustive]`, trick 4 — builder type-state), [ch17](ch17-redfish-applied-walkthrough.md) (client counterpart)
+> **Перекрёстные ссылки:** [гл. 02](ch02-typed-command-interfaces-request-determi.md) (типизированные команды, перевёрнутые для диспетчеризации действий), [гл. 04](ch04-capability-tokens-zero-cost-proof-of-aut.md) (capability-токены для доступности источников), [гл. 06](ch06-dimensional-analysis-making-the-compiler.md) (размерные типы, сторона сериализации), [гл. 07](ch07-validated-boundaries-parse-dont-validate.md) (проверенные границы, перевёрнуто: «строй, а не сериализуй»), [гл. 09](ch09-phantom-types-for-resource-tracking.md) (phantom-типы, версионирование схем), [гл. 11](ch11-fourteen-tricks-from-the-trenches.md) (приём 3: `#[non_exhaustive]`, приём 4: билдер с typestate), [гл. 17](ch17-redfish-applied-walkthrough.md) (клиентская часть)
 
-## The Mirror Problem
+## Проблема зеркала
 
-Chapter 17 asks: *"How do I consume Redfish correctly?"* This chapter asks the
-mirror question: *"How do I produce Redfish correctly?"*
+Глава 17 спрашивает: *«Как правильно потреблять Redfish?»* Эта глава задаёт зеркальный вопрос: *«Как правильно отдавать Redfish?»*
 
-On the client side, the danger is **trusting** bad data. On the server side, the
-danger is **emitting** bad data — and every client in the fleet trusts what you
-send.
+На стороне клиента опасность в том, чтобы **доверять** плохим данным. На стороне сервера опасность в том, чтобы **выдавать** плохие данные, а каждый клиент в парке доверяет тому, что вы отправляете.
 
-A single `GET /redfish/v1/Systems/1` response must fuse data from many sources:
+Один ответ `GET /redfish/v1/Systems/1` должен объединять данные из многих источников:
 
 ```mermaid
 flowchart LR
-    subgraph Sources
-        SMBIOS["SMBIOS\nType 1, Type 17"]
-        SDR["IPMI Sensors\n(SDR + readings)"]
-        SEL["IPMI SEL\n(critical events)"]
-        PCIe["PCIe Config\nSpace"]
-        FW["Firmware\nVersion Table"]
-        PWR["Power State\nRegister"]
+    subgraph Sources["Источники"]
+        SMBIOS["SMBIOS\nТип 1, Тип 17"]
+        SDR["Датчики IPMI\n(SDR + показания)"]
+        SEL["SEL IPMI\n(критические события)"]
+        PCIe["Конфигурационное\nпространство PCIe"]
+        FW["Таблица версий\nпрошивки"]
+        PWR["Регистр состояния\nпитания"]
     end
 
-    subgraph Server["Redfish Server"]
-        Handler["GET handler"]
-        Builder["ComputerSystem\nBuilder"]
+    subgraph Server["Сервер Redfish"]
+        Handler["Обработчик GET"]
+        Builder["Билдер\nComputerSystem"]
     end
 
-    SMBIOS -->|"Name, UUID, Serial"| Handler
+    SMBIOS -->|"Имя, UUID, серийный номер"| Handler
     SDR -->|"Temperatures, Fans"| Handler
-    SEL -->|"Health escalation"| Handler
-    PCIe -->|"Device links"| Handler
-    FW -->|"BIOS version"| Handler
+    SEL -->|"Эскалация здоровья"| Handler
+    PCIe -->|"Связи устройств"| Handler
+    FW -->|"Версия BIOS"| Handler
     PWR -->|"PowerState"| Handler
     Handler --> Builder
-    Builder -->|".build()"| JSON["Schema-compliant\nJSON response"]
+    Builder -->|".build()"| JSON["JSON, соответствующий\nсхеме"]
 
     style JSON fill:#c8e6c9,color:#000
     style Builder fill:#e1f5fe,color:#000
 ```
 
-In C, this is a 500-line handler that calls into six subsystems, manually builds
-a JSON tree with `json_object_set()`, and hopes every required field was populated.
-Forget one? The response violates the Redfish schema. Get the unit wrong? Every
-client sees corrupted telemetry.
+В C это обработчик на 500 строк, который обращается к шести подсистемам, вручную строит дерево JSON через `json_object_set()` и надеется, что каждое обязательное поле заполнено. Забыли одно? Ответ нарушает схему Redfish. Перепутали единицу? Каждый клиент получает искажённую телеметрию.
 
 ```c
-// C — the assembly problem
+// C — проблема сборки
 json_t *get_computer_system(const char *id) {
     json_t *obj = json_object();
     json_object_set_new(obj, "@odata.type",
         json_string("#ComputerSystem.v1_13_0.ComputerSystem"));
 
-    // 🐛 Forgot to set "Name" — schema requires it
-    // 🐛 Forgot to set "UUID" — schema requires it
+    // 🐛 Забыли задать "Name": схема его требует
+    // 🐛 Забыли задать "UUID": схема его требует
 
     smbios_type1_t *t1 = smbios_get_type1();
     if (t1) {
@@ -66,53 +60,49 @@ json_t *get_computer_system(const char *id) {
     }
 
     json_object_set_new(obj, "PowerState",
-        json_string(get_power_state()));  // at least this one is always available
+        json_string(get_power_state()));  // хотя бы это всегда доступно
 
-    // 🐛 Reading is in raw ADC counts, not Celsius — no type to catch it
+    // 🐛 Показание в сырых отсчётах АЦП, а не в Цельсиях: нет типа, который это поймает
     double cpu_temp = read_sensor(SENSOR_CPU_TEMP);
-    // This number ends up in a Thermal response somewhere else...
-    // but nothing ties it to "Celsius" at the type level
+    // Это число где-то попадает в ответ Thermal...
+    // но ничто не связывает его с «Цельсием» на уровне типов
 
-    // 🐛 Health is manually computed — forgot to include PSU status
+    // 🐛 Здоровье вычисляется вручную: забыли учесть статус БП
     json_object_set_new(obj, "Status",
-        build_status("Enabled", "OK")); // should be "Critical" — PSU is failing
+        build_status("Enabled", "OK")); // должно быть "Critical": БП выходит из строя
 
-    return obj; // missing 2 required fields, wrong health, raw units
+    return obj; // не хватает 2 обязательных полей, неверное здоровье, сырые единицы
 }
 ```
 
-Four bugs in one handler. On the client side, each bug affects **one** client.
-On the server side, each bug affects **every** client that queries this BMC.
+Четыре ошибки в одном обработчике. На стороне клиента каждая ошибка затрагивает **одного** клиента. На стороне сервера каждая ошибка затрагивает **каждого** клиента, который запрашивает этот BMC.
 
 ---
 
-## Section 1 — Response Builder Type-State: "Construct, Don't Serialize" (ch07 Inverted)
+## Раздел 1 — Typestate билдера ответа: «строй, а не сериализуй» (гл. 07, перевёрнуто)
 
-Chapter 7 teaches "parse, don't validate" — validate inbound data once, carry the
-proof in a type. The server-side mirror is **"construct, don't serialize"** — build
-the outbound response through a builder that gates `.build()` on all required fields
-being present.
+Глава 7 учит «parse, don't validate»: проверить входящие данные один раз и хранить доказательство в типе. Зеркальный приём на стороне сервера — **«construct, don't serialize»**: строить исходящий ответ через билдер, который открывает `.build()` только при наличии всех обязательных полей.
 
 ```rust,ignore
 use std::marker::PhantomData;
 
-// ──── Type-level field tracking ────
+// ──── Отслеживание полей на уровне типов ────
 
 pub struct HasField;
 pub struct MissingField;
 
-// ──── Response Builder ────
+// ──── Билдер ответа ────
 
-/// Builder for a ComputerSystem Redfish resource.
-/// Type parameters track which REQUIRED fields have been supplied.
-/// Optional fields don't need type-level tracking.
+/// Билдер ресурса ComputerSystem Redfish.
+/// Параметры типа отслеживают, какие ОБЯЗАТЕЛЬНЫЕ поля уже заданы.
+/// Необязательные поля не нужно отслеживать на уровне типов.
 pub struct ComputerSystemBuilder<Name, Uuid, PowerState, Status> {
-    // Required fields — tracked at the type level
+    // Обязательные поля — отслеживаются на уровне типов
     name: Option<String>,
     uuid: Option<String>,
     power_state: Option<PowerStateValue>,
     status: Option<ResourceStatus>,
-    // Optional fields — not tracked (always settable)
+    // Необязательные поля — не отслеживаются (можно задать всегда)
     manufacturer: Option<String>,
     model: Option<String>,
     serial_number: Option<String>,
@@ -157,7 +147,7 @@ pub struct MemorySummary {
     pub status: ResourceStatus,
 }
 
-// ──── Constructor: all fields start MissingField ────
+// ──── Конструктор: все поля начинаются как MissingField ────
 
 impl ComputerSystemBuilder<MissingField, MissingField, MissingField, MissingField> {
     pub fn new() -> Self {
@@ -170,7 +160,7 @@ impl ComputerSystemBuilder<MissingField, MissingField, MissingField, MissingFiel
     }
 }
 
-// ──── Required field setters — each transitions one type parameter ────
+// ──── Сеттеры обязательных полей — каждый переводит один параметр типа ────
 
 impl<U, P, S> ComputerSystemBuilder<MissingField, U, P, S> {
     pub fn name(self, name: String) -> ComputerSystemBuilder<HasField, U, P, S> {
@@ -228,7 +218,7 @@ impl<N, U, P> ComputerSystemBuilder<N, U, P, MissingField> {
     }
 }
 
-// ──── Optional field setters — available in any state ────
+// ──── Сеттеры необязательных полей — доступны в любом состоянии ────
 
 impl<N, U, P, S> ComputerSystemBuilder<N, U, P, S> {
     pub fn manufacturer(mut self, m: String) -> Self {
@@ -251,7 +241,7 @@ impl<N, U, P, S> ComputerSystemBuilder<N, U, P, S> {
     }
 }
 
-// ──── .build() ONLY exists when all required fields are HasField ────
+// ──── .build() существует ТОЛЬКО когда все обязательные поля — HasField ────
 
 impl ComputerSystemBuilder<HasField, HasField, HasField, HasField> {
     pub fn build(self, id: &str) -> serde_json::Value {
@@ -265,7 +255,7 @@ impl ComputerSystemBuilder<HasField, HasField, HasField, HasField> {
             "Status": self.status.unwrap(),
         });
 
-        // Optional fields — included only if present
+        // Необязательные поля — включаются, только если заданы
         if let Some(m) = self.manufacturer {
             obj["Manufacturer"] = serde_json::json!(m);
         }
@@ -290,67 +280,60 @@ impl ComputerSystemBuilder<HasField, HasField, HasField, HasField> {
 }
 
 //
-// ── The Compiler Enforces Completeness ──
+// ── Компилятор обеспечивает полноту ──
 //
-// ✅ All required fields set — .build() is available:
+// ✅ Все обязательные поля заданы — .build() доступен:
 // ComputerSystemBuilder::new()
 //     .name("PowerEdge R750".into())
 //     .uuid("4c4c4544-...".into())
 //     .power_state(PowerStateValue::On)
 //     .status(ResourceStatus { ... })
-//     .manufacturer("Dell".into())        // optional — fine to include
+//     .manufacturer("Dell".into())        // необязательное — можно включать
 //     .build("1")
 //
-// ❌ Missing "Name" — compile error:
+// ❌ Нет «Name» — ошибка компиляции:
 // ComputerSystemBuilder::new()
 //     .uuid("4c4c4544-...".into())
 //     .power_state(PowerStateValue::On)
 //     .status(ResourceStatus { ... })
 //     .build("1")
-//   ERROR: method `build` not found for
+//   ОШИБКА: метод `build` не найден для
 //   `ComputerSystemBuilder<MissingField, HasField, HasField, HasField>`
 ```
 
-**Bug class eliminated:** schema-non-compliant responses. The handler physically
-cannot serialize a `ComputerSystem` without supplying every required field. The
-compiler error message even tells you *which* field is missing — it's right there
-in the type parameter: `MissingField` in the `Name` position.
+**Устранённый класс ошибок:** ответы, не соответствующие схеме. Обработчик физически не может сериализовать `ComputerSystem`, не задав каждое обязательное поле. Сообщение компилятора даже подсказывает, *какого* поля не хватает: это видно в параметре типа, где стоит `MissingField` на месте `Name`.
 
 ---
 
-## Section 2 — Source-Availability Tokens (Capability Tokens, ch04 — New Twist)
+## Раздел 2 — Токены доступности источников (capability-токены, гл. 04, новый поворот)
 
-In ch04 and ch17, capability tokens prove **authorization** — "the caller is
-allowed to do this." On the server side, the same pattern proves **availability** —
-"this data source was successfully initialized."
+В гл. 04 и гл. 17 capability-токены доказывают **авторизацию**: «вызывающему разрешено это делать». На стороне сервера тот же паттерн доказывает **доступность**: «этот источник данных успешно инициализирован».
 
-Each subsystem the BMC queries can fail independently. SMBIOS tables might be
-corrupt. The sensor subsystem might still be initializing. PCIe bus scan might
-have timed out. Encode each as a proof token:
+Каждая подсистема, которую опрашивает BMC, может отказать независимо. Таблицы SMBIOS могут быть повреждены. Подсистема датчиков может ещё инициализироваться. Сканирование шины PCIe может завершиться по тайм-ауту. Кодируем каждую как токен-доказательство:
 
 ```rust,ignore
-/// Proof that SMBIOS tables were successfully parsed.
-/// Only produced by the SMBIOS init function.
+/// Доказательство, что таблицы SMBIOS успешно разобраны.
+/// Создаётся только функцией инициализации SMBIOS.
 pub struct SmbiosReady {
     _private: (),
 }
 
-/// Proof that IPMI sensor subsystem is responsive.
+/// Доказательство, что подсистема датчиков IPMI отвечает.
 pub struct SensorsReady {
     _private: (),
 }
 
-/// Proof that PCIe bus scan completed.
+/// Доказательство, что сканирование шины PCIe завершено.
 pub struct PcieReady {
     _private: (),
 }
 
-/// Proof that the SEL was successfully read.
+/// Доказательство, что SEL успешно прочитан.
 pub struct SelReady {
     _private: (),
 }
 
-// ──── Data source initialization ────
+// ──── Инициализация источников данных ────
 
 pub struct SmbiosTables {
     pub product_name: String,
@@ -366,9 +349,9 @@ pub struct SensorCache {
     pub psu_power: Vec<(String, Watts)>,
 }
 
-/// Rich SEL summary — per-subsystem health derived from typed events.
-/// Built by the consumer pipeline in ch07's SEL section.
-/// Replaces the lossy `has_critical_events: bool` with typed granularity.
+/// Расширенная сводка SEL — здоровье по подсистемам, выведенное из типизированных событий.
+/// Строится конвейером потребителя из раздела SEL гл. 07.
+/// Заменяет теряющий информацию `has_critical_events: bool` типизированной детализацией.
 pub struct TypedSelSummary {
     pub total_entries: u32,
     pub processor_health: HealthValue,
@@ -381,8 +364,8 @@ pub struct TypedSelSummary {
 }
 
 pub fn init_smbios() -> Option<(SmbiosReady, SmbiosTables)> {
-    // Read SMBIOS entry point, parse tables...
-    // Returns None if tables are absent or corrupt
+    // Читаем точку входа SMBIOS, разбираем таблицы...
+    // Возвращает None, если таблицы отсутствуют или повреждены
     Some((
         SmbiosReady { _private: () },
         SmbiosTables {
@@ -395,8 +378,8 @@ pub fn init_smbios() -> Option<(SmbiosReady, SmbiosTables)> {
 }
 
 pub fn init_sensors() -> Option<(SensorsReady, SensorCache)> {
-    // Initialize SDR repository, read all sensors...
-    // Returns None if IPMI subsystem is not responsive
+    // Инициализируем репозиторий SDR, читаем все датчики...
+    // Возвращает None, если подсистема IPMI не отвечает
     Some((
         SensorsReady { _private: () },
         SensorCache {
@@ -415,8 +398,8 @@ pub fn init_sensors() -> Option<(SensorsReady, SensorCache)> {
 }
 
 pub fn init_sel() -> Option<(SelReady, TypedSelSummary)> {
-    // In production: read SEL entries, parse via ch07's TryFrom,
-    // classify via classify_event_health(), aggregate via summarize_sel().
+    // В продакшене: читаем записи SEL, разбираем через TryFrom из гл. 07,
+    // классифицируем через classify_event_health(), агрегируем через summarize_sel().
     Some((
         SelReady { _private: () },
         TypedSelSummary {
@@ -433,11 +416,10 @@ pub fn init_sel() -> Option<(SelReady, TypedSelSummary)> {
 }
 ```
 
-Now, functions that populate builder fields from a data source **require the
-corresponding proof token**:
+Теперь функции, которые заполняют поля билдера из источника данных, **требуют соответствующий токен-доказательство**:
 
 ```rust,ignore
-/// Populate SMBIOS-sourced fields. Requires proof SMBIOS is available.
+/// Заполняет поля из SMBIOS. Требует доказательство, что SMBIOS доступен.
 fn populate_from_smbios<P, S>(
     builder: ComputerSystemBuilder<MissingField, MissingField, P, S>,
     _proof: &SmbiosReady,
@@ -450,18 +432,18 @@ fn populate_from_smbios<P, S>(
         .serial_number(tables.serial_number.clone())
 }
 
-/// Fallback when SMBIOS is unavailable — supplies required fields
-/// with safe defaults.
+/// Запасной вариант, когда SMBIOS недоступен: обязательные поля заполняются
+/// безопасными значениями по умолчанию.
 fn populate_smbios_fallback<P, S>(
     builder: ComputerSystemBuilder<MissingField, MissingField, P, S>,
 ) -> ComputerSystemBuilder<HasField, HasField, P, S> {
     builder
-        .name("Unknown System".into())
+        .name("Неизвестная система".into())
         .uuid("00000000-0000-0000-0000-000000000000".into())
 }
 ```
 
-The handler chooses the path based on which tokens are available:
+Обработчик выбирает путь в зависимости от того, какие токены доступны:
 
 ```rust,ignore
 fn build_computer_system(
@@ -478,25 +460,20 @@ fn build_computer_system(
         None => populate_smbios_fallback(builder),
     };
 
-    // Both paths produce HasField for Name and UUID.
-    // .build() is available either way.
+    // Оба пути дают HasField для Name и UUID.
+    // .build() доступен в любом случае.
     builder.build("1")
 }
 ```
 
-**Bug class eliminated:** calling into a subsystem that failed initialization.
-If SMBIOS didn't parse, you don't have a `SmbiosReady` token — the compiler forces
-you through the fallback path. No runtime `if (smbios != NULL)` to forget.
+**Устранённый класс ошибок:** обращение к подсистеме, которая не смогла инициализироваться. Если SMBIOS не разобрался, токена `SmbiosReady` у вас нет: компилятор заставляет пройти через запасной путь. Никакой проверки `if (smbios != NULL)` во время выполнения, которую можно забыть.
 
-### Combining Source Tokens with Capability Mixins (ch08)
+### Комбинирование токенов источников с capability-миксинами (гл. 08)
 
-With multiple Redfish resource types to serve (ComputerSystem, Chassis, Manager,
-Thermal, Power), source-population logic repeats across handlers. The **mixin**
-pattern from ch08 eliminates this duplication. Declare what sources a handler has,
-and blanket impls provide the population methods automatically:
+Когда нужно обслуживать несколько типов ресурсов Redfish (ComputerSystem, Chassis, Manager, Thermal, Power), логика заполнения из источников повторяется в обработчиках. Паттерн **миксинов** из гл. 08 устраняет это дублирование. Объявляете, какие источники есть у обработчика, и blanket impl сами предоставляют методы заполнения:
 
 ```rust,ignore
-/// ── Ingredient Traits (ch08) for data sources ──
+/// ── Трейты-ингредиенты (гл. 08) для источников данных ──
 
 pub trait HasSmbios {
     fn smbios(&self) -> &(SmbiosReady, SmbiosTables);
@@ -510,7 +487,7 @@ pub trait HasSel {
     fn sel(&self) -> &(SelReady, TypedSelSummary);
 }
 
-/// ── Mixin: any handler with SMBIOS + Sensors gets identity population ──
+/// ── Миксин: любой обработчик с SMBIOS и датчиками получает заполнение идентификации ──
 
 pub trait IdentityMixin: HasSmbios {
     fn populate_identity<P, S>(
@@ -526,10 +503,10 @@ pub trait IdentityMixin: HasSmbios {
     }
 }
 
-/// Auto-implement for any type that has SMBIOS capability.
+/// Автоматическая реализация для любого типа с возможностью SMBIOS.
 impl<T: HasSmbios> IdentityMixin for T {}
 
-/// ── Mixin: any handler with Sensors + SEL gets health rollup ──
+/// ── Миксин: любой обработчик с датчиками и SEL получает агрегацию здоровья ──
 
 pub trait HealthMixin: HasSensors + HasSel {
     fn compute_health(&self) -> ResourceStatus {
@@ -544,7 +521,7 @@ pub trait HealthMixin: HasSensors + HasSel {
 
 impl<T: HasSensors + HasSel> HealthMixin for T {}
 
-/// ── Concrete handler owns available sources ──
+/// ── Конкретный обработчик владеет доступными источниками ──
 
 struct FullPlatformHandler {
     smbios: (SmbiosReady, SmbiosTables),
@@ -562,33 +539,27 @@ impl HasSel     for FullPlatformHandler {
     fn sel(&self) -> &(SelReady, TypedSelSummary) { &self.sel }
 }
 
-// FullPlatformHandler automatically gets:
-//   IdentityMixin::populate_identity()   (via HasSmbios)
-//   HealthMixin::compute_health()        (via HasSensors + HasSel)
+// FullPlatformHandler автоматически получает:
+//   IdentityMixin::populate_identity()   (через HasSmbios)
+//   HealthMixin::compute_health()        (через HasSensors + HasSel)
 //
-// A SensorsOnlyHandler that impls HasSensors but NOT HasSel
-// would get IdentityMixin (if it has SMBIOS) but NOT HealthMixin.
-// Calling .compute_health() on it → compile error.
+// SensorsOnlyHandler, который реализует HasSensors, но НЕ HasSel,
+// получит IdentityMixin (если есть SMBIOS), но НЕ HealthMixin.
+// Вызов .compute_health() у него → ошибка компиляции.
 ```
 
-This directly mirrors ch08's `BaseBoardController` pattern: ingredient traits
-declare what you have, mixin traits provide behavior via blanket impls, and
-the compiler gates each mixin on its prerequisites. Adding a new data
-source (e.g., `HasNvme`) plus a mixin (e.g., `StorageMixin: HasNvme + HasSel`)
-gives health rollup for storage to every handler that has both — automatically.
+Это напрямую повторяет паттерн `BaseBoardController` из гл. 08: трейты-ингредиенты объявляют, что у вас есть, трейты-миксины предоставляют поведение через blanket impl, а компилятор открывает каждый миксин только при выполнении его предусловий. Добавление нового источника данных (например, `HasNvme`) и миксина (например, `StorageMixin: HasNvme + HasSel`) даёт агрегацию здоровья для хранилища каждому обработчику, у которого есть оба, автоматически.
 
 ---
 
-## Section 3 — Dimensional Types at the Serialization Boundary (ch06)
+## Раздел 3 — Размерные типы на границе сериализации (гл. 06)
 
-On the client side (ch17 §4), dimensional types prevent **reading** °C as RPM.
-On the server side, they prevent **writing** RPM into a Celsius JSON field. This
-is arguably more dangerous — a wrong value on the server propagates to every client.
+На стороне клиента (гл. 17, §4) размерные типы не дают **прочитать** °C как об/мин. На стороне сервера они не дают **записать** об/мин в JSON-поле в градусах Цельсия. Это, пожалуй, опаснее: неверное значение на сервере доходит до каждого клиента.
 
 ```rust,ignore
 use serde::Serialize;
 
-// ──── Dimensional types from ch06, with Serialize ────
+// ──── Размерные типы из гл. 06, с Serialize ────
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Serialize)]
 pub struct Celsius(pub f64);
@@ -599,15 +570,15 @@ pub struct Rpm(pub u32);
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Serialize)]
 pub struct Watts(pub f64);
 
-// ──── Redfish Thermal response members ────
-// Field types enforce which unit belongs in which JSON property.
+// ──── Элементы ответа Redfish Thermal ────
+// Типы полей задают, какая единица относится к какому JSON-свойству.
 
 #[derive(Serialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct TemperatureMember {
     pub member_id: String,
     pub name: String,
-    pub reading_celsius: Celsius,           // ← must be Celsius
+    pub reading_celsius: Celsius,           // ← обязан быть Celsius
     #[serde(skip_serializing_if = "Option::is_none")]
     pub upper_threshold_critical: Option<Celsius>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -620,8 +591,8 @@ pub struct TemperatureMember {
 pub struct FanMember {
     pub member_id: String,
     pub name: String,
-    pub reading: Rpm,                       // ← must be Rpm
-    pub reading_units: &'static str,        // always "RPM"
+    pub reading: Rpm,                       // ← обязан быть Rpm
+    pub reading_units: &'static str,        // всегда "RPM"
     pub status: ResourceStatus,
 }
 
@@ -630,13 +601,13 @@ pub struct FanMember {
 pub struct PowerControlMember {
     pub member_id: String,
     pub name: String,
-    pub power_consumed_watts: Watts,        // ← must be Watts
+    pub power_consumed_watts: Watts,        // ← обязан быть Watts
     #[serde(skip_serializing_if = "Option::is_none")]
     pub power_capacity_watts: Option<Watts>,
     pub status: ResourceStatus,
 }
 
-// ──── Building a Thermal response from sensor cache ────
+// ──── Построение ответа Thermal из кэша датчиков ────
 
 fn build_thermal_response(
     _proof: &SensorsReady,
@@ -645,7 +616,7 @@ fn build_thermal_response(
     let temps = vec![
         TemperatureMember {
             member_id: "0".into(),
-            name: "CPU Temp".into(),
+            name: "Температура ЦП".into(),
             reading_celsius: cache.cpu_temp,     // Celsius → Celsius ✅
             upper_threshold_critical: Some(Celsius(95.0)),
             upper_threshold_fatal: Some(Celsius(105.0)),
@@ -661,7 +632,7 @@ fn build_thermal_response(
         },
         TemperatureMember {
             member_id: "1".into(),
-            name: "Inlet Temp".into(),
+            name: "Температура на входе".into(),
             reading_celsius: cache.inlet_temp,   // Celsius → Celsius ✅
             upper_threshold_critical: Some(Celsius(42.0)),
             upper_threshold_fatal: None,
@@ -672,7 +643,7 @@ fn build_thermal_response(
             },
         },
 
-        // ❌ Compile error — can't put Rpm in a Celsius field:
+        // ❌ Ошибка компиляции — нельзя положить Rpm в поле Celsius:
         // TemperatureMember {
         //     reading_celsius: cache.fan_readings[0].1,  // Rpm ≠ Celsius
         //     ...
@@ -701,39 +672,33 @@ fn build_thermal_response(
 }
 ```
 
-**Bug class eliminated:** unit confusion at serialization. The Redfish schema says
-`ReadingCelsius` is in °C. The Rust type system says `reading_celsius` must be
-`Celsius`. If a developer accidentally passes `Rpm(8400)` or `Watts(285.0)`, the
-compiler catches it before the value ever reaches JSON.
+**Устранённый класс ошибок:** путаница единиц при сериализации. Схема Redfish говорит, что `ReadingCelsius` — в °C. Система типов Rust говорит, что `reading_celsius` обязан быть `Celsius`. Если разработчик по ошибке передаст `Rpm(8400)` или `Watts(285.0)`, компилятор поймает это до того, как значение попадёт в JSON.
 
 ---
 
-## Section 4 — Health Rollup as a Typed Fold
+## Раздел 4 — Агрегация здоровья как типизированная свёртка
 
-Redfish `Status.Health` is a *rollup* — the worst health of all sub-components.
-In C, this is typically a series of `if` checks that inevitably misses a source.
-With typed enums and `Ord`, the rollup is a one-line fold — and the compiler
-ensures every source contributes:
+`Status.Health` в Redfish — это *агрегат*: худшее состояние среди всех подкомпонентов. В C это обычно серия проверок `if`, в которой неизбежно пропускается какой-нибудь источник. С типизированными enum и `Ord` агрегация становится однострочной свёрткой, а компилятор гарантирует, что каждый источник участвует:
 
 ```rust,ignore
-/// Roll up health from multiple sources.
-/// Ord on HealthValue: OK < Warning < Critical.
-/// Returns the worst (max) value.
+/// Агрегирует здоровье из нескольких источников.
+/// Ord для HealthValue: OK < Warning < Critical.
+/// Возвращает худшее (максимальное) значение.
 fn rollup(sources: &[HealthValue]) -> HealthValue {
     sources.iter().copied().max().unwrap_or(HealthValue::OK)
 }
 
-/// Compute system-level health from all sub-components.
-/// Takes explicit references to every source — the caller must provide ALL of them.
+/// Вычисляет здоровье системы по всем подкомпонентам.
+/// Принимает явные ссылки на каждый источник: вызывающий обязан передать ВСЕ.
 fn compute_system_health(
     sensors: Option<&(SensorsReady, SensorCache)>,
     sel: Option<&(SelReady, TypedSelSummary)>,
 ) -> ResourceStatus {
     let mut inputs = Vec::new();
 
-    // ── Live sensor readings ──
+    // ── Текущие показания датчиков ──
     if let Some((_proof, cache)) = sensors {
-        // Temperature health (dimensional: Celsius comparison)
+        // Здоровье по температуре (размерное: сравнение Celsius)
         if cache.cpu_temp > Celsius(95.0) {
             inputs.push(HealthValue::Critical);
         } else if cache.cpu_temp > Celsius(85.0) {
@@ -742,7 +707,7 @@ fn compute_system_health(
             inputs.push(HealthValue::OK);
         }
 
-        // Fan health (dimensional: Rpm comparison)
+        // Здоровье вентиляторов (размерное: сравнение Rpm)
         for (_name, rpm) in &cache.fan_readings {
             if *rpm < Rpm(500) {
                 inputs.push(HealthValue::Critical);
@@ -753,7 +718,7 @@ fn compute_system_health(
             }
         }
 
-        // PSU health (dimensional: Watts comparison)
+        // Здоровье БП (размерное: сравнение Watts)
         for (_name, watts) in &cache.psu_power {
             if *watts > Watts(800.0) {
                 inputs.push(HealthValue::Critical);
@@ -763,9 +728,9 @@ fn compute_system_health(
         }
     }
 
-    // ── SEL per-subsystem health (from ch07's TypedSelSummary) ──
-    // Each subsystem's health was derived by exhaustive matching over
-    // every sensor type and event variant. No information was lost.
+    // ── Здоровье по подсистемам из SEL (из TypedSelSummary гл. 07) ──
+    // Здоровье каждой подсистемы выведено исчерпывающим сопоставлением по
+    // каждому типу датчика и варианту события. Информация не потеряна.
     if let Some((_proof, sel_summary)) = sel {
         inputs.push(sel_summary.processor_health);
         inputs.push(sel_summary.memory_health);
@@ -786,32 +751,23 @@ fn compute_system_health(
 }
 ```
 
-**Bug class eliminated:** incomplete health rollup. In C, forgetting to include PSU
-status in the health calculation is a silent bug — the system reports "OK" while a
-PSU is failing. Here, `compute_system_health` takes explicit references to every
-data source. The SEL contribution is no longer a lossy `bool` — it's seven
-per-subsystem `HealthValue` fields derived by exhaustive matching in ch07's consumer
-pipeline. Adding a new SEL sensor type forces the classifier to handle it; adding a
-new subsystem field forces the rollup to include it.
+**Устранённый класс ошибок:** неполная агрегация здоровья. В C забытый учёт статуса БП в расчёте здоровья — тихая ошибка: система сообщает «OK», пока БП выходит из строя. Здесь `compute_system_health` принимает явные ссылки на каждый источник данных. Вклад SEL больше не `bool`, который теряет информацию: это семь полей `HealthValue` по подсистемам, выведенных исчерпывающим сопоставлением в конвейере потребителя из гл. 07. Добавление нового типа датчика SEL вынуждает классификатор его обработать; добавление нового поля подсистемы вынуждает агрегацию его учесть.
 
 ---
 
-## Section 5 — Schema Versioning with Phantom Types (ch09)
+## Раздел 5 — Версионирование схем с phantom-типами (гл. 09)
 
-If the BMC advertises `ComputerSystem.v1_13_0`, the response **must** include
-properties introduced in that schema version (`LastResetTime`, `BootProgress`).
-Advertising v1.13 without those fields is a Redfish Interop Validator failure.
-Phantom version markers make this a compile-time contract:
+Если BMC объявляет `ComputerSystem.v1_13_0`, ответ **обязан** содержать свойства, введённые в этой версии схемы (`LastResetTime`, `BootProgress`). Объявить v1.13 без этих полей — провал Redfish Interop Validator. Phantom-маркеры версий превращают это в контракт на этапе компиляции:
 
 ```rust,ignore
 use std::marker::PhantomData;
 
-// ──── Schema Version Markers ────
+// ──── Маркеры версий схемы ────
 
 pub struct V1_5;
 pub struct V1_13;
 
-// ──── Version-Aware Response ────
+// ──── Ответ с учётом версии ────
 
 pub struct ComputerSystemResponse<V> {
     pub base: ComputerSystemBase,
@@ -829,7 +785,7 @@ pub struct ComputerSystemBase {
     pub bios_version: Option<String>,
 }
 
-// Methods available on ALL versions:
+// Методы, доступные во ВСЕХ версиях:
 impl<V> ComputerSystemResponse<V> {
     pub fn base_json(&self) -> serde_json::Value {
         serde_json::json!({
@@ -842,27 +798,27 @@ impl<V> ComputerSystemResponse<V> {
     }
 }
 
-// ──── v1.13-specific fields ────
+// ──── Поля, специфичные для v1.13 ────
 
-/// Date and time of the last system reset.
+/// Дата и время последнего сброса системы.
 pub struct LastResetTime(pub String);
 
-/// Boot progress information.
+/// Информация о ходе загрузки.
 pub struct BootProgress {
     pub last_state: String,
     pub last_state_time: String,
 }
 
 impl ComputerSystemResponse<V1_13> {
-    /// LastResetTime — REQUIRED in v1.13+.
-    /// This method only exists on V1_13. If the BMC advertises v1.13
-    /// and the handler doesn't call this, the field is missing.
+    /// LastResetTime — ОБЯЗАТЕЛЕН в v1.13 и выше.
+    /// Этот метод есть только у V1_13. Если BMC объявляет v1.13,
+    /// а обработчик не вызывает его, поле будет отсутствовать.
     pub fn last_reset_time(&self) -> LastResetTime {
-        // Read from RTC or boot timestamp register
+        // Читаем из RTC или регистра метки времени загрузки
         LastResetTime("2026-03-16T08:30:00Z".to_string())
     }
 
-    /// BootProgress — REQUIRED in v1.13+.
+    /// BootProgress — ОБЯЗАТЕЛЕН в v1.13 и выше.
     pub fn boot_progress(&self) -> BootProgress {
         BootProgress {
             last_state: "OSRunning".to_string(),
@@ -870,7 +826,7 @@ impl ComputerSystemResponse<V1_13> {
         }
     }
 
-    /// Build the full v1.13 JSON response, including version-specific fields.
+    /// Формирует полный JSON-ответ v1.13, включая поля, специфичные для версии.
     pub fn to_json(&self) -> serde_json::Value {
         let mut obj = self.base_json();
         obj["@odata.type"] =
@@ -890,7 +846,7 @@ impl ComputerSystemResponse<V1_13> {
 }
 
 impl ComputerSystemResponse<V1_5> {
-    /// v1.5 JSON — no LastResetTime, no BootProgress.
+    /// JSON версии v1.5: без LastResetTime и BootProgress.
     pub fn to_json(&self) -> serde_json::Value {
         let mut obj = self.base_json();
         obj["@odata.type"] =
@@ -898,40 +854,35 @@ impl ComputerSystemResponse<V1_5> {
         obj
     }
 
-    // last_reset_time() doesn't exist here.
-    // Calling it → compile error:
+    // last_reset_time() здесь не существует.
+    // Вызов → ошибка компиляции:
     //   let resp: ComputerSystemResponse<V1_5> = ...;
     //   resp.last_reset_time();
-    //   ❌ ERROR: method `last_reset_time` not found for
+    //   ❌ ОШИБКА: метод `last_reset_time` не найден для
     //            `ComputerSystemResponse<V1_5>`
 }
 ```
 
-**Bug class eliminated:** schema version mismatch. If the BMC is configured to
-advertise v1.13, use `ComputerSystemResponse<V1_13>` and the compiler ensures
-every v1.13-required field is produced. Downgrade to v1.5? Change the type
-parameter — the v1.13 methods vanish, and no dead fields leak into the response.
+**Устранённый класс ошибок:** несоответствие версии схемы. Если BMC настроен объявлять v1.13, используйте `ComputerSystemResponse<V1_13>`, и компилятор гарантирует, что каждое поле, обязательное для v1.13, будет сформировано. Понижаете до v1.5? Смените параметр типа: методы v1.13 исчезнут, и в ответ не просочатся лишние поля.
 
 ---
 
-## Section 6 — Typed Action Dispatch (ch02 Inverted)
+## Раздел 6 — Типизированная диспетчеризация действий (гл. 02, перевёрнуто)
 
-In ch02, the typed command pattern binds `Request → Response` on the **client**
-side. On the **server** side, the same pattern validates incoming action payloads
-and dispatches them type-safely — the inverse direction.
+В гл. 02 паттерн типизированной команды связывает `Request → Response` на стороне **клиента**. На стороне **сервера** тот же паттерн проверяет входящие полезные нагрузки действий и диспетчеризует их безопасно по типам: обратное направление.
 
 ```rust,ignore
 use serde::Deserialize;
 
-// ──── Action Trait (mirror of ch02's IpmiCmd trait) ────
+// ──── Трейт действия (зеркало трейта IpmiCmd из гл. 02) ────
 
-/// A Redfish action: the framework deserializes Params from the POST body,
-/// then calls execute(). If the JSON doesn't match Params, deserialization
-/// fails — execute() is never called with bad input.
+/// Действие Redfish: фреймворк десериализует Params из тела POST,
+/// затем вызывает execute(). Если JSON не соответствует Params,
+/// десериализация завершается ошибкой: execute() никогда не вызывается с некорректными данными.
 pub trait RedfishAction {
-    /// The expected JSON body structure.
+    /// Ожидаемая структура тела JSON.
     type Params: serde::de::DeserializeOwned;
-    /// The result of executing the action.
+    /// Результат выполнения действия.
     type Result: serde::Serialize;
 
     fn execute(&self, params: Self::Params) -> Result<Self::Result, RedfishError>;
@@ -971,32 +922,32 @@ impl RedfishAction for ComputerSystemReset {
     fn execute(&self, params: ResetParams) -> Result<(), RedfishError> {
         match params.reset_type {
             ResetType::GracefulShutdown => {
-                // Send ACPI shutdown to host
-                println!("Initiating ACPI shutdown");
+                // Отправляем хосту ACPI-команду выключения
+                println!("Инициирован ACPI-выключение");
                 Ok(())
             }
             ResetType::ForceOff => {
-                // Assert power-off to host
-                println!("Forcing power off");
+                // Выставляем сигнал отключения питания хоста
+                println!("Принудительное выключение питания");
                 Ok(())
             }
             ResetType::On | ResetType::ForceOn => {
-                println!("Powering on");
+                println!("Включение питания");
                 Ok(())
             }
             ResetType::GracefulRestart => {
-                println!("ACPI restart");
+                println!("Перезапуск ACPI");
                 Ok(())
             }
             ResetType::ForceRestart => {
-                println!("Forced restart");
+                println!("Принудительный перезапуск");
                 Ok(())
             }
             ResetType::PushPowerButton => {
-                println!("Simulating power button press");
+                println!("Имитация нажатия кнопки питания");
                 Ok(())
             }
-            // Exhaustive — compiler catches missing variants
+            // Исчерпывающе — компилятор поймает пропущенные варианты
         }
     }
 }
@@ -1025,76 +976,71 @@ impl RedfishAction for ManagerResetToDefaults {
     fn execute(&self, params: ResetToDefaultsParams) -> Result<(), RedfishError> {
         match params.reset_to_defaults_type {
             ResetToDefaultsType::ResetAll => {
-                println!("Full factory reset");
+                println!("Полный сброс к заводским настройкам");
                 Ok(())
             }
             ResetToDefaultsType::PreserveNetworkAndUsers => {
-                println!("Reset preserving network + users");
+                println!("Сброс с сохранением сети и пользователей");
                 Ok(())
             }
             ResetToDefaultsType::PreserveNetwork => {
-                println!("Reset preserving network config");
+                println!("Сброс с сохранением сетевой конфигурации");
                 Ok(())
             }
         }
     }
 }
 
-// ──── Generic Action Dispatcher ────
+// ──── Общий диспетчер действий ────
 
 fn dispatch_action<A: RedfishAction>(
     action: &A,
     raw_body: &str,
 ) -> Result<A::Result, RedfishError> {
-    // Deserialization validates the payload structure.
-    // If the JSON doesn't match A::Params, this fails
-    // and execute() is never called.
+    // Десериализация проверяет структуру полезной нагрузки.
+    // Если JSON не соответствует A::Params, это завершается ошибкой,
+    // и execute() не вызывается.
     let params: A::Params = serde_json::from_str(raw_body)
         .map_err(|e| RedfishError::InvalidPayload(e.to_string()))?;
 
     action.execute(params)
 }
 
-// ── Usage ──
+// ── Использование ──
 
 fn handle_reset_action(body: &str) -> Result<(), RedfishError> {
-    // Type-safe: ResetParams is validated by serde before execute()
+    // Типобезопасно: ResetParams проверяется serde до вызова execute()
     dispatch_action(&ComputerSystemReset, body)?;
     Ok(())
 
-    // Invalid JSON: {"ResetType": "Explode"}
-    // → serde error: "unknown variant `Explode`"
-    // → execute() never called
+    // Некорректный JSON: {"ResetType": "Explode"}
+    // → ошибка serde: "unknown variant `Explode`"
+    // → execute() не вызывается
 
-    // Missing field: {}
-    // → serde error: "missing field `ResetType`"
-    // → execute() never called
+    // Отсутствует поле: {}
+    // → ошибка serde: "missing field `ResetType`"
+    // → execute() не вызывается
 }
 ```
 
-**Bug classes eliminated:**
-- **Invalid action payload:** serde rejects unknown enum variants and missing fields
-  before `execute()` is called. No manual `if (body["ResetType"] == ...)` chains.
-- **Missing variant handling:** `match params.reset_type` is exhaustive — adding a
-  new `ResetType` variant forces every action handler to be updated.
-- **Type confusion:** `ComputerSystemReset` expects `ResetParams`;
-  `ManagerResetToDefaults` expects `ResetToDefaultsParams`. The trait system prevents
-  passing one action's params to another action's handler.
+**Устранённые классы ошибок:**
+- **Некорректная полезная нагрузка действия:** serde отвергает неизвестные варианты enum и отсутствующие поля до вызова `execute()`. Никаких ручных цепочек `if (body["ResetType"] == ...)`.
+- **Необработанный вариант:** `match params.reset_type` исчерпывающий: добавление нового `ResetType` вынуждает обновить каждый обработчик действия.
+- **Путаница типов:** `ComputerSystemReset` ожидает `ResetParams`, а `ManagerResetToDefaults` ожидает `ResetToDefaultsParams`. Система трейтов не даёт передать параметры одного действия обработчику другого.
 
 ---
 
-## Section 7 — Putting It All Together: The GET Handler
+## Раздел 7 — Собираем всё вместе: обработчик GET
 
-Here's the complete handler that composes all six sections into a single
-schema-compliant response:
+Вот полный обработчик, который соединяет все шесть разделов в один ответ, соответствующий схеме:
 
 ```rust,ignore
-/// Complete GET /redfish/v1/Systems/1 handler.
+/// Полный обработчик GET /redfish/v1/Systems/1.
 ///
-/// Every required field is enforced by the builder type-state.
-/// Every data source is gated by availability tokens.
-/// Every unit is locked to its dimensional type.
-/// Every health input feeds the typed rollup.
+/// Каждое обязательное поле обеспечивается typestate билдера.
+/// Каждый источник данных открывается токенами доступности.
+/// Каждая единица измерения закреплена за своим размерным типом.
+/// Каждый входной сигнал здоровья попадает в типизированную агрегацию.
 fn handle_get_computer_system(
     smbios: &Option<(SmbiosReady, SmbiosTables)>,
     sensors: &Option<(SensorsReady, SensorCache)>,
@@ -1102,31 +1048,31 @@ fn handle_get_computer_system(
     power_state: PowerStateValue,
     bios_version: Option<String>,
 ) -> serde_json::Value {
-    // ── 1. Health rollup (Section 4) ──
-    // Folds health from sensors + SEL into a single typed status
+    // ── 1. Агрегация здоровья (раздел 4) ──
+    // Сворачиваем здоровье датчиков и SEL в один типизированный статус
     let health = compute_system_health(
         sensors.as_ref(),
         sel.as_ref(),
     );
 
-    // ── 2. Builder type-state (Section 1) ──
+    // ── 2. Typestate билдера (раздел 1) ──
     let builder = ComputerSystemBuilder::new()
         .power_state(power_state)
         .status(health);
 
-    // ── 3. Source-availability tokens (Section 2) ──
+    // ── 3. Токены доступности источников (раздел 2) ──
     let builder = match smbios {
         Some((proof, tables)) => {
-            // SMBIOS available — populate from hardware
+            // SMBIOS доступен — заполняем из аппаратуры
             populate_from_smbios(builder, proof, tables)
         }
         None => {
-            // SMBIOS unavailable — safe defaults
+            // SMBIOS недоступен — безопасные значения по умолчанию
             populate_smbios_fallback(builder)
         }
     };
 
-    // ── 4. Optional enrichment from sensors (Section 3) ──
+    // ── 4. Необязательное дополнение из датчиков (раздел 3) ──
     let builder = if let Some((_proof, cache)) = sensors {
         builder
             .processor_summary(ProcessorSummary {
@@ -1150,21 +1096,21 @@ fn handle_get_computer_system(
         None => builder,
     };
 
-    // ── 5. Build (Section 1) ──
-    // .build() is available because both paths (SMBIOS present / absent)
-    // produce HasField for Name and UUID. The compiler verified this.
+    // ── 5. Сборка (раздел 1) ──
+    // .build() доступен, потому что оба пути (SMBIOS есть / нет)
+    // дают HasField для Name и UUID. Компилятор это проверил.
     builder.build("1")
 }
 
-// ──── Server Startup ────
+// ──── Запуск сервера ────
 
 fn main() {
-    // Initialize all data sources — each returns an availability token
+    // Инициализируем все источники данных: каждый возвращает токен доступности
     let smbios = init_smbios();
     let sensors = init_sensors();
     let sel = init_sel();
 
-    // Simulate handler call
+    // Имитируем вызов обработчика
     let response = handle_get_computer_system(
         &smbios,
         &sensors,
@@ -1177,7 +1123,7 @@ fn main() {
 }
 ```
 
-**Expected output:**
+**Ожидаемый вывод:**
 
 ```json
 {
@@ -1205,63 +1151,49 @@ fn main() {
 }
 ```
 
-### What the Compiler Proves (Server Side)
+### Что доказывает компилятор (сторона сервера)
 
-| # | Bug class | How it's prevented | Pattern (Section) |
-|---|-----------|-------------------|-------------------|
-| 1 | Missing required field in response | `.build()` requires all type-state markers to be `HasField` | Builder type-state (§1) |
-| 2 | Calling into failed subsystem | Source-availability tokens gate data access | Capability tokens (§2) |
-| 3 | No fallback for unavailable source | Both `match` arms (present/absent) must produce `HasField` | Type-state + exhaustive match (§2) |
-| 4 | Wrong unit in JSON field | `reading_celsius: Celsius` ≠ `Rpm` ≠ `Watts` | Dimensional types (§3) |
-| 5 | Incomplete health rollup | `compute_system_health` takes explicit source refs; SEL provides per-subsystem `HealthValue` via ch07's `TypedSelSummary` | Typed function signature + exhaustive matching (§4) |
-| 6 | Schema version mismatch | `ComputerSystemResponse<V1_13>` has `last_reset_time()`; `V1_5` doesn't | Phantom types (§5) |
-| 7 | Invalid action payload accepted | serde rejects unknown/missing fields before `execute()` | Typed action dispatch (§6) |
-| 8 | Missing action variant handling | `match params.reset_type` is exhaustive | Enum exhaustiveness (§6) |
-| 9 | Wrong action params to wrong handler | `RedfishAction::Params` is an associated type | Typed commands inverted (§6) |
+| № | Класс ошибки | Как это предотвращается | Паттерн (раздел) |
+|---|--------------|-------------------------|------------------|
+| 1 | Отсутствует обязательное поле в ответе | `.build()` требует, чтобы все маркеры типа были `HasField` | Typestate билдера (§1) |
+| 2 | Обращение к неисправной подсистеме | Токены доступности источников открывают доступ к данным | Capability-токены (§2) |
+| 3 | Нет запасного пути для недоступного источника | Обе ветки `match` (есть / нет) обязаны давать `HasField` | Typestate + исчерпывающее match (§2) |
+| 4 | Неверная единица в поле JSON | `reading_celsius: Celsius` ≠ `Rpm` ≠ `Watts` | Размерные типы (§3) |
+| 5 | Неполная агрегация здоровья | `compute_system_health` принимает явные ссылки на источники; SEL даёт `HealthValue` по подсистемам через `TypedSelSummary` гл. 07 | Типизированная сигнатура функции + исчерпывающее сопоставление (§4) |
+| 6 | Несоответствие версии схемы | `ComputerSystemResponse<V1_13>` имеет `last_reset_time()`, у `V1_5` его нет | Phantom-типы (§5) |
+| 7 | Принимается некорректная полезная нагрузка действия | serde отвергает неизвестные и отсутствующие поля до `execute()` | Типизированная диспетчеризация действий (§6) |
+| 8 | Отсутствует обработка варианта действия | `match params.reset_type` исчерпывающий | Исчерпываемость enum (§6) |
+| 9 | Параметры не того действия переданы обработчику | `RedfishAction::Params` — ассоциированный тип | Типизированные команды, перевёрнутые (§6) |
 
-**Total runtime overhead: zero.** The builder markers, availability tokens, phantom
-version types, and dimensional newtypes all compile away. The JSON produced is
-identical to the hand-rolled C version — minus nine classes of bugs.
+**Суммарные накладные расходы во время выполнения: ноль.** Маркеры билдера, токены доступности, phantom-типы версий и размерные newtype исчезают при компиляции. Получаемый JSON идентичен версии на C, написанной вручную, за вычетом девяти классов ошибок.
 
 ---
 
-## The Mirror: Client vs. Server Pattern Map
+## Зеркало: карта паттернов клиента и сервера
 
-| Concern | Client (ch17) | Server (this chapter) |
-|---------|---------------|----------------------|
-| **Boundary direction** | Inbound: JSON → typed values | Outbound: typed values → JSON |
-| **Core principle** | "Parse, don't validate" | "Construct, don't serialize" |
-| **Field completeness** | `TryFrom` validates required fields are present | Builder type-state gates `.build()` on required fields |
-| **Unit safety** | `Celsius` ≠ `Rpm` when reading | `Celsius` ≠ `Rpm` when writing |
-| **Privilege / availability** | Capability tokens gate requests | Availability tokens gate data source access |
-| **Data sources** | Single source (BMC) | Multiple sources (SMBIOS, sensors, SEL, PCIe, ...) |
-| **Schema version** | Phantom types prevent accessing unsupported fields | Phantom types enforce providing version-required fields |
-| **Actions** | Client sends typed action POST | Server validates + dispatches via `RedfishAction` trait |
-| **Health** | Read and trust `Status.Health` | Compute `Status.Health` via typed rollup |
-| **Failure propagation** | One bad parse → one client error | One bad serialization → every client sees wrong data |
+| Аспект | Клиент (гл. 17) | Сервер (эта глава) |
+|--------|-----------------|--------------------|
+| **Направление границы** | Входящая: JSON → типизированные значения | Исходящая: типизированные значения → JSON |
+| **Основной принцип** | «Parse, don't validate» | «Construct, don't serialize» |
+| **Полнота полей** | `TryFrom` проверяет наличие обязательных полей | Typestate билдера открывает `.build()` при обязательных полях |
+| **Безопасность единиц** | `Celsius` ≠ `Rpm` при чтении | `Celsius` ≠ `Rpm` при записи |
+| **Привилегии / доступность** | Capability-токены открывают запросы | Токены доступности открывают доступ к источникам данных |
+| **Источники данных** | Один источник (BMC) | Несколько источников (SMBIOS, датчики, SEL, PCIe, ...) |
+| **Версия схемы** | Phantom-типы не дают обращаться к неподдерживаемым полям | Phantom-типы требуют заполнения полей, обязательных для версии |
+| **Действия** | Клиент отправляет типизированный POST действия | Сервер проверяет и диспетчеризует через трейт `RedfishAction` |
+| **Здоровье** | Читает и доверяет `Status.Health` | Вычисляет `Status.Health` через типизированную агрегацию |
+| **Распространение сбоя** | Один плохой разбор → одна ошибка клиента | Одна плохая сериализация → каждый клиент видит неверные данные |
 
-The two chapters form a complete story. Ch17: *"Every response I consume is
-type-checked."* This chapter: *"Every response I produce is type-checked."* The
-same patterns flow in both directions — the type system doesn't know or care
-which end of the wire you're on.
+Две главы образуют полную картину. Гл. 17: *«Каждый ответ, который я потребляю, проверен типами».* Эта глава: *«Каждый ответ, который я отдаю, проверен типами».* Одни и те же паттерны работают в обоих направлениях: система типов не знает и не заботится о том, с какой стороны провода вы находитесь.
 
-## Key Takeaways
+## Ключевые выводы
 
-1. **"Construct, don't serialize"** is the server-side mirror of "parse, don't
-   validate" — use builder type-state so `.build()` only exists when all required
-   fields are present.
-2. **Source-availability tokens prove initialization** — the same capability token
-   pattern from ch04, repurposed to prove a data source is ready.
-3. **Dimensional types protect producers and consumers** — putting `Rpm` in a
-   `ReadingCelsius` field is a compile error, not a customer-reported bug.
-4. **Health rollup is a typed fold** — `Ord` on `HealthValue` plus explicit source
-   references mean the compiler catches "forgot to include PSU status."
-5. **Schema versioning at the type level** — phantom type parameters make
-   version-specific fields appear and disappear at compile time.
-6. **Action dispatch inverts ch02** — `serde` deserializes the payload into a
-   typed `Params` struct, and exhaustive matching on enum variants means adding a
-   new `ResetType` forces every handler to be updated.
-7. **Server-side bugs propagate to every client** — that's why compile-time
-   correctness on the producer side is even more critical than on the consumer side.
+1. **«Construct, don't serialize»** — серверное зеркало «parse, don't validate»: используйте typestate билдера, чтобы `.build()` существовал только тогда, когда заданы все обязательные поля.
+2. **Токены доступности источников доказывают инициализацию**: тот же паттерн capability-токена из гл. 04, переиспользованный, чтобы доказать готовность источника данных.
+3. **Размерные типы защищают и производителей, и потребителей**: положить `Rpm` в поле `ReadingCelsius` — это ошибка компиляции, а не баг, о котором сообщит заказчик.
+4. **Агрегация здоровья — это типизированная свёртка**: `Ord` для `HealthValue` плюс явные ссылки на источники означают, что компилятор поймает «забыли учесть статус БП».
+5. **Версионирование схемы на уровне типов**: параметры phantom-типов заставляют поля, специфичные для версии, появляться и исчезать на этапе компиляции.
+6. **Диспетчеризация действий — обратная сторона гл. 02**: `serde` десериализует полезную нагрузку в типизированную структуру `Params`, а исчерпывающее сопоставление по вариантам enum означает, что добавление нового `ResetType` вынуждает обновить каждый обработчик.
+7. **Ошибки на стороне сервера распространяются на каждого клиента**: поэтому корректность на этапе компиляции со стороны производителя ещё важнее, чем со стороны потребителя.
 
 ---
