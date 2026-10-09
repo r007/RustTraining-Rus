@@ -1,33 +1,33 @@
-# Dependency Management and Supply Chain Security 🟢
+# Управление зависимостями и безопасность цепочки поставок 🟢
 
-> **What you'll learn:**
-> - Scanning for known vulnerabilities with `cargo-audit`
-> - Enforcing license, advisory, and source policies with `cargo-deny`
-> - Supply chain trust verification with Mozilla's `cargo-vet`
-> - Tracking outdated dependencies and detecting breaking API changes
-> - Visualizing and deduplicating your dependency tree
+> **Чему вы научитесь:**
+> - Поиск известных уязвимостей с помощью `cargo-audit`
+> - Соблюдение политик по лицензиям, рекомендациям и источникам с помощью `cargo-deny`
+> - Проверка доверия к цепочке поставок с помощью `cargo-vet` от Mozilla
+> - Отслеживание устаревших зависимостей и обнаружение несовместимых изменений API
+> - Визуализация и дедупликация дерева зависимостей
 >
-> **Cross-references:** [Release Profiles](ch07-release-profiles-and-binary-size.md) — `cargo-udeps` trims unused dependencies found here · [CI/CD Pipeline](ch11-putting-it-all-together-a-production-cic.md) — audit and deny jobs in the pipeline · [Build Scripts](ch01-build-scripts-buildrs-in-depth.md) — `build-dependencies` are part of your supply chain too
+> **Перекрёстные ссылки:** [Профили релиза](ch07-release-profiles-and-binary-size.md) — `cargo-udeps` убирает неиспользуемые зависимости, найденные здесь · [CI/CD-конвейер](ch11-putting-it-all-together-a-production-cic.md) — джобы audit и deny в конвейере · [Build-скрипты](ch01-build-scripts-buildrs-in-depth.md) — `build-dependencies` тоже входят в вашу цепочку поставок
 
-A Rust binary doesn't just contain your code — it contains every transitive
-dependency in your `Cargo.lock`. A vulnerability, license violation, or
-malicious crate anywhere in that tree becomes *your* problem. This chapter
-covers the tools that make dependency management auditable and automated.
+Бинарник на Rust содержит не только ваш код — он содержит все транзитивные зависимости
+из `Cargo.lock`. Уязвимость, нарушение лицензии или вредоносный крейт в любой точке этого
+дерева становятся *вашей* проблемой. Эта глава описывает инструменты, которые делают
+управление зависимостями поддающимся аудиту и автоматизированным.
 
-### cargo-audit — Known Vulnerability Scanning
+### cargo-audit — поиск известных уязвимостей
 
-[`cargo-audit`](https://github.com/rustsec/rustsec/tree/main/cargo-audit)
-checks your `Cargo.lock` against the [RustSec Advisory Database](https://rustsec.org/),
-which tracks known vulnerabilities in published crates.
+[`cargo-audit`](https://github.com/rustsec/rustsec/tree/main/cargo-audit) сверяет ваш
+`Cargo.lock` с [базой рекомендаций RustSec](https://rustsec.org/), в которой отслеживаются
+известные уязвимости опубликованных крейтов.
 
 ```bash
-# Install
+# Установка
 cargo install cargo-audit
 
-# Scan for known vulnerabilities
+# Поиск известных уязвимостей
 cargo audit
 
-# Output:
+# Вывод:
 # Crate:     chrono
 # Version:   0.4.19
 # Title:     Potential segfault in localtime_r invocations
@@ -36,24 +36,24 @@ cargo audit
 # URL:       https://rustsec.org/advisories/RUSTSEC-2020-0159
 # Solution:  Upgrade to >= 0.4.20
 
-# Check and fail CI if vulnerabilities exist
+# Проверка с падением CI, если есть уязвимости
 cargo audit --deny warnings
 
-# Generate JSON output for automated processing
+# Генерация JSON-вывода для автоматической обработки
 cargo audit --json
 
-# Fix vulnerabilities by updating Cargo.lock
+# Исправление уязвимостей обновлением Cargo.lock
 cargo audit fix
 ```
 
-**CI integration:**
+**Интеграция с CI:**
 
 ```yaml
 # .github/workflows/audit.yml
-name: Security Audit
+name: Проверка безопасности
 on:
   schedule:
-    - cron: '0 0 * * *'  # Daily check — advisories appear continuously
+    - cron: '0 0 * * *'  # Ежедневная проверка — рекомендации появляются постоянно
   push:
     paths: ['Cargo.lock']
 
@@ -67,47 +67,47 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
-### cargo-deny — Comprehensive Policy Enforcement
+### cargo-deny — комплексное применение политик
 
-[`cargo-deny`](https://github.com/EmbarkStudios/cargo-deny) goes far beyond
-vulnerability scanning. It enforces policies across four dimensions:
+[`cargo-deny`](https://github.com/EmbarkStudios/cargo-deny) выходит далеко за рамки поиска
+уязвимостей. Он применяет политики по четырём направлениям:
 
-1. **Advisories** — known vulnerabilities (like cargo-audit)
-2. **Licenses** — allowed/denied license list
-3. **Bans** — forbidden crates or duplicate versions
-4. **Sources** — allowed registries and git sources
+1. **Рекомендации (advisories)** — известные уязвимости (как и в cargo-audit)
+2. **Лицензии** — список разрешённых и запрещённых лицензий
+3. **Ограничения (bans)** — запрещённые крейты или дублирующиеся версии
+4. **Источники (sources)** — разрешённые реестры и git-источники
 
 ```bash
-# Install
+# Установка
 cargo install cargo-deny
 
-# Initialize configuration
+# Инициализация конфигурации
 cargo deny init
-# Creates deny.toml with documented defaults
+# Создаёт deny.toml с документированными значениями по умолчанию
 
-# Run all checks
+# Запуск всех проверок
 cargo deny check
 
-# Run specific checks
+# Запуск отдельных проверок
 cargo deny check advisories
 cargo deny check licenses
 cargo deny check bans
 cargo deny check sources
 ```
 
-**Example `deny.toml`:**
+**Пример `deny.toml`:**
 
 ```toml
 # deny.toml
 
 [advisories]
-vulnerability = "deny"        # Fail on known vulnerabilities
-unmaintained = "warn"         # Warn on unmaintained crates
-yanked = "deny"               # Fail on yanked crates
-notice = "warn"               # Warn on informational advisories
+vulnerability = "deny"        # Падать при известных уязвимостях
+unmaintained = "warn"         # Предупреждать о неподдерживаемых крейтах
+yanked = "deny"               # Падать на отозванных (yanked) крейтах
+notice = "warn"               # Предупреждать об информационных рекомендациях
 
 [licenses]
-unlicensed = "deny"           # All crates must have a license
+unlicensed = "deny"           # У всех крейтов должна быть лицензия
 allow = [
     "MIT",
     "Apache-2.0",
@@ -116,109 +116,107 @@ allow = [
     "ISC",
     "Unicode-DFS-2016",
 ]
-copyleft = "deny"             # No GPL/LGPL/AGPL in this project
-default = "deny"              # Deny anything not explicitly allowed
+copyleft = "deny"             # Никаких GPL/LGPL/AGPL в этом проекте
+default = "deny"              # Запрещать всё, что не разрешено явно
 
 [bans]
-multiple-versions = "warn"    # Warn if same crate appears at 2 versions
-wildcards = "deny"            # No path = "*" in dependencies
-highlight = "all"             # Show all duplicates, not just first
+multiple-versions = "warn"    # Предупреждать, если один крейт присутствует в 2 версиях
+wildcards = "deny"            # Никаких path = "*" в зависимостях
+highlight = "all"             # Показывать все дубликаты, а не только первый
 
-# Ban specific problematic crates
+# Запрещаем отдельные проблемные крейты
 deny = [
-    # openssl-sys pulls in C OpenSSL — prefer rustls
+    # openssl-sys подтягивает C-библиотеку OpenSSL — предпочитайте rustls
     { name = "openssl-sys", wrappers = ["native-tls"] },
 ]
 
-# Allow specific duplicate versions (when unavoidable)
+# Разрешаем отдельные дублирующиеся версии (когда их не избежать)
 [[bans.skip]]
 name = "syn"
-version = "1.0"               # syn 1.x and 2.x often coexist
+version = "1.0"               # syn 1.x и 2.x часто сосуществуют
 
 [sources]
-unknown-registry = "deny"     # Only allow crates.io
-unknown-git = "deny"          # No random git dependencies
+unknown-registry = "deny"     # Разрешён только crates.io
+unknown-git = "deny"          # Никаких случайных git-зависимостей
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
 ```
 
-**License enforcement** is particularly valuable for commercial projects:
+**Контроль лицензий** особенно ценен для коммерческих проектов:
 
 ```bash
-# Check which licenses are in your dependency tree
+# Проверить, какие лицензии есть в дереве зависимостей
 cargo deny list
 
-# Output:
+# Вывод:
 # MIT          — 127 crates
 # Apache-2.0   — 89 crates
 # BSD-3-Clause — 12 crates
-# MPL-2.0      — 3 crates   ← might need legal review
+# MPL-2.0      — 3 crates   ← может потребоваться юридическая проверка
 # Unicode-DFS  — 1 crate
 ```
 
-### cargo-vet — Supply Chain Trust Verification
+### cargo-vet — проверка доверия к цепочке поставок
 
-[`cargo-vet`](https://github.com/mozilla/cargo-vet) (from Mozilla) addresses a
-different question: not "does this crate have known bugs?" but "has a trusted
-human actually reviewed this code?"
+[`cargo-vet`](https://github.com/mozilla/cargo-vet) (от Mozilla) отвечает на другой вопрос:
+не «есть ли у этого крейта известные баги?», а «проверил ли этот код доверенный человек?»
 
 ```bash
-# Install
+# Установка
 cargo install cargo-vet
 
-# Initialize (creates supply-chain/ directory)
+# Инициализация (создаёт директорию supply-chain/)
 cargo vet init
 
-# Check which crates need review
+# Проверить, какие крейты нужно проверить
 cargo vet
 
-# After reviewing a crate, certify it:
+# После проверки крейта подтвердите это:
 cargo vet certify serde 1.0.203
-# Records that you've audited serde 1.0.203 for your criteria
+# Фиксирует, что вы проверили serde 1.0.203 по своим критериям
 
-# Import audits from trusted organizations
+# Импорт аудитов от доверенных организаций
 cargo vet import mozilla
 cargo vet import google
 cargo vet import bytecode-alliance
 ```
 
-**How it works:**
+**Как это работает:**
 
 ```text
 supply-chain/
-├── audits.toml       ← Your team's audit certifications
-├── config.toml       ← Trust configuration and criteria
-└── imports.lock      ← Pinned imports from other organizations
+├── audits.toml       ← Сертификаты аудита вашей команды
+├── config.toml       ← Конфигурация доверия и критерии
+└── imports.lock      ← Зафиксированные импорты от других организаций
 ```
 
-`cargo-vet` is most valuable for organizations with strict supply-chain
-requirements (government, finance, infrastructure). For most teams,
-`cargo-deny` provides sufficient protection.
+`cargo-vet` наиболее полезен организациям со строгими требованиями к цепочке поставок
+(госсектор, финансы, инфраструктура). Для большинства команд `cargo-deny` даёт достаточную защиту.
 
-### cargo-outdated and cargo-semver-checks
+### cargo-outdated и cargo-semver-checks
 
-**`cargo-outdated`** — find dependencies that have newer versions:
+**`cargo-outdated`** — поиск зависимостей, для которых есть более новые версии:
 
 ```bash
 cargo install cargo-outdated
 
 cargo outdated --workspace
-# Output:
+# Вывод:
 # Name        Project  Compat  Latest   Kind
 # serde       1.0.193  1.0.203 1.0.203  Normal
 # regex       1.9.6    1.10.4  1.10.4   Normal
-# thiserror   1.0.50   1.0.61  2.0.3    Normal  ← major version available
+# thiserror   1.0.50   1.0.61  2.0.3    Normal  ← доступна мажорная версия
 ```
 
-**`cargo-semver-checks`** — detect breaking API changes before publishing.
-Essential for library crates:
+**`cargo-semver-checks`** — обнаружение несовместимых изменений API до публикации.
+Незаменим для библиотечных крейтов:
 
 ```bash
 cargo install cargo-semver-checks
 
-# Check if your changes are semver-compatible
+# Проверить, совместимы ли ваши изменения с semver
 cargo semver-checks
 
-# Output:
+# Вывод:
 # ✗ Function `parse_gpu_csv` is now private (was public)
 #   → This is a BREAKING change. Bump MAJOR version.
 #
@@ -228,22 +226,22 @@ cargo semver-checks
 # ✓ Function `parse_gpu_csv_v2` was added (non-breaking)
 ```
 
-### cargo-tree — Dependency Visualization and Deduplication
+### cargo-tree — визуализация и дедупликация зависимостей
 
-`cargo tree` is built into Cargo (no installation needed) and is invaluable
-for understanding your dependency graph:
+`cargo tree` встроен в Cargo (ничего устанавливать не нужно) и незаменим для понимания
+графа зависимостей:
 
 ```bash
-# Full dependency tree
+# Полное дерево зависимостей
 cargo tree
 
-# Find why a specific crate is included
+# Понять, почему включён конкретный крейт
 cargo tree --invert --package openssl-sys
-# Shows all paths from your crate to openssl-sys
+# Показывает все пути от вашего крейта к openssl-sys
 
-# Find duplicate versions
+# Найти дублирующиеся версии
 cargo tree --duplicates
-# Output:
+# Вывод:
 # syn v1.0.109
 # └── serde_derive v1.0.193
 #
@@ -251,29 +249,28 @@ cargo tree --duplicates
 # ├── thiserror-impl v1.0.56
 # └── tokio-macros v2.2.0
 
-# Show only direct dependencies
+# Показать только прямые зависимости
 cargo tree --depth 1
 
-# Show dependency features
+# Показать фичи зависимостей
 cargo tree --format "{p} {f}"
 
-# Count total dependencies
+# Подсчитать общее количество зависимостей
 cargo tree | wc -l
 ```
 
-**Deduplication strategy**: When `cargo tree --duplicates` shows the same crate
-at two major versions, check if you can update the dependency chain to unify them.
-Each duplicate adds compile time and binary size.
+**Стратегия дедупликации**: если `cargo tree --duplicates` показывает один и тот же крейт
+в двух мажорных версиях, проверьте, можно ли обновить цепочку зависимостей, чтобы объединить
+их. Каждый дубликат увеличивает время компиляции и размер бинарника.
 
-### Application: Multi-Crate Dependency Hygiene
+### Применение: гигиена зависимостей в мультикрейтовом проекте
 
-The workspace uses `[workspace.dependencies]` for centralized
-version management — an excellent practice. Combined with
-[`cargo tree --duplicates`](ch07-release-profiles-and-binary-size.md) for size
-analysis, this prevents version drift and reduces binary bloat:
+Воркспейс использует `[workspace.dependencies]` для централизованного управления версиями —
+отличная практика. В сочетании с [`cargo tree --duplicates`](ch07-release-profiles-and-binary-size.md)
+для анализа размера это предотвращает расхождение версий и уменьшает раздувание бинарника:
 
 ```toml
-# Root Cargo.toml — all versions pinned in one place
+# Корневой Cargo.toml — все версии зафиксированы в одном месте
 [workspace.dependencies]
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["preserve_order"] }
@@ -283,17 +280,17 @@ anyhow = "1.0"
 rayon = "1.8"
 ```
 
-**Recommended additions for the project:**
+**Рекомендуемые дополнения для проекта:**
 
 ```bash
-# Add to CI pipeline:
-cargo deny init              # One-time setup
-cargo deny check             # Every PR — licenses, advisories, bans
-cargo audit --deny warnings  # Every push — vulnerability scanning
-cargo outdated --workspace   # Weekly — track available updates
+# Добавить в CI-конвейер:
+cargo deny init              # Однократная настройка
+cargo deny check             # Каждый PR — лицензии, рекомендации, ограничения
+cargo audit --deny warnings  # Каждый push — поиск уязвимостей
+cargo outdated --workspace   # Раз в неделю — отслеживание доступных обновлений
 ```
 
-**Recommended `deny.toml` for the project:**
+**Рекомендуемый `deny.toml` для проекта:**
 
 ```toml
 [advisories]
@@ -302,10 +299,10 @@ yanked = "deny"
 
 [licenses]
 allow = ["MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC", "Unicode-DFS-2016"]
-copyleft = "deny"     # Hardware diagnostics tool — no copyleft
+copyleft = "deny"     # Инструмент диагностики железа — никакого copyleft
 
 [bans]
-multiple-versions = "warn"   # Track duplicates, don't block yet
+multiple-versions = "warn"   # Отслеживаем дубликаты, пока не блокируем
 wildcards = "deny"
 
 [sources]
@@ -313,79 +310,81 @@ unknown-registry = "deny"
 unknown-git = "deny"
 ```
 
-### Supply Chain Audit Pipeline
+### Конвейер аудита цепочки поставок
 
 ```mermaid
 flowchart LR
-    PR["Pull Request"] --> AUDIT["cargo audit<br/>Known CVEs"]
-    AUDIT --> DENY["cargo deny check<br/>Licenses + Bans + Sources"]
-    DENY --> OUTDATED["cargo outdated<br/>Weekly schedule"]
-    OUTDATED --> SEMVER["cargo semver-checks<br/>Library crates only"]
-    
-    AUDIT -->|"Fail"| BLOCK["❌ Block merge"]
-    DENY -->|"Fail"| BLOCK
-    SEMVER -->|"Breaking change"| BUMP["Bump major version"]
-    
+    PR["Pull Request"] --> AUDIT["cargo audit<br/>Известные CVE"]
+    AUDIT --> DENY["cargo deny check<br/>Лицензии + Ограничения + Источники"]
+    DENY --> OUTDATED["cargo outdated<br/>По расписанию, раз в неделю"]
+    OUTDATED --> SEMVER["cargo semver-checks<br/>Только библиотечные крейты"]
+
+    AUDIT -->|"Ошибка"| BLOCK["❌ Блокировать слияние"]
+    DENY -->|"Ошибка"| BLOCK
+    SEMVER -->|"Несовместимое изменение"| BUMP["Поднять мажорную версию"]
+
     style BLOCK fill:#ff6b6b,color:#000
     style BUMP fill:#ffd43b,color:#000
     style PR fill:#e3f2fd,color:#000
 ```
 
-### 🏋️ Exercises
+### 🏋️ Упражнения
 
-#### 🟢 Exercise 1: Audit Your Dependencies
+#### 🟢 Упражнение 1: проверьте свои зависимости
 
-Run `cargo audit` and `cargo deny init && cargo deny check` on any Rust project. How many advisories are found? How many license categories are in your tree?
+Запустите `cargo audit` и `cargo deny init && cargo deny check` на любом проекте на Rust.
+Сколько рекомендаций найдено? Сколько категорий лицензий в вашем дереве?
 
 <details>
-<summary>Solution</summary>
+<summary>Решение</summary>
 
 ```bash
 cargo audit
-# Note any advisories — often chrono, time, or older crates
+# Обратите внимание на рекомендации — чаще всего это chrono, time или старые крейты
 
 cargo deny init
 cargo deny list
-# Shows license breakdown: MIT (N), Apache-2.0 (N), etc.
+# Показывает разбивку по лицензиям: MIT (N), Apache-2.0 (N) и т. д.
 
 cargo deny check
-# Shows full audit across all four dimensions
+# Показывает полную проверку по всем четырём направлениям
 ```
 </details>
 
-#### 🟡 Exercise 2: Find and Eliminate Duplicate Dependencies
+#### 🟡 Упражнение 2: найдите и устраните дублирующиеся зависимости
 
-Run `cargo tree --duplicates` on a workspace. Find a crate that appears at two versions. Can you update `Cargo.toml` to unify them? Measure the compile-time and binary-size impact.
+Запустите `cargo tree --duplicates` на воркспейсе. Найдите крейт, который присутствует в двух
+версиях. Можно ли обновить `Cargo.toml`, чтобы их объединить? Измерьте влияние на время
+компиляции и размер бинарника.
 
 <details>
-<summary>Solution</summary>
+<summary>Решение</summary>
 
 ```bash
 cargo tree --duplicates
-# Typical: syn 1.x and syn 2.x
+# Типично: syn 1.x и syn 2.x
 
-# Find who pulls in the old version:
+# Выясняем, кто подтягивает старую версию:
 cargo tree --invert --package syn@1.0.109
-# Output: serde_derive 1.0.xxx -> syn 1.0.109
+# Вывод: serde_derive 1.0.xxx -> syn 1.0.109
 
-# Check if a newer serde_derive uses syn 2.x:
+# Проверяем, использует ли новый serde_derive syn 2.x:
 cargo update -p serde_derive
 cargo tree --duplicates
-# If syn 1.x is gone, you've eliminated a duplicate
+# Если syn 1.x исчез, вы устранили дубликат
 
-# Measure impact:
-time cargo build --release  # Before and after
+# Измеряем влияние:
+time cargo build --release  # До и после
 cargo bloat --release --crates | head -20
 ```
 </details>
 
-### Key Takeaways
+### Ключевые выводы
 
-- `cargo audit` catches known CVEs — run it on every push and on a daily schedule
-- `cargo deny` enforces four policy dimensions: advisories, licenses, bans, and sources
-- Use `[workspace.dependencies]` to centralize version management across a multi-crate workspace
-- `cargo tree --duplicates` reveals bloat; each duplicate adds compile time and binary size
-- `cargo-vet` is for high-security environments; `cargo-deny` is sufficient for most teams
+- `cargo audit` ловит известные CVE — запускайте его на каждый push и по ежедневному расписанию
+- `cargo deny` применяет политики по четырём направлениям: рекомендации, лицензии, ограничения и источники
+- Используйте `[workspace.dependencies]`, чтобы централизовать управление версиями в мультикрейтовом воркспейсе
+- `cargo tree --duplicates` выявляет раздувание: каждый дубликат увеличивает время компиляции и размер бинарника
+- `cargo-vet` предназначен для сред с высокими требованиями к безопасности; для большинства команд достаточно `cargo-deny`
 
 ---
-

@@ -1,102 +1,102 @@
-# Miri, Valgrind, and Sanitizers — Verifying Unsafe Code 🔴
+# Miri, Valgrind и санитайзеры — проверка unsafe-кода 🔴
 
-> **What you'll learn:**
-> - Miri as a MIR interpreter — what it catches (aliasing, UB, leaks) and what it can't (FFI, syscalls)
-> - Valgrind memcheck, Helgrind (data races), Callgrind (profiling), and Massif (heap)
-> - LLVM sanitizers: ASan, MSan, TSan, LSan with nightly `-Zbuild-std`
-> - `cargo-fuzz` for crash discovery and `loom` for concurrency model checking
-> - A decision tree for choosing the right verification tool
+> **Чему вы научитесь:**
+> - Miri как интерпретатор MIR — что он ловит (алиасинг, UB, утечки) и что не может (FFI, системные вызовы)
+> - Valgrind memcheck, Helgrind (гонки данных), Callgrind (профилирование) и Massif (куча)
+> - Санитайзеры LLVM: ASan, MSan, TSan, LSan с nightly-сборкой `-Zbuild-std`
+> - `cargo-fuzz` для поиска падений и `loom` для проверки моделей конкурентности
+> - Дерево решений для выбора подходящего инструмента проверки
 >
-> **Cross-references:** [Code Coverage](ch04-code-coverage-seeing-what-tests-miss.md) — coverage finds untested paths, Miri verifies the tested ones · [`no_std` & Features](ch09-no-std-and-feature-verification.md) — `no_std` code often requires `unsafe` that Miri can verify · [CI/CD Pipeline](ch11-putting-it-all-together-a-production-cic.md) — Miri job in the pipeline
+> **Перекрёстные ссылки:** [Покрытие кода](ch04-code-coverage-seeing-what-tests-miss.md) — покрытие находит непротестированные пути, Miri проверяет протестированные · [`no_std` и фичи](ch09-no-std-and-feature-verification.md) — код `no_std` часто требует `unsafe`, который может проверить Miri · [CI/CD-конвейер](ch11-putting-it-all-together-a-production-cic.md) — джоба Miri в конвейере
 
-Safe Rust guarantees memory safety and data-race freedom at compile time. But the
-moment you write `unsafe` — for FFI, hand-rolled data structures, or performance
-tricks — those guarantees become *your* responsibility. This chapter covers the
-tools that verify your `unsafe` code actually upholds the safety contracts it claims.
+Безопасный Rust гарантирует безопасность памяти и отсутствие гонок данных на этапе компиляции.
+Но как только вы пишете `unsafe` — для FFI, собственных структур данных или ради
+производительности, — эти гарантии становятся *вашей* ответственностью. Эта глава описывает
+инструменты, которые проверяют, действительно ли ваш `unsafe`-код выполняет заявленные
+контракты безопасности.
 
-### Miri — An Interpreter for Unsafe Rust
+### Miri — интерпретатор для unsafe Rust
 
-[Miri](https://github.com/rust-lang/miri) is an **interpreter** for Rust's
-Mid-level Intermediate Representation (MIR). Instead of compiling to machine code,
-Miri *executes* your program step-by-step with exhaustive checks for undefined
-behavior at every operation.
+[Miri](https://github.com/rust-lang/miri) — это **интерпретатор** промежуточного
+представления Rust (Mid-level Intermediate Representation, MIR). Вместо компиляции в машинный
+код Miri *выполняет* программу шаг за шагом, проверяя на каждой операции отсутствие
+неопределённого поведения (UB).
 
 ```bash
-# Install Miri (nightly-only component)
+# Установка Miri (компонент только для nightly)
 rustup +nightly component add miri
 
-# Run your test suite under Miri
+# Запуск тестового набора под Miri
 cargo +nightly miri test
 
-# Run a specific binary under Miri
+# Запуск конкретного бинарника под Miri
 cargo +nightly miri run
 
-# Run a specific test
+# Запуск конкретного теста
 cargo +nightly miri test -- test_name
 ```
 
-**How Miri works:**
+**Как работает Miri:**
 
 ```text
-Source → rustc → MIR → Miri interprets MIR
+Исходник → rustc → MIR → Miri интерпретирует MIR
                         │
-                        ├─ Tracks every pointer's provenance
-                        ├─ Validates every memory access
-                        ├─ Checks alignment at every deref
-                        ├─ Detects use-after-free
-                        ├─ Detects data races (with threads)
-                        └─ Enforces Stacked Borrows / Tree Borrows rules
+                        ├─ Отслеживает происхождение (provenance) каждого указателя
+                        ├─ Проверяет каждое обращение к памяти
+                        ├─ Проверяет выравнивание при каждом разыменовании
+                        ├─ Обнаруживает use-after-free
+                        ├─ Обнаруживает гонки данных (в многопоточном коде)
+                        └─ Применяет правила Stacked Borrows / Tree Borrows
 ```
 
-### What Miri Catches (and What It Cannot)
+### Что ловит Miri (а что не может)
 
-**Miri detects:**
+**Miri обнаруживает:**
 
-| Category | Example | Would Crash at Runtime? |
-|----------|---------|------------------------|
-| Out-of-bounds access | `ptr.add(100).read()` past allocation | Sometimes (depends on page layout) |
-| Use after free | Reading a dropped `Box` through raw pointer | Sometimes (depends on allocator) |
-| Double free | Calling `drop_in_place` twice | Usually |
-| Unaligned access | `(ptr as *const u32).read()` on odd address | On some architectures |
-| Invalid values | `transmute::<u8, bool>(2)` | Silently wrong |
-| Dangling references | `&*ptr` where ptr is freed | No (silent corruption) |
-| Data races | Two threads, one writing, no synchronization | Intermittent, hard to reproduce |
-| Stacked Borrows violation | Aliasing `&mut` references | No (silent corruption) |
+| Категория | Пример | Упадёт ли во время выполнения? |
+|-----------|--------|--------------------------------|
+| Выход за границы | `ptr.add(100).read()` за пределами выделения | Иногда (зависит от раскладки страниц) |
+| Use-after-free | Чтение `Box` после освобождения через сырой указатель | Иногда (зависит от аллокатора) |
+| Double free | Двойной вызов `drop_in_place` | Обычно |
+| Невыровненный доступ | `(ptr as *const u32).read()` по нечётному адресу | На некоторых архитектурах |
+| Некорректные значения | `transmute::<u8, bool>(2)` | Молча даёт неверный результат |
+| Висящие ссылки | `&*ptr`, где ptr уже освобождён | Нет (молчаливое повреждение) |
+| Гонки данных | Два потока, один пишет, без синхронизации | Периодически, трудно воспроизвести |
+| Нарушение Stacked Borrows | Алиасинг `&mut`-ссылок | Нет (молчаливое повреждение) |
 
-**Miri does NOT detect:**
+**Miri НЕ обнаруживает:**
 
-| Limitation | Why |
-|-----------|-----|
-| Logic bugs | Miri checks memory safety, not correctness |
-| Concurrency deadlocks | Miri checks data races, not livelocks |
-| Performance issues | Interpretation is 10-100× slower than native |
-| OS/hardware interaction | Miri can't emulate syscalls, device I/O |
-| All FFI calls | Can't interpret C code (only Rust MIR) |
-| Exhaustive path coverage | Only tests the paths your test suite reaches |
+| Ограничение | Почему |
+|-------------|--------|
+| Логические ошибки | Miri проверяет безопасность памяти, а не корректность |
+| Взаимоблокировки | Miri проверяет гонки данных, а не livelock |
+| Проблемы производительности | Интерпретация в 10–100× медленнее нативного выполнения |
+| Взаимодействие с ОС и железом | Miri не может эмулировать системные вызовы и ввод-вывод устройств |
+| Все вызовы FFI | Не может интерпретировать C-код (только Rust MIR) |
+| Полное покрытие путей | Проверяет только те пути, до которых доходит ваш тестовый набор |
 
-**A concrete example — catching unsound code that "works" in practice:**
+**Конкретный пример — поиск некорректного кода, который «работает» на практике:**
 
 ```rust
 #[cfg(test)]
 mod tests {
     #[test]
     fn test_miri_catches_ub() {
-        // This "works" in release builds but is undefined behavior
+        // Это «работает» в release-сборках, но является неопределённым поведением
         let mut v = vec![1, 2, 3];
         let ptr = v.as_ptr();
 
-        // Push may reallocate, invalidating ptr
+        // Push может перевыделить буфер, и тогда ptr станет недействительным
         v.push(4);
 
-        // ❌ UB: ptr may be dangling after reallocation
-        // Miri will catch this even if the allocator happens to
-        // not move the buffer.
+        // ❌ UB: ptr может висеть после перевыделения
+        // Miri поймает это, даже если аллокатор случайно не переместит буфер.
         // let _val = unsafe { *ptr };
-        // Error: Miri would report:
+        // Ошибка: Miri сообщит:
         //   "pointer to alloc1234 was dereferenced after this
         //    allocation got freed"
-        
-        // ✅ Correct: get a fresh pointer after mutation
+
+        // ✅ Правильно: получаем новый указатель после изменения
         let ptr = v.as_ptr();
         let val = unsafe { *ptr };
         assert_eq!(val, 1);
@@ -104,50 +104,50 @@ mod tests {
 }
 ```
 
-### Running Miri on a Real Crate
+### Запуск Miri на реальном крейте
 
-**Practical Miri workflow for a crate with `unsafe`:**
+**Практический workflow Miri для крейта с `unsafe`:**
 
 ```bash
-# Step 1: Run all tests under Miri
+# Шаг 1: запустите все тесты под Miri
 cargo +nightly miri test 2>&1 | tee miri_output.txt
 
-# Step 2: If Miri reports errors, isolate them
+# Шаг 2: если Miri сообщил об ошибках, изолируйте их
 cargo +nightly miri test -- failing_test_name
 
-# Step 3: Use Miri's backtrace for diagnosis
+# Шаг 3: используйте бэктрейс Miri для диагностики
 MIRIFLAGS="-Zmiri-backtrace=full" cargo +nightly miri test
 
-# Step 4: Choose a borrow model
-# Stacked Borrows (default, stricter):
+# Шаг 4: выберите модель заимствований
+# Stacked Borrows (по умолчанию, строже):
 cargo +nightly miri test
 
-# Tree Borrows (experimental, more permissive):
+# Tree Borrows (экспериментальная, менее строгая):
 MIRIFLAGS="-Zmiri-tree-borrows" cargo +nightly miri test
 ```
 
-**Miri flags for common scenarios:**
+**Флаги Miri для типичных сценариев:**
 
 ```bash
-# Disable isolation (allow file system access, env vars)
+# Отключить изоляцию (разрешить доступ к файловой системе и переменным окружения)
 MIRIFLAGS="-Zmiri-disable-isolation" cargo +nightly miri test
 
-# Memory leak detection is ON by default in Miri.
-# To suppress leak errors (e.g., for intentional leaks):
+# Проверка утечек памяти включена в Miri по умолчанию.
+# Чтобы подавить ошибки утечек (например, для намеренных утечек):
 # MIRIFLAGS="-Zmiri-ignore-leaks" cargo +nightly miri test
 
-# Seed the RNG for reproducible results with randomized tests
+# Задать seed для ГСЧ — воспроизводимые результаты в тестах с рандомизацией
 MIRIFLAGS="-Zmiri-seed=42" cargo +nightly miri test
 
-# Enable strict provenance checking
+# Включить строгую проверку provenance
 MIRIFLAGS="-Zmiri-strict-provenance" cargo +nightly miri test
 
-# Multiple flags
+# Несколько флагов сразу
 MIRIFLAGS="-Zmiri-disable-isolation -Zmiri-backtrace=full -Zmiri-strict-provenance" \
     cargo +nightly miri test
 ```
 
-**Miri in CI:**
+**Miri в CI:**
 
 ```yaml
 # .github/workflows/miri.yml
@@ -163,138 +163,139 @@ jobs:
         with:
           components: miri
 
-      - name: Run Miri
+      - name: Запуск Miri
         run: cargo miri test --workspace
         env:
           MIRIFLAGS: "-Zmiri-backtrace=full"
-          # Leak checking is on by default.
-          # Skip tests that use system calls Miri can't handle
-          # (file I/O, networking, etc.)
+          # Проверка утечек включена по умолчанию.
+          # Пропускайте тесты, которые используют системные вызовы, с которыми Miri не справляется
+          # (файловый ввод-вывод, сеть и т. п.)
 ```
 
-> **Performance note**: Miri is 10-100× slower than native execution. A test suite
-> that runs in 5 seconds natively may take 5 minutes under Miri. In CI, run Miri
-> on a focused subset: crates with `unsafe` code only.
+> **Замечание о производительности**: Miri в 10–100× медленнее нативного выполнения. Тестовый
+> набор, который нативно выполняется за 5 секунд, под Miri может идти 5 минут. В CI запускайте
+> Miri на выбранном подмножестве: только крейты с `unsafe`-кодом.
 
-### Valgrind and Its Rust Integration
+### Valgrind и его интеграция с Rust
 
-[Valgrind](https://valgrind.org/) is the classic C/C++ memory checker. It works
-on compiled Rust binaries too, checking for memory errors at the machine-code level.
+[Valgrind](https://valgrind.org/) — классический инструмент проверки памяти для C/C++.
+Он работает и со скомпилированными бинарниками Rust, проверяя ошибки памяти на уровне
+машинного кода.
 
 ```bash
-# Install Valgrind
+# Установка Valgrind
 sudo apt install valgrind  # Debian/Ubuntu
 sudo dnf install valgrind  # Fedora
 
-# Build with debug info (Valgrind needs symbols)
+# Сборка с отладочной информацией (Valgrind нужны символы)
 cargo build --tests
-# or for release with debug info:
+# или для release с отладочной информацией:
 # cargo build --release
 # [profile.release]
 # debug = true
 
-# Run a specific test binary under Valgrind
+# Запуск конкретного тестового бинарника под Valgrind
 valgrind --tool=memcheck \
     --leak-check=full \
     --show-leak-kinds=all \
     --track-origins=yes \
     ./target/debug/deps/my_crate-abc123 --test-threads=1
 
-# Run the main binary
+# Запуск основного бинарника
 valgrind --tool=memcheck \
     --leak-check=full \
     --error-exitcode=1 \
     ./target/debug/diag_tool --run-diagnostics
 ```
 
-**Valgrind tools beyond memcheck:**
+**Инструменты Valgrind помимо memcheck:**
 
-| Tool | Command | What It Detects |
-|------|---------|----------------|
-| **Memcheck** | `--tool=memcheck` | Memory leaks, use-after-free, buffer overflows |
-| **Helgrind** | `--tool=helgrind` | Data races and lock-order violations |
-| **DRD** | `--tool=drd` | Data races (different detection algorithm) |
-| **Callgrind** | `--tool=callgrind` | CPU instruction profiling (path-level) |
-| **Massif** | `--tool=massif` | Heap memory profiling over time |
-| **Cachegrind** | `--tool=cachegrind` | Cache miss analysis |
+| Инструмент | Команда | Что обнаруживает |
+|------------|---------|------------------|
+| **Memcheck** | `--tool=memcheck` | Утечки памяти, use-after-free, переполнение буфера |
+| **Helgrind** | `--tool=helgrind` | Гонки данных и нарушения порядка захвата блокировок |
+| **DRD** | `--tool=drd` | Гонки данных (другой алгоритм обнаружения) |
+| **Callgrind** | `--tool=callgrind` | Профилирование количества инструкций CPU (на уровне путей) |
+| **Massif** | `--tool=massif` | Профилирование кучи во времени |
+| **Cachegrind** | `--tool=cachegrind` | Анализ промахов кеша |
 
-**Using Callgrind for instruction-level profiling:**
+**Callgrind для профилирования на уровне инструкций:**
 
 ```bash
-# Record instruction counts (more stable than wall-clock time)
+# Подсчёт инструкций (стабильнее, чем измерение реального времени)
 valgrind --tool=callgrind \
     --callgrind-out-file=callgrind.out \
     ./target/release/diag_tool --run-diagnostics
 
-# Visualize with KCachegrind
+# Визуализация в KCachegrind
 kcachegrind callgrind.out
-# or the text-based alternative:
+# или текстовый вариант:
 callgrind_annotate callgrind.out | head -100
 ```
 
-**Miri vs Valgrind — when to use which:**
+**Miri или Valgrind — когда что использовать:**
 
-| Aspect | Miri | Valgrind |
+| Аспект | Miri | Valgrind |
 |--------|------|----------|
-| Checks Rust-specific UB | ✅ Stacked/Tree Borrows | ❌ Not aware of Rust rules |
-| Checks C FFI code | ❌ Can't interpret C | ✅ Checks all machine code |
-| Needs nightly | ✅ Yes | ❌ No |
-| Speed | 10-100× slower | 10-50× slower |
-| Platform | Any (interprets MIR) | Linux, macOS (runs native code) |
-| Data race detection | ✅ Yes | ✅ Yes (Helgrind/DRD) |
-| Leak detection | ✅ Yes | ✅ Yes (more thorough) |
-| False positives | Very rare | Occasional (especially with allocators) |
+| Проверяет UB, специфичный для Rust | ✅ Stacked/Tree Borrows | ❌ Не знает правил Rust |
+| Проверяет C FFI-код | ❌ Не может интерпретировать C | ✅ Проверяет весь машинный код |
+| Нужен nightly | ✅ Да | ❌ Нет |
+| Скорость | В 10–100× медленнее | В 10–50× медленнее |
+| Платформа | Любая (интерпретирует MIR) | Linux, macOS (выполняет нативный код) |
+| Обнаружение гонок данных | ✅ Да | ✅ Да (Helgrind/DRD) |
+| Обнаружение утечек | ✅ Да | ✅ Да (более тщательно) |
+| Ложные срабатывания | Очень редко | Иногда (особенно с аллокаторами) |
 
-**Use both**:
-- **Miri** for pure-Rust `unsafe` code (Stacked Borrows, provenance)
-- **Valgrind** for FFI-heavy code and whole-program leak analysis
+**Используйте оба:**
+- **Miri** — для чистого Rust `unsafe` (Stacked Borrows, provenance)
+- **Valgrind** — для кода с большим количеством FFI и для анализа утечек всей программы
 
 ### AddressSanitizer, MemorySanitizer, ThreadSanitizer
 
-LLVM sanitizers are compile-time instrumentation passes that insert runtime checks.
-They're faster than Valgrind (2-5× overhead vs 10-50×) and catch different classes
-of bugs.
+Санитайзеры LLVM — это проходы инструментирования на этапе компиляции, которые добавляют
+проверки времени выполнения. Они быстрее Valgrind (накладные расходы 2–5× против 10–50×)
+и ловят другие классы ошибок.
 
 ```bash
-# Required: install Rust source for rebuilding std with sanitizer instrumentation
+# Нужно: установите исходники Rust для пересборки std с инструментированием санитайзера
 rustup component add rust-src --toolchain nightly
-# AddressSanitizer (ASan) — buffer overflows, use-after-free, stack overflows
+# AddressSanitizer (ASan) — переполнение буфера, use-after-free, переполнение стека
 RUSTFLAGS="-Zsanitizer=address" \
     cargo +nightly test -Zbuild-std --target x86_64-unknown-linux-gnu
 
-# MemorySanitizer (MSan) — uninitialized memory reads
+# MemorySanitizer (MSan) — чтение неинициализированной памяти
 RUSTFLAGS="-Zsanitizer=memory" \
     cargo +nightly test -Zbuild-std --target x86_64-unknown-linux-gnu
 
-# ThreadSanitizer (TSan) — data races
+# ThreadSanitizer (TSan) — гонки данных
 RUSTFLAGS="-Zsanitizer=thread" \
     cargo +nightly test -Zbuild-std --target x86_64-unknown-linux-gnu
 
-# LeakSanitizer (LSan) — memory leaks (included in ASan by default)
+# LeakSanitizer (LSan) — утечки памяти (по умолчанию входит в ASan)
 RUSTFLAGS="-Zsanitizer=leak" \
     cargo +nightly test --target x86_64-unknown-linux-gnu
 ```
 
-> **Note**: ASan, MSan, and TSan require `-Zbuild-std` to rebuild the standard
-> library with sanitizer instrumentation. LSan does not.
+> **Примечание**: ASan, MSan и TSan требуют `-Zbuild-std`, чтобы пересобрать стандартную
+> библиотеку с инструментированием санитайзера. LSan — не требует.
 
-**Sanitizer comparison:**
+**Сравнение санитайзеров:**
 
-| Sanitizer | Overhead | Catches | Nightly? | `-Zbuild-std`? |
-|-----------|----------|---------|----------|----------------|
-| **ASan** | 2× memory, 2× CPU | Buffer overflow, use-after-free, stack overflow | Yes | Yes |
-| **MSan** | 3× memory, 3× CPU | Uninitialized reads | Yes | Yes |
-| **TSan** | 5-10× memory, 5× CPU | Data races | Yes | Yes |
-| **LSan** | Minimal | Memory leaks | Yes | No |
+| Санитайзер | Накладные расходы | Что ловит | Nightly? | `-Zbuild-std`? |
+|------------|-------------------|-----------|----------|----------------|
+| **ASan** | 2× память, 2× CPU | Переполнение буфера, use-after-free, переполнение стека | Да | Да |
+| **MSan** | 3× память, 3× CPU | Чтение неинициализированных данных | Да | Да |
+| **TSan** | 5–10× память, 5× CPU | Гонки данных | Да | Да |
+| **LSan** | Минимальные | Утечки памяти | Да | Нет |
 
-**Practical example — catching a data race with TSan:**
+**Практический пример — ловим гонку данных с помощью TSan:**
 
 ```rust
 use std::sync::Arc;
 use std::thread;
 
 fn racy_counter() -> u64 {
-    // ❌ UB: unsynchronized shared mutable state
+    // ❌ UB: неслинхронизированное разделяемое изменяемое состояние
     let data = Arc::new(std::cell::UnsafeCell::new(0u64));
     let mut handles = vec![];
 
@@ -302,7 +303,7 @@ fn racy_counter() -> u64 {
         let data = Arc::clone(&data);
         handles.push(thread::spawn(move || {
             for _ in 0..1000 {
-                // SAFETY: UNSOUND — data race!
+                // SAFETY: НЕКОРРЕКТНО — гонка данных!
                 unsafe {
                     *data.get() += 1;
                 }
@@ -314,26 +315,26 @@ fn racy_counter() -> u64 {
         h.join().unwrap();
     }
 
-    // Value should be 4000 but may be anything due to race
+    // Значение должно быть 4000, но из-за гонки может оказаться любым
     unsafe { *data.get() }
 }
 
-// Both Miri and TSan catch this:
+// И Miri, и TSan находят это:
 // Miri:  "Data race detected between (1) write and (2) write"
 // TSan:  "WARNING: ThreadSanitizer: data race"
 //
-// Fix: use AtomicU64 or Mutex<u64>
+// Исправление: используйте AtomicU64 или Mutex<u64>
 ```
 
-### Related Tools: Fuzzing and Concurrency Verification
+### Смежные инструменты: фаззинг и проверка конкурентности
 
-**`cargo-fuzz` — Coverage-Guided Fuzzing** (finds crashes in parsers and decoders):
+**`cargo-fuzz` — фаззинг с обратной связью по покрытию** (находит падения в парсерах и декодерах):
 
 ```bash
-# Install
+# Установка
 cargo install cargo-fuzz
 
-# Initialize a fuzz target
+# Инициализация цели фаззинга
 cargo fuzz init
 cargo fuzz add parse_gpu_csv
 ```
@@ -345,25 +346,25 @@ use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|data: &[u8]| {
     if let Ok(s) = std::str::from_utf8(data) {
-        // The fuzzer generates millions of inputs looking for panics/crashes.
+        // Фаззер генерирует миллионы входных данных в поисках паник и падений.
         let _ = diag_tool::parse_gpu_csv(s);
     }
 });
 ```
 
 ```bash
-# Run the fuzzer (runs until interrupted or crash found)
-cargo +nightly fuzz run parse_gpu_csv -- -max_total_time=300  # 5 minutes
+# Запуск фаззера (работает до прерывания или до обнаружения падения)
+cargo +nightly fuzz run parse_gpu_csv -- -max_total_time=300  # 5 минут
 
-# Minimize a crash
+# Минимизация падения
 cargo +nightly fuzz tmin parse_gpu_csv artifacts/parse_gpu_csv/crash-...
 ```
 
-> **When to fuzz**: Any function that parses untrusted/semi-trusted input (sensor output,
-> config files, network data, JSON/CSV). Fuzzing found real bugs in every major
-> Rust parser crate (serde, regex, image).
+> **Когда фаззить**: любая функция, которая разбирает недоверенные или полудоверенные входные
+> данные (вывод датчиков, конфигурационные файлы, сетевые данные, JSON/CSV). Фаззинг находил
+> реальные ошибки во всех крупных крейтах-парсерах Rust (serde, regex, image).
 
-**`loom` — Concurrency Model Checker** (exhaustively tests atomic orderings):
+**`loom` — проверка моделей конкурентности** (исчерпывающе перебирает порядки атомарных операций):
 
 ```toml
 [dev-dependencies]
@@ -389,38 +390,38 @@ mod tests {
             t1.join().unwrap();
             t2.join().unwrap();
 
-            // loom explores ALL possible thread interleavings
+            // loom перебирает ВСЕ возможные чередования потоков
             assert_eq!(counter.load(Ordering::SeqCst), 2);
         });
     }
 }
 ```
 
-> **When to use `loom`**: When you have lock-free data structures or custom
-> synchronization primitives. Loom exhaustively explores thread interleavings —
-> it's a model checker, not a stress test. Not needed for `Mutex`/`RwLock`-based code.
+> **Когда использовать `loom`**: когда у вас есть структуры данных без блокировок или
+> собственные примитивы синхронизации. Loom исчерпывающе перебирает чередования потоков —
+> это проверка модели, а не стресс-тест. Для кода на основе `Mutex`/`RwLock` он не нужен.
 
-### When to Use Which Tool
+### Когда какой инструмент использовать
 
 ```text
-Decision tree for unsafe verification:
+Дерево решений для проверки unsafe-кода:
 
-Is the code pure Rust (no FFI)?
-├─ Yes → Use Miri (catches Rust-specific UB, Stacked Borrows)
-│        Also run ASan in CI for defense-in-depth
-└─ No (calls C/C++ code via FFI)
-   ├─ Memory safety concerns?
-   │  └─ Yes → Use Valgrind memcheck AND ASan
-   ├─ Concurrency concerns?
-   │  └─ Yes → Use TSan (faster) or Helgrind (more thorough)
-   └─ Memory leak concerns?
-      └─ Yes → Use Valgrind --leak-check=full
+Код написан на чистом Rust (без FFI)?
+├─ Да → Используйте Miri (ловит UB, специфичный для Rust, Stacked Borrows)
+│        В CI также запускайте ASan для защиты в глубину
+└─ Нет (вызывает C/C++ код через FFI)
+   ├─ Есть опасения по безопасности памяти?
+   │  └─ Да → Используйте Valgrind memcheck И ASan
+   ├─ Есть опасения по конкурентности?
+   │  └─ Да → Используйте TSan (быстрее) или Helgrind (тщательнее)
+   └─ Есть опасения по утечкам памяти?
+      └─ Да → Используйте Valgrind --leak-check=full
 ```
 
-**Recommended CI matrix:**
+**Рекомендуемая матрица CI:**
 
 ```yaml
-# Run all tools in parallel for fast feedback
+# Запускаем все инструменты параллельно для быстрой обратной связи
 jobs:
   miri:
     runs-on: ubuntu-latest
@@ -449,145 +450,145 @@ jobs:
           done
 ```
 
-### Application: Zero Unsafe — and When You'll Need It
+### Применение: ноль unsafe — и когда он понадобится
 
-The project contains **zero `unsafe` blocks** across 90K+ lines of
-Rust. This is a remarkable achievement for a systems-level diagnostics tool and
-demonstrates that safe Rust is sufficient for:
-- IPMI communication (via `std::process::Command` to `ipmitool`)
-- GPU queries (via `std::process::Command` to `accel-query`)
-- PCIe topology parsing (pure JSON/text parsing)
-- SEL record management (pure data structures)
-- DER report generation (JSON serialization)
+В проекте **ни одного блока `unsafe`** на более чем 90 тысячах строк Rust. Для инструмента
+диагностики системного уровня это замечательное достижение, которое показывает, что безопасного
+Rust достаточно для:
+- Связи с IPMI (через `std::process::Command` к `ipmitool`)
+- Запросов к GPU (через `std::process::Command` к `accel-query`)
+- Разбора топологии PCIe (чистый разбор JSON и текста)
+- Управления записями SEL (чистые структуры данных)
+- Генерации DER-отчётов (сериализация JSON)
 
-**When will the project need `unsafe`?**
+**Когда проекту понадобится `unsafe`?**
 
-The likely triggers for introducing `unsafe`:
+Вероятные причины появления `unsafe`:
 
-| Scenario | Why `unsafe` | Recommended Verification |
-|----------|-------------|-------------------------|
-| Direct ioctl-based IPMI | `libc::ioctl()` bypasses `ipmitool` subprocess | Miri + Valgrind |
-| Direct GPU driver queries | accel-mgmt FFI instead of `accel-query` parsing | Valgrind (C library) |
-| Memory-mapped PCIe config | `mmap` for direct config-space reads | ASan + Valgrind |
-| Lock-free SEL buffer | `AtomicPtr` for concurrent event collection | Miri + TSan |
-| Embedded/no_std variant | Raw pointer manipulation for bare-metal | Miri |
+| Сценарий | Почему нужен `unsafe` | Рекомендуемая проверка |
+|----------|----------------------|------------------------|
+| Прямой IPMI через ioctl | `libc::ioctl()` обходит подпроцесс `ipmitool` | Miri + Valgrind |
+| Прямые запросы к драйверу GPU | FFI к accel-mgmt вместо разбора вывода `accel-query` | Valgrind (C-библиотека) |
+| Memory-mapped конфигурация PCIe | `mmap` для прямого чтения конфигурационного пространства | ASan + Valgrind |
+| Буфер SEL без блокировок | `AtomicPtr` для параллельного сбора событий | Miri + TSan |
+| Вариант для встраиваемых систем / `no_std` | Манипуляции с сырыми указателями для bare-metal | Miri |
 
-**Preparation**: Before introducing `unsafe`, add the verification tools to CI:
+**Подготовка**: прежде чем вводить `unsafe`, добавьте инструменты проверки в CI:
 
 ```toml
-# Cargo.toml — add a feature flag for unsafe optimizations
+# Cargo.toml — добавляем флаги фич для unsafe-оптимизаций
 [features]
 default = []
-direct-ipmi = []     # Enable direct ioctl IPMI instead of ipmitool subprocess
-direct-accel-api = []     # Enable accel-mgmt FFI instead of accel-query parsing
+direct-ipmi = []     # Включить прямой ioctl-доступ к IPMI вместо подпроцесса ipmitool
+direct-accel-api = []     # Включить FFI accel-mgmt вместо разбора вывода accel-query
 ```
 
 ```rust
-// src/ipmi.rs — gated behind a feature flag
+// src/ipmi.rs — за флагом фичи
 #[cfg(feature = "direct-ipmi")]
 mod direct {
-    //! Direct IPMI device access via /dev/ipmi0 ioctl.
+    //! Прямой доступ к IPMI-устройству через ioctl на /dev/ipmi0.
     //!
     //! # Safety
-    //! This module uses `unsafe` for ioctl system calls.
-    //! Verified with: Miri (where possible), Valgrind memcheck, ASan.
+    //! Этот модуль использует `unsafe` для системных вызовов ioctl.
+    //! Проверено: Miri (где возможно), Valgrind memcheck, ASan.
 
     use std::os::unix::io::RawFd;
 
-    // ... unsafe ioctl implementation ...
+    // ... реализация unsafe ioctl ...
 }
 
 #[cfg(not(feature = "direct-ipmi"))]
 mod subprocess {
-    //! IPMI via ipmitool subprocess (default, fully safe).
-    // ... current implementation ...
+    //! IPMI через подпроцесс ipmitool (по умолчанию, полностью безопасно).
+    // ... текущая реализация ...
 }
 ```
 
-> **Key insight**: Keep `unsafe` behind [feature flags](ch09-no-std-and-feature-verification.md)
-> so it can be verified independently. Run `cargo +nightly miri test --features direct-ipmi`
-> in [CI](ch11-putting-it-all-together-a-production-cic.md) to continuously verify the unsafe
-> paths without affecting the safe default build.
+> **Ключевая мысль**: держите `unsafe` за [флагами фич](ch09-no-std-and-feature-verification.md),
+> чтобы его можно было проверять независимо. Запускайте `cargo +nightly miri test --features direct-ipmi`
+> в [CI](ch11-putting-it-all-together-a-production-cic.md), чтобы непрерывно проверять unsafe-пути,
+> не затрагивая безопасную сборку по умолчанию.
 
-### `cargo-careful` — Extra UB Checks on Stable
+### `cargo-careful` — дополнительные проверки UB без Miri
 
-[`cargo-careful`](https://github.com/RalfJung/cargo-careful) runs your code
-with extra standard library checks enabled — catching some undefined behavior
-that normal builds ignore, without requiring nightly or Miri's 10-100× slowdown:
+[`cargo-careful`](https://github.com/RalfJung/cargo-careful) запускает ваш код с включёнными
+дополнительными проверками стандартной библиотеки. Он ловит часть неопределённого поведения,
+которое обычные сборки игнорируют, не требуя nightly или замедления Miri в 10–100×:
 
 ```bash
-# Install (requires nightly, but runs your code at near-native speed)
+# Установка (требуется nightly, но код выполняется почти с нативной скоростью)
 cargo install cargo-careful
 
-# Run tests with extra UB checks (catches uninitialized memory, invalid values)
+# Запуск тестов с дополнительными проверками UB (ловит неинициализированную память и некорректные значения)
 cargo +nightly careful test
 
-# Run a binary with extra checks
+# Запуск бинарника с дополнительными проверками
 cargo +nightly careful run -- --run-diagnostics
 ```
 
-**What `cargo-careful` catches that normal builds don't:**
-- Reads of uninitialized memory in `MaybeUninit` and `zeroed()`
-- Creating invalid `bool`, `char`, or enum values via transmute
-- Unaligned pointer reads/writes
-- `copy_nonoverlapping` with overlapping ranges
+**Что `cargo-careful` ловит, чего не ловят обычные сборки:**
+- Чтение неинициализированной памяти в `MaybeUninit` и `zeroed()`
+- Создание некорректных значений `bool`, `char` или перечислений через transmute
+- Невыровненное чтение и запись через указатели
+- `copy_nonoverlapping` с перекрывающимися диапазонами
 
-**Where it fits in the verification ladder:**
+**Место в лестнице проверок:**
 
 ```text
-Least overhead                                          Most thorough
+Наименьшие накладные расходы                                Наибольшая тщательность
 ├─ cargo test ──► cargo careful test ──► Miri ──► ASan ──► Valgrind ─┤
-│  (0× overhead)  (~1.5× overhead)   (10-100×)  (2×)     (10-50×)   │
-│  Safe Rust only  Catches some UB    Pure-Rust  FFI+Rust FFI+Rust   │
+│  (0× накладные)  (~1.5× накладные)  (10-100×)  (2×)     (10-50×)   │
+│  Только safe Rust  Ловит часть UB  Чистый Rust  FFI+Rust  FFI+Rust │
 ```
 
-> **Recommendation**: Add `cargo +nightly careful test` to CI as a fast safety
-> check. It runs at near-native speed (unlike Miri) and catches real bugs that
-> safe Rust abstractions mask.
+> **Рекомендация**: добавьте `cargo +nightly careful test` в CI как быструю проверку безопасности.
+> Он работает почти с нативной скоростью (в отличие от Miri) и ловит реальные ошибки, которые
+> маскируют безопасные абстракции Rust.
 
-### Troubleshooting Miri and Sanitizers
+### Устранение неполадок с Miri и санитайзерами
 
-| Symptom | Cause | Fix |
-|---------|-------|-----|
-| `Miri does not support FFI` | Miri is a Rust interpreter; it can't execute C code | Use Valgrind or ASan for FFI code instead |
-| `error: unsupported operation: can't call foreign function` | Miri hit an `extern "C"` call | Mock the FFI boundary or gate behind `#[cfg(miri)]` |
-| `Stacked Borrows violation` | Aliasing rule violation — even if code "works" | Miri is correct; refactor to avoid aliasing `&mut` with `&` |
-| Sanitizer says `DEADLYSIGNAL` | ASan detected buffer overflow | Check array indexing, slice operations, and pointer arithmetic |
-| `LeakSanitizer: detected memory leaks` | `Box::leak()`, `forget()`, or missing `drop()` | Intentional: suppress with `__lsan_disable()`; unintentional: fix the leak |
-| Miri is extremely slow | Miri interprets, doesn't compile — 10-100× slower | Run only on `--lib` tests or tag specific tests with `#[cfg_attr(miri, ignore)]` for slow ones |
-| `TSan: false positive` with atomics | TSan doesn't understand Rust's atomic ordering model perfectly | Add `TSAN_OPTIONS=suppressions=tsan.supp` with specific suppressions |
+| Симптом | Причина | Решение |
+|---------|---------|---------|
+| `Miri does not support FFI` | Miri — интерпретатор Rust, он не может выполнять C-код | Для FFI-кода используйте Valgrind или ASan |
+| `error: unsupported operation: can't call foreign function` | Miri встретил вызов `extern "C"` | Замокайте границу FFI или ограничьте код через `#[cfg(miri)]` |
+| `Stacked Borrows violation` | Нарушение правила алиасинга — даже если код «работает» | Miri прав; перепишите код, чтобы не алиасить `&mut` с `&` |
+| Санитайзер сообщает `DEADLYSIGNAL` | ASan обнаружил переполнение буфера | Проверьте индексацию массивов, операции со срезами и арифметику указателей |
+| `LeakSanitizer: detected memory leaks` | `Box::leak()`, `forget()` или пропущенный `drop()` | Намеренно: подавите через `__lsan_disable()`; непреднамеренно: исправьте утечку |
+| Miri невероятно медленный | Miri интерпретирует, а не компилирует — в 10–100× медленнее | Запускайте только тесты `--lib` или помечайте медленные тесты через `#[cfg_attr(miri, ignore)]` |
+| `TSan: false positive` с атомарными операциями | TSan не до конца понимает модель порядка атомарных операций Rust | Добавьте `TSAN_OPTIONS=suppressions=tsan.supp` с конкретными подавлениями |
 
-### Try It Yourself
+### Попробуйте сами
 
-1. **Trigger a Miri UB detection**: Write an `unsafe` function that creates two
-   `&mut` references to the same `i32` (aliasing violation). Run `cargo +nightly miri test`
-   and observe the "Stacked Borrows" error. Fix it with `UnsafeCell` or separate allocations.
+1. **Вызовите обнаружение UB в Miri**: напишите `unsafe`-функцию, которая создаёт две ссылки
+   `&mut` на один и тот же `i32` (нарушение алиасинга). Запустите `cargo +nightly miri test`
+   и посмотрите на ошибку «Stacked Borrows». Исправьте её через `UnsafeCell` или отдельные выделения.
 
-2. **Run ASan on a deliberate bug**: Create a test that does `unsafe` out-of-bounds
-   array access. Build with `RUSTFLAGS="-Zsanitizer=address"` and observe ASan's
-   report. Note how it pinpoints the exact line.
+2. **Запустите ASan на намеренной ошибке**: создайте тест с `unsafe`-доступом к массиву за
+   пределами границ. Соберите с `RUSTFLAGS="-Zsanitizer=address"` и посмотрите отчёт ASan.
+   Обратите внимание, как он указывает точную строку.
 
-3. **Benchmark Miri overhead**: Time `cargo test --lib` vs `cargo +nightly miri test --lib`
-   on the same test suite. Calculate the slowdown factor. Based on this, decide
-   which tests to run under Miri in CI and which to skip with `#[cfg_attr(miri, ignore)]`.
+3. **Измерьте накладные расходы Miri**: замерьте `cargo test --lib` и `cargo +nightly miri test --lib`
+   на одном и том же наборе тестов. Рассчитайте коэффициент замедления. По результатам решите,
+   какие тесты запускать под Miri в CI, а какие пропускать через `#[cfg_attr(miri, ignore)]`.
 
-### Safety Verification Decision Tree
+### Дерево решений для проверки безопасности
 
 ```mermaid
 flowchart TD
-    START["Have unsafe code?"] -->|No| SAFE["Safe Rust — no<br/>verification needed"]
-    START -->|Yes| KIND{"What kind?"}
-    
-    KIND -->|"Pure Rust unsafe"| MIRI["Miri<br/>MIR interpreter<br/>catches aliasing, UB, leaks"]
-    KIND -->|"FFI / C interop"| VALGRIND["Valgrind memcheck<br/>or ASan"]
-    KIND -->|"Concurrent unsafe"| CONC{"Lock-free?"}
-    
-    CONC -->|"Atomics/lock-free"| LOOM["loom<br/>Model checker for atomics"]
-    CONC -->|"Mutex/shared state"| TSAN["TSan or<br/>Miri -Zmiri-check-number-validity"]
-    
+    START["Есть unsafe-код?"] -->|Нет| SAFE["Безопасный Rust — проверка<br/>не нужна"]
+    START -->|Да| KIND{"Какой именно?"}
+
+    KIND -->|"Чистый Rust unsafe"| MIRI["Miri<br/>интерпретатор MIR<br/>ловит алиасинг, UB, утечки"]
+    KIND -->|"FFI / взаимодействие с C"| VALGRIND["Valgrind memcheck<br/>или ASan"]
+    KIND -->|"Конкурентный unsafe"| CONC{"Без блокировок?"}
+
+    CONC -->|"Атомарные операции / без блокировок"| LOOM["loom<br/>Проверка моделей для атомарных операций"]
+    CONC -->|"Mutex / разделяемое состояние"| TSAN["TSan или<br/>Miri -Zmiri-check-number-validity"]
+
     MIRI --> CI_MIRI["CI: cargo +nightly miri test"]
     VALGRIND --> CI_VALGRIND["CI: valgrind --leak-check=full"]
-    
+
     style SAFE fill:#91e5a3,color:#000
     style MIRI fill:#e3f2fd,color:#000
     style VALGRIND fill:#ffd43b,color:#000
@@ -595,14 +596,16 @@ flowchart TD
     style TSAN fill:#ffd43b,color:#000
 ```
 
-### 🏋️ Exercises
+### 🏋️ Упражнения
 
-#### 🟡 Exercise 1: Trigger a Miri UB Detection
+#### 🟡 Упражнение 1: вызовите обнаружение UB в Miri
 
-Write an `unsafe` function that creates two `&mut` references to the same `i32` (aliasing violation). Run `cargo +nightly miri test` and observe the Stacked Borrows error. Fix it.
+Напишите `unsafe`-функцию, которая создаёт две ссылки `&mut` на один и тот же `i32`
+(нарушение алиасинга). Запустите `cargo +nightly miri test`, найдите ошибку Stacked Borrows
+и исправьте её.
 
 <details>
-<summary>Solution</summary>
+<summary>Решение</summary>
 
 ```rust
 #[cfg(test)]
@@ -612,15 +615,15 @@ mod tests {
         let mut x: i32 = 42;
         let ptr = &mut x as *mut i32;
         unsafe {
-            // BUG: Two &mut references to the same location
+            // ОШИБКА: две ссылки &mut на одно и то же место
             let _a = &mut *ptr;
-            let _b = &mut *ptr; // Miri: Stacked Borrows violation!
+            let _b = &mut *ptr; // Miri: нарушение Stacked Borrows!
         }
     }
 }
 ```
 
-Fix: use separate allocations or `UnsafeCell`:
+Исправление: используйте отдельные выделения или `UnsafeCell`:
 
 ```rust
 use std::cell::UnsafeCell;
@@ -636,12 +639,13 @@ fn no_aliasing_ub() {
 ```
 </details>
 
-#### 🔴 Exercise 2: ASan Out-of-Bounds Detection
+#### 🔴 Упражнение 2: обнаружение выхода за границы с помощью ASan
 
-Create a test with `unsafe` out-of-bounds array access. Build with `RUSTFLAGS="-Zsanitizer=address"` on nightly and observe ASan's report.
+Создайте тест с `unsafe`-доступом к массиву за пределами границ. Соберите на nightly с
+`RUSTFLAGS="-Zsanitizer=address"` и посмотрите отчёт ASan.
 
 <details>
-<summary>Solution</summary>
+<summary>Решение</summary>
 
 ```rust
 #[test]
@@ -649,7 +653,7 @@ fn oob_access() {
     let arr = [1u8, 2, 3, 4, 5];
     let ptr = arr.as_ptr();
     unsafe {
-        let _val = *ptr.add(10); // Out of bounds!
+        let _val = *ptr.add(10); // Выход за границы!
     }
 }
 ```
@@ -657,17 +661,20 @@ fn oob_access() {
 ```bash
 RUSTFLAGS="-Zsanitizer=address" cargo +nightly test -Zbuild-std \
   --target x86_64-unknown-linux-gnu -- oob_access
-# ASan report: stack-buffer-overflow at <exact address>
+# Отчёт ASan: stack-buffer-overflow по адресу <точный адрес>
 ```
 </details>
 
-### Key Takeaways
+### Ключевые выводы
 
-- **Miri** is the tool for pure-Rust `unsafe` — it catches aliasing violations, use-after-free, and leaks that compile and pass tests
-- **Valgrind** is the tool for FFI/C interop — it works on the final binary without recompilation
-- **Sanitizers** (ASan, TSan, MSan) require nightly but run at near-native speed — ideal for large test suites
-- **`loom`** is purpose-built for verifying lock-free concurrent data structures
-- Run Miri in CI on every push; run sanitizers on a nightly schedule to avoid slowing the main pipeline
+- **Miri** — инструмент для чистого Rust `unsafe`: он ловит нарушения алиасинга, use-after-free
+  и утечки, которые компилируются и проходят тесты
+- **Valgrind** — инструмент для FFI и взаимодействия с C: он работает с готовым бинарником
+  без перекомпиляции
+- **Санитайзеры** (ASan, TSan, MSan) требуют nightly, но работают почти с нативной скоростью —
+  идеально для больших тестовых наборов
+- **`loom`** создан специально для проверки структур данных без блокировок
+- Запускайте Miri в CI на каждый push, а санитайзеры — по ночному расписанию, чтобы не замедлять
+  основной конвейер
 
 ---
-

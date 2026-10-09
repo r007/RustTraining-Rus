@@ -1,95 +1,95 @@
-# Code Coverage — Seeing What Tests Miss 🟢
+# Покрытие кода — видим то, что пропускают тесты 🟢
 
-> **What you'll learn:**
-> - Source-based coverage with `cargo-llvm-cov` (the most accurate Rust coverage tool)
-> - Quick coverage checks with `cargo-tarpaulin` and Mozilla's `grcov`
-> - Setting up coverage gates in CI with Codecov and Coveralls
-> - A coverage-guided testing strategy that prioritizes high-risk blind spots
+> **Чему вы научитесь:**
+> - Покрытие на основе исходников с `cargo-llvm-cov` (самый точный инструмент покрытия для Rust)
+> - Быстрые проверки покрытия с `cargo-tarpaulin` и `grcov` от Mozilla
+> - Настройка порогов покрытия в CI с помощью Codecov и Coveralls
+> - Стратегия тестирования, управляемая покрытием, которая в первую очередь закрывает опасные слепые зоны
 >
-> **Cross-references:** [Miri and Sanitizers](ch05-miri-valgrind-and-sanitizers-verifying-u.md) — coverage finds untested code, Miri finds UB in tested code · [Benchmarking](ch03-benchmarking-measuring-what-matters.md) — coverage shows *what's tested*, benchmarks show *what's fast* · [CI/CD Pipeline](ch11-putting-it-all-together-a-production-cic.md) — coverage gate in the pipeline
+> **Перекрёстные ссылки:** [Miri и санитайзеры](ch05-miri-valgrind-and-sanitizers-verifying-u.md) — покрытие находит непротестированный код, Miri находит UB в протестированном · [Бенчмаркинг](ch03-benchmarking-measuring-what-matters.md) — покрытие показывает *что протестировано*, бенчмарки — *что быстро* · [CI/CD-конвейер](ch11-putting-it-all-together-a-production-cic.md) — порог покрытия в конвейере
 
-Code coverage measures which lines, branches, or functions your tests actually
-execute. It doesn't prove correctness (a covered line can still have bugs), but
-it reliably reveals **blind spots** — code paths that no test exercises at all.
+Покрытие кода показывает, какие строки, ветви или функции ваши тесты на самом деле
+выполняют. Оно не доказывает корректность (покрытая строка всё равно может содержать
+ошибку), но надёжно выявляет **слепые зоны** — пути в коде, которые не проверяет ни один тест.
 
-With 1,006 tests across many crates, the project has substantial test investment.
-Coverage analysis answers: "Is that investment reaching the code that matters?"
+В проекте 1 006 тестов в нескольких крейтах, то есть вложения в тестирование серьёзные.
+Анализ покрытия отвечает на вопрос: «Доходят ли эти вложения до кода, который важен?»
 
-### Source-Based Coverage with `llvm-cov`
+### Покрытие на основе исходного кода с `llvm-cov`
 
-Rust uses LLVM, which provides source-based coverage instrumentation — the most
-accurate coverage method available. The recommended tool is
+Rust использует LLVM, который предоставляет инструментирование покрытия на основе
+исходного кода — самый точный из доступных методов. Рекомендуемый инструмент —
 [`cargo-llvm-cov`](https://github.com/taiki-e/cargo-llvm-cov):
 
 ```bash
-# Install
+# Установка
 cargo install cargo-llvm-cov
 
-# Or via rustup component (for the raw llvm tools)
+# Или через компонент rustup (для «сырых» инструментов LLVM)
 rustup component add llvm-tools-preview
 ```
 
-**Basic usage:**
+**Базовое использование:**
 
 ```bash
-# Run tests and show per-file coverage summary
+# Запустить тесты и показать сводку покрытия по файлам
 cargo llvm-cov
 
-# Generate HTML report (browsable, line-by-line highlighting)
+# Сгенерировать HTML-отчёт (просмотр с построчной подсветкой)
 cargo llvm-cov --html
-# Output: target/llvm-cov/html/index.html
+# Результат: target/llvm-cov/html/index.html
 
-# Generate LCOV format (for CI integrations)
+# Сгенерировать отчёт в формате LCOV (для интеграций с CI)
 cargo llvm-cov --lcov --output-path lcov.info
 
-# Workspace-wide coverage (all crates)
+# Покрытие всего воркспейса (все крейты)
 cargo llvm-cov --workspace
 
-# Include only specific packages
+# Включить только определённые пакеты
 cargo llvm-cov --package accel_diag --package topology_lib
 
-# Coverage including doc tests
+# Покрытие с учётом doc-тестов
 cargo llvm-cov --doctests
 ```
 
-**Reading the HTML report:**
+**Чтение HTML-отчёта:**
 
 ```text
 target/llvm-cov/html/index.html
-├── Filename          │ Function │ Line   │ Branch │ Region
+├── Файл                  │ Функции │ Строки │ Ветви  │ Регионы
 ├─ accel_diag/src/lib.rs │  78.5%  │ 82.3% │ 61.2% │  74.1%
 ├─ sel_mgr/src/parse.rs│  95.2%  │ 96.8% │ 88.0% │  93.5%
 ├─ topology_lib/src/.. │  91.0%  │ 93.4% │ 79.5% │  89.2%
 └─ ...
 
-Green = covered    Red = not covered    Yellow = partially covered (branch)
+Зелёный = покрыто    Красный = не покрыто    Жёлтый = покрыто частично (ветвление)
 ```
 
-**Coverage types explained:**
+**Типы покрытия:**
 
-| Type | What It Measures | Significance |
-|------|------------------|-------------|
-| **Line coverage** | Which source lines were executed | Basic "was this code reached?" |
-| **Branch coverage** | Which `if`/`match` arms were taken | Catches untested conditions |
-| **Function coverage** | Which functions were called | Finds dead code |
-| **Region coverage** | Which code regions (sub-expressions) were hit | Most granular |
+| Тип | Что измеряет | Значение |
+|-----|--------------|----------|
+| **Покрытие строк** | Какие строки исходника выполнялись | Базовый вопрос: «до этого кода вообще дошло?» |
+| **Покрытие ветвлений** | Какие ветки `if`/`match` выполнялись | Выявляет непроверенные условия |
+| **Покрытие функций** | Какие функции вызывались | Находит мёртвый код |
+| **Покрытие регионов** | Какие регионы кода (подвыражения) выполнялись | Самый детальный уровень |
 
-### cargo-tarpaulin — The Quick Path
+### cargo-tarpaulin — быстрый путь
 
-[`cargo-tarpaulin`](https://github.com/xd009642/tarpaulin) is a Linux-specific
-coverage tool that's simpler to set up (no LLVM components needed):
+[`cargo-tarpaulin`](https://github.com/xd009642/tarpaulin) — инструмент покрытия,
+работающий только в Linux, который проще настроить (не нужны компоненты LLVM):
 
 ```bash
-# Install
+# Установка
 cargo install cargo-tarpaulin
 
-# Basic coverage report
+# Базовый отчёт о покрытии
 cargo tarpaulin
 
-# HTML output
+# HTML-вывод
 cargo tarpaulin --out Html
 
-# With specific options
+# С дополнительными опциями
 cargo tarpaulin \
     --workspace \
     --timeout 120 \
@@ -98,43 +98,43 @@ cargo tarpaulin \
     --exclude-files "*/tests/*" "*/benches/*" \
     --ignore-panics
 
-# Skip certain crates
-cargo tarpaulin --workspace --exclude diag_tool  # exclude the binary crate
+# Пропустить некоторые крейты
+cargo tarpaulin --workspace --exclude diag_tool  # исключить крейт-бинарник
 ```
 
-**tarpaulin vs llvm-cov comparison:**
+**Сравнение tarpaulin и llvm-cov:**
 
-| Feature | cargo-llvm-cov | cargo-tarpaulin |
-|---------|----------------|-----------------|
-| Accuracy | Source-based (most accurate) | Ptrace-based (occasional overcounting) |
-| Platform | Any (llvm-based) | Linux only |
-| Branch coverage | Yes | Limited |
-| Doc tests | Yes | No |
-| Setup | Needs `llvm-tools-preview` | Self-contained |
-| Speed | Faster (compile-time instrumentation) | Slower (ptrace overhead) |
-| Stability | Very stable | Occasional false positives |
+| Возможность | cargo-llvm-cov | cargo-tarpaulin |
+|-------------|----------------|-----------------|
+| Точность | На основе исходников (самый точный) | На основе ptrace (иногда завышает покрытие) |
+| Платформа | Любая (на основе LLVM) | Только Linux |
+| Покрытие ветвлений | Да | Ограниченно |
+| Doc-тесты | Да | Нет |
+| Настройка | Нужен `llvm-tools-preview` | Самодостаточный |
+| Скорость | Быстрее (инструментирование на этапе компиляции) | Медленнее (накладные расходы ptrace) |
+| Стабильность | Очень стабильный | Иногда ложные срабатывания |
 
-**Recommendation**: Use `cargo-llvm-cov` for accuracy. Use `cargo-tarpaulin` when
-you need a quick check without installing LLVM tools.
+**Рекомендация**: используйте `cargo-llvm-cov` ради точности. `cargo-tarpaulin` — когда
+нужна быстрая проверка без установки инструментов LLVM.
 
-### grcov — Mozilla's Coverage Tool
+### grcov — инструмент покрытия от Mozilla
 
-[`grcov`](https://github.com/mozilla/grcov) is Mozilla's coverage aggregator.
-It consumes raw LLVM profiling data and produces reports in multiple formats:
+[`grcov`](https://github.com/mozilla/grcov) — агрегатор покрытия от Mozilla.
+Он обрабатывает сырые данные профилирования LLVM и формирует отчёты в нескольких форматах:
 
 ```bash
-# Install
+# Установка
 cargo install grcov
 
-# Step 1: Build with coverage instrumentation
+# Шаг 1: сборка с инструментированием покрытия
 export RUSTFLAGS="-Cinstrument-coverage"
 export LLVM_PROFILE_FILE="target/coverage/%p-%m.profraw"
 cargo build --tests
 
-# Step 2: Run tests (generates .profraw files)
+# Шаг 2: запуск тестов (генерирует файлы .profraw)
 cargo test
 
-# Step 3: Aggregate with grcov
+# Шаг 3: агрегация с помощью grcov
 grcov target/coverage/ \
     --binary-path target/debug/ \
     --source-dir . \
@@ -145,21 +145,22 @@ grcov target/coverage/ \
     --ignore "*/tests/*" \
     --ignore "*/.cargo/*"
 
-# Step 4: View report
+# Шаг 4: просмотр отчёта
 open target/coverage/report/html/index.html
 ```
 
-**When to use grcov**: It's most useful when you need to **merge coverage from
-multiple test runs** (e.g., unit tests + integration tests + fuzz tests) into a
-single report.
+**Когда использовать grcov**: он полезнее всего, когда нужно **объединить покрытие из
+нескольких запусков тестов** (например, модульных, интеграционных и фаззинг-тестов)
+в один отчёт.
 
-### Coverage in CI: Codecov and Coveralls
+### Покрытие в CI: Codecov и Coveralls
 
-Upload coverage data to a tracking service for historical trends and PR annotations:
+Загружайте данные о покрытии в сервис мониторинга, чтобы видеть исторические тренды
+и аннотации в PR:
 
 ```yaml
 # .github/workflows/coverage.yml
-name: Code Coverage
+name: Покрытие кода
 
 on: [push, pull_request]
 
@@ -172,96 +173,97 @@ jobs:
         with:
           components: llvm-tools-preview
 
-      - name: Install cargo-llvm-cov
+      - name: Установка cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
 
-      - name: Generate coverage
+      - name: Генерация покрытия
         run: cargo llvm-cov --workspace --lcov --output-path lcov.info
 
-      - name: Upload to Codecov
+      - name: Загрузка в Codecov
         uses: codecov/codecov-action@v4
         with:
           files: lcov.info
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: true
 
-      # Optional: enforce minimum coverage
-      - name: Check coverage threshold
+      # Опционально: задать минимальный порог покрытия
+      - name: Проверка порога покрытия
         run: |
           cargo llvm-cov --workspace --fail-under-lines 80
-          # Fails the build if line coverage drops below 80%
+          # Сборка падает, если покрытие строк опускается ниже 80%
 ```
 
-**Coverage gates** — enforce minimums per crate by reading the JSON output:
+**Пороги покрытия** — задавайте минимумы для каждого крейта, читая JSON-вывод:
 
 ```bash
-# Get per-crate coverage as JSON
+# Получить покрытие по крейтам в формате JSON
 cargo llvm-cov --workspace --json | jq '.data[0].totals.lines.percent'
 
-# Fail if below threshold
+# Упасть, если покрытие ниже порога
 cargo llvm-cov --workspace --fail-under-lines 80
 cargo llvm-cov --workspace --fail-under-functions 70
 cargo llvm-cov --workspace --fail-under-regions 60
 ```
 
-### Coverage-Guided Testing Strategy
+### Стратегия тестирования, управляемая покрытием
 
-Coverage numbers alone are meaningless without a strategy. Here's how to use
-coverage data effectively:
+Сами по себе цифры покрытия бессмысленны без стратегии. Вот как эффективно использовать
+данные о покрытии:
 
-**Step 1: Triage by risk**
+**Шаг 1: сортировка по риску**
 
 ```text
-High coverage, high risk     → ✅ Good — maintain it
-High coverage, low risk      → 🔄 Possibly over-tested — skip if slow
-Low coverage, high risk      → 🔴 Write tests NOW — this is where bugs hide
-Low coverage, low risk       → 🟡 Track but don't panic
+Высокое покрытие, высокий риск     → ✅ Хорошо — поддерживайте
+Высокое покрытие, низкий риск      → 🔄 Возможно, избыточно протестировано — пропускайте, если медленно
+Низкое покрытие, высокий риск      → 🔴 Пишите тесты СЕЙЧАС — здесь прячутся баги
+Низкое покрытие, низкий риск       → 🟡 Отслеживайте, но не паникуйте
 ```
 
-**Step 2: Focus on branch coverage, not line coverage**
+**Шаг 2: ориентируйтесь на покрытие ветвлений, а не строк**
 
 ```rust
-// 100% line coverage, 50% branch coverage — still risky!
+// 100% покрытие строк, 50% покрытие ветвлений — всё ещё рискованно!
 pub fn classify_temperature(temp_c: i32) -> ThermalState {
-    if temp_c > 105 {       // ← tested with temp=110 → Critical
+    if temp_c > 105 {       // ← проверено при temp=110 → Critical
         ThermalState::Critical
-    } else if temp_c > 85 { // ← tested with temp=90 → Warning
+    } else if temp_c > 85 { // ← проверено при temp=90 → Warning
         ThermalState::Warning
-    } else if temp_c < -10 { // ← NEVER TESTED → sensor error case missed
+    } else if temp_c < -10 { // ← НИКОГДА НЕ ПРОВЕРЯЛОСЬ → случай ошибки датчика пропущен
         ThermalState::SensorError
     } else {
-        ThermalState::Normal  // ← tested with temp=25 → Normal
+        ThermalState::Normal  // ← проверено при temp=25 → Normal
     }
 }
 ```
 
-**Step 3: Exclude noise**
+**Шаг 3: отсекайте шум**
 
 ```bash
-# Exclude test code from coverage (it's always "covered")
+# Исключаем тестовый код из покрытия (он всегда «покрыт»)
 cargo llvm-cov --workspace --ignore-filename-regex 'tests?\.rs$|benches/'
 
-# Exclude generated code
+# Исключаем сгенерированный код
 cargo llvm-cov --workspace --ignore-filename-regex 'target/'
 ```
 
-In code, mark untestable sections:
+В коде отмечайте участки, которые нельзя протестировать:
 
 ```rust
-// Coverage tools recognize this pattern
+// Инструменты покрытия распознают этот паттерн
 #[cfg(not(tarpaulin_include))]  // tarpaulin
 fn unreachable_hardware_path() {
-    // This path requires actual GPU hardware to trigger
+    // Этот путь требует реального GPU, чтобы сработать
 }
 
-// For llvm-cov, use a more targeted approach:
-// Simply accept that some paths need integration/hardware tests,
-// not unit tests. Track them in a coverage exceptions list.
+// Для llvm-cov используйте более точный подход:
+// просто примите, что некоторые пути нуждаются в интеграционных и аппаратных тестах,
+// а не в модульных. Отслеживайте их в списке исключений покрытия.
 ```
 
-### Complementary Testing Tools
+### Дополнительные инструменты тестирования
 
-**`proptest` — Property-Based Testing** finds edge cases that hand-written tests miss:
+**`proptest` — property-based тестирование** находит крайние случаи, которые пропускают
+написанные вручную тесты:
 
 ```toml
 [dev-dependencies]
@@ -274,9 +276,9 @@ use proptest::prelude::*;
 proptest! {
     #[test]
     fn parse_never_panics(input in "\\PC*") {
-        // proptest generates thousands of random strings
-        // If parse_gpu_csv panics on any input, the test fails
-        // and proptest minimizes the failing case for you.
+        // proptest генерирует тысячи случайных строк
+        // Если parse_gpu_csv паникует на каком-либо входе, тест падает,
+        // и proptest минимизирует упавший пример за вас.
         let _ = parse_gpu_csv(&input);
     }
 
@@ -284,13 +286,13 @@ proptest! {
     fn temperature_roundtrip(raw in 0u16..4096) {
         let temp = Temperature::from_raw(raw);
         let md = temp.millidegrees_c();
-        // Property: millidegrees should always be derivable from raw
+        // Свойство: значение в тысячных долях градуса всегда должно выводиться из raw
         assert_eq!(md, (raw as i32) * 625 / 10);
     }
 }
 ```
 
-**`insta` — Snapshot Testing** for large structured outputs (JSON, text reports):
+**`insta` — snapshot-тестирование** для больших структурированных выводов (JSON, текстовые отчёты):
 
 ```toml
 [dev-dependencies]
@@ -301,130 +303,132 @@ insta = { version = "1", features = ["json"] }
 #[test]
 fn test_der_report_format() {
     let report = generate_der_report(&test_results);
-    // First run: creates a snapshot file. Subsequent runs: compares against it.
-    // Run `cargo insta review` to accept changes interactively.
+    // При первом запуске создаётся файл снимка. При последующих — сравнение с ним.
+    // Запустите `cargo insta review`, чтобы принять изменения в интерактивном режиме.
     insta::assert_json_snapshot!(report);
 }
 ```
 
-> **When to add proptest/insta**: If your unit tests are all "happy path" examples,
-> proptest will find the edge cases you missed. If you're testing large output
-> formats (JSON reports, DER records), insta snapshots are faster to write and
-> maintain than hand-written assertions.
+> **Когда добавлять proptest и insta**: если ваши модульные тесты — это только примеры
+> «счастливого пути», proptest найдёт крайние случаи, которые вы упустили. Если вы тестируете
+> большие форматы вывода (JSON-отчёты, записи DER), снимки insta писать и поддерживать
+> быстрее, чем ручные assert-ы.
 
-### Application: 1,000+ Tests Coverage Map
+### Применение: карта покрытия для более чем 1000 тестов
 
-The project has 1,000+ tests but no coverage tracking. Adding it
-reveals the testing investment distribution. Uncovered paths are prime candidates
-for [Miri and sanitizer](ch05-miri-valgrind-and-sanitizers-verifying-u.md) verification:
+В проекте больше 1000 тестов, но отслеживания покрытия нет. Его добавление покажет,
+как распределены тестовые усилия. Непокрытые пути — первые кандидаты на проверку с помощью
+[Miri и санитайзеров](ch05-miri-valgrind-and-sanitizers-verifying-u.md):
 
-**Recommended coverage configuration:**
+**Рекомендуемая конфигурация покрытия:**
 
 ```bash
-# Quick workspace coverage (proposed CI command)
+# Быстрое покрытие всего воркспейса (предлагаемая команда для CI)
 cargo llvm-cov --workspace \
     --ignore-filename-regex 'tests?\.rs$' \
     --fail-under-lines 75 \
     --html
 
-# Per-crate coverage for targeted improvement
+# Покрытие по крейтам для целенаправленного улучшения
 for crate in accel_diag event_log topology_lib network_diag compute_diag fan_diag; do
     echo "=== $crate ==="
     cargo llvm-cov --package "$crate" --json 2>/dev/null | \
-        jq -r '.data[0].totals | "Lines: \(.lines.percent | round)%  Branches: \(.branches.percent | round)%"'
+        jq -r '.data[0].totals | "Строки: \(.lines.percent | round)%  Ветви: \(.branches.percent | round)%"'
 done
 ```
 
-**Expected high-coverage crates** (based on test density):
-- `topology_lib` — 922-line golden-file test suite
-- `event_log` — registry with `create_test_record()` helpers
-- `cable_diag` — `make_test_event()` / `make_test_context()` patterns
+**Крейты с ожидаемо высоким покрытием** (исходя из плотности тестов):
+- `topology_lib` — набор тестов golden-файлов на 922 строки
+- `event_log` — реестр с хелперами `create_test_record()`
+- `cable_diag` — паттерны `make_test_event()` / `make_test_context()`
 
-**Expected coverage gaps** (based on code inspection):
-- Error handling arms in IPMI communication paths
-- GPU hardware-specific branches (require actual GPU)
-- `dmesg` parsing edge cases (platform-dependent output)
+**Ожидаемые пробелы в покрытии** (по результатам просмотра кода):
+- Ветки обработки ошибок в путях IPMI-коммуникации
+- Ветки, специфичные для железа GPU (требуют реального GPU)
+- Крайние случаи парсинга `dmesg` (вывод зависит от платформы)
 
-> **The 80/20 rule of coverage**: Getting from 0% to 80% coverage is straightforward.
-> Getting from 80% to 95% requires increasingly contrived test scenarios. Getting
-> from 95% to 100% requires `#[cfg(not(...))]` exclusions and is rarely worth the
-> effort. Target **80% line coverage and 70% branch coverage** as a practical floor.
+> **Правило 80/20 для покрытия**: от 0% до 80% добраться несложно. От 80% до 95% требует
+> всё более искусственных тестовых сценариев. От 95% до 100% требует исключений
+> `#[cfg(not(...))]` и редко стоит усилий. Ориентируйтесь на **80% покрытия строк и 70%
+> покрытия ветвлений** как на разумный практический минимум.
 
-### Troubleshooting Coverage
+### Устранение неполадок с покрытием
 
-| Symptom | Cause | Fix |
-|---------|-------|-----|
-| `llvm-cov` shows 0% for all files | Instrumentation not applied | Ensure you run `cargo llvm-cov`, not `cargo test` + `llvm-cov` separately |
-| Coverage counts `unreachable!()` as uncovered | Those branches exist in compiled code | Use `#[cfg(not(tarpaulin_include))]` or add to exclusion regex |
-| Test binary crashes under coverage | Instrumentation + sanitizer conflict | Don't combine `cargo llvm-cov` with `-Zsanitizer=address`; run them separately |
-| Coverage differs between `llvm-cov` and `tarpaulin` | Different instrumentation techniques | Use `llvm-cov` as source of truth (compiler-native); file issues for large discrepancies |
-| `error: profraw file is malformed` | Test binary crashed mid-execution | Fix the test failure first; profraw files are corrupt when the process exits abnormally |
-| Branch coverage seems impossibly low | Optimizer creates branches for match arms, unwrap, etc. | Focus on *line* coverage for practical thresholds; branch coverage is inherently lower |
+| Симптом | Причина | Решение |
+|---------|---------|---------|
+| `llvm-cov` показывает 0% для всех файлов | Инструментирование не применено | Запускайте `cargo llvm-cov`, а не `cargo test` и `llvm-cov` по отдельности |
+| Покрытие считает `unreachable!()` непокрытым | Эти ветки есть в скомпилированном коде | Используйте `#[cfg(not(tarpaulin_include))]` или добавьте в регулярное выражение исключений |
+| Тестовый бинарник падает под покрытием | Конфликт инструментирования и санитайзера | Не комбинируйте `cargo llvm-cov` с `-Zsanitizer=address`; запускайте их отдельно |
+| Покрытие различается между `llvm-cov` и `tarpaulin` | Разные методы инструментирования | Считайте источником истины `llvm-cov` (встроен в компилятор); заводите задачи при крупных расхождениях |
+| `error: profraw file is malformed` | Тестовый бинарник упал во время выполнения | Сначала исправьте падающий тест; profraw-файлы повреждаются, если процесс завершился аварийно |
+| Покрытие ветвлений кажется невероятно низким | Оптимизатор создаёт ветки для ветвей `match`, `unwrap` и т. д. | Для практических порогов ориентируйтесь на *покрытие строк*; покрытие ветвлений по природе ниже |
 
-### Try It Yourself
+### Попробуйте сами
 
-1. **Measure coverage on your project**: Run `cargo llvm-cov --workspace --html`
-   and open the report. Find the three files with the lowest coverage. Are they
-   untested, or inherently hard to test (hardware-dependent code)?
+1. **Измерьте покрытие своего проекта**: запустите `cargo llvm-cov --workspace --html`
+   и откройте отчёт. Найдите три файла с самым низким покрытием. Они просто не тестируются
+   или им по природе трудно быть протестированными (код, зависящий от железа)?
 
-2. **Set a coverage gate**: Add `cargo llvm-cov --workspace --fail-under-lines 60`
-   to your CI. Intentionally comment out a test and verify CI fails. Then raise
-   the threshold to your project's actual coverage level minus 2%.
+2. **Задайте порог покрытия**: добавьте `cargo llvm-cov --workspace --fail-under-lines 60`
+   в CI. Намеренно закомментируйте тест и убедитесь, что CI падает. Затем поднимите порог
+   до фактического покрытия проекта минус 2%.
 
-3. **Branch vs. line coverage**: Write a function with a 3-arm `match` and
-   test only 2 arms. Compare line coverage (may show 66%) vs. branch coverage
-   (may show 50%). Which metric is more useful for your project?
+3. **Покрытие ветвлений и строк**: напишите функцию с `match` из трёх веток и протестируйте
+   только две из них. Сравните покрытие строк (может показать 66%) и покрытие ветвлений
+   (может показать 50%). Какая метрика полезнее для вашего проекта?
 
-### Coverage Tool Selection
+### Выбор инструмента покрытия
 
 ```mermaid
 flowchart TD
-    START["Need code coverage?"] --> ACCURACY{"Priority?"}
-    
-    ACCURACY -->|"Most accurate"| LLVM["cargo-llvm-cov<br/>Source-based, compiler-native"]
-    ACCURACY -->|"Quick check"| TARP["cargo-tarpaulin<br/>Linux only, fast"]
-    ACCURACY -->|"Multi-run aggregate"| GRCOV["grcov<br/>Mozilla, combines profiles"]
-    
-    LLVM --> CI_GATE["CI coverage gate<br/>--fail-under-lines 80"]
+    START["Нужно покрытие кода?"] --> ACCURACY{"Приоритет?"}
+
+    ACCURACY -->|"Максимальная точность"| LLVM["cargo-llvm-cov<br/>На основе исходников, нативно для компилятора"]
+    ACCURACY -->|"Быстрая проверка"| TARP["cargo-tarpaulin<br/>Только Linux, быстрый"]
+    ACCURACY -->|"Агрегация нескольких запусков"| GRCOV["grcov<br/>Mozilla, объединяет профили"]
+
+    LLVM --> CI_GATE["Порог покрытия в CI<br/>--fail-under-lines 80"]
     TARP --> CI_GATE
-    
-    CI_GATE --> UPLOAD{"Upload to?"}
+
+    CI_GATE --> UPLOAD{"Куда загружать?"}
     UPLOAD -->|"Codecov"| CODECOV["codecov/codecov-action"]
     UPLOAD -->|"Coveralls"| COVERALLS["coverallsapp/github-action"]
-    
+
     style LLVM fill:#91e5a3,color:#000
     style TARP fill:#e3f2fd,color:#000
     style GRCOV fill:#e3f2fd,color:#000
     style CI_GATE fill:#ffd43b,color:#000
 ```
 
-### 🏋️ Exercises
+### 🏋️ Упражнения
 
-#### 🟢 Exercise 1: First Coverage Report
+#### 🟢 Упражнение 1: первый отчёт о покрытии
 
-Install `cargo-llvm-cov`, run it on any Rust project, and open the HTML report. Find the three files with the lowest line coverage.
+Установите `cargo-llvm-cov`, запустите его на любом проекте на Rust и откройте HTML-отчёт.
+Найдите три файла с самым низким покрытием строк.
 
 <details>
-<summary>Solution</summary>
+<summary>Решение</summary>
 
 ```bash
 cargo install cargo-llvm-cov
 cargo llvm-cov --workspace --html --open
-# The report sorts files by coverage — lowest at the bottom
-# Look for files under 50% — those are your blind spots
+# Отчёт сортирует файлы по покрытию — самые низкие внизу
+# Ищите файлы ниже 50% — это ваши слепые зоны
 ```
 </details>
 
-#### 🟡 Exercise 2: CI Coverage Gate
+#### 🟡 Упражнение 2: порог покрытия в CI
 
-Add a coverage gate to a GitHub Actions workflow that fails if line coverage drops below 60%. Verify it works by commenting out a test.
+Добавьте порог покрытия в workflow GitHub Actions, который падает, если покрытие строк
+опускается ниже 60%. Проверьте работу, закомментировав один тест.
 
 <details>
-<summary>Solution</summary>
+<summary>Решение</summary>
 
 ```yaml
 # .github/workflows/coverage.yml
-name: Coverage
+name: Покрытие
 on: [push, pull_request]
 jobs:
   coverage:
@@ -438,16 +442,18 @@ jobs:
       - run: cargo llvm-cov --workspace --fail-under-lines 60
 ```
 
-Comment out a test, push, and watch the workflow fail.
+Закомментируйте тест, отправьте изменения и посмотрите, как workflow падает.
 </details>
 
-### Key Takeaways
+### Ключевые выводы
 
-- `cargo-llvm-cov` is the most accurate coverage tool for Rust — it uses the compiler's own instrumentation
-- Coverage doesn't prove correctness, but **zero coverage proves zero testing** — use it to find blind spots
-- Set a coverage gate in CI (e.g., `--fail-under-lines 80`) to prevent regressions
-- Don't chase 100% coverage — focus on high-risk code paths (error handling, unsafe, parsing)
-- Never combine coverage instrumentation with sanitizers in the same run
+- `cargo-llvm-cov` — самый точный инструмент покрытия для Rust: он использует собственное
+  инструментирование компилятора
+- Покрытие не доказывает корректность, но **нулевое покрытие доказывает отсутствие тестов** —
+  используйте его, чтобы находить слепые зоны
+- Задайте порог покрытия в CI (например, `--fail-under-lines 80`), чтобы предотвращать регрессии
+- Не гонитесь за 100% покрытием — сосредоточьтесь на путях с высоким риском (обработка ошибок,
+  unsafe, парсинг)
+- Никогда не комбинируйте инструментирование покрытия с санитайзерами в одном запуске
 
 ---
-

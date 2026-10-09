@@ -1,126 +1,121 @@
-# Rust Engineering Practices — Beyond `cargo build`
+# Инженерные практики Rust — за пределами `cargo build`
 
-## Speaker Intro
+## Об авторе
 
-- Principal Firmware Architect in Microsoft SCHIE (Silicon and Cloud Hardware Infrastructure Engineering) team
-- Industry veteran with expertise in security, systems programming (firmware, operating systems, hypervisors), CPU and platform architecture, and C++ systems
-- Started programming in Rust in 2017 (@AWS EC2), and have been in love with the language ever since
+- Ведущий архитектор прошивок в команде SCHIE (Silicon and Cloud Hardware Infrastructure Engineering) компании Microsoft
+- Опытный инженер с экспертизой в безопасности, системном программировании (прошивки, операционные системы, гипервизоры), архитектуре CPU и платформ, а также системах на C++
+- Начал программировать на Rust в 2017 году (@AWS EC2) и с тех пор влюблён в этот язык
 
 ---
 
-> A practical guide to the Rust toolchain features that most teams discover too late:
-> build scripts, cross-compilation, benchmarking, code coverage, and safety verification
-> with Miri and Valgrind. Each chapter uses concrete examples drawn from
-> a real hardware-diagnostics codebase —
-> a large multi-crate workspace — so every technique maps directly to production code.
+> Практическое руководство по возможностям инструментария Rust, которые большинство команд открывают слишком поздно: build-скрипты, кросс-компиляция, бенчмаркинг, покрытие кода и проверка безопасности с помощью Miri и Valgrind. Каждая глава опирается на конкретные примеры из реального кода для диагностики оборудования — большого многокрейтового воркспейса, — поэтому каждый приём напрямую переносится в продакшн-код.
 
-## How to Use This Book
+## Как пользоваться этой книгой
 
-This book is designed for **self-paced study or team workshops**. Each chapter is largely independent — read them in order or jump to the topic you need.
+Эта книга рассчитана на **самостоятельное изучение или командные воркшопы**. Каждая глава в значительной степени независима: читайте их по порядку или сразу переходите к нужной теме.
 
-### Difficulty Legend
+### Обозначения сложности
 
-| Symbol | Level | Meaning |
-|:------:|-------|---------|
-| 🟢 | Starter | Straightforward tools with clear patterns — useful on day one |
-| 🟡 | Intermediate | Requires understanding of toolchain internals or platform concepts |
-| 🔴 | Advanced | Deep toolchain knowledge, nightly features, or multi-tool orchestration |
+| Символ | Уровень | Значение |
+|:------:|---------|----------|
+| 🟢 | Начальный | Простые инструменты с понятными шаблонами — полезны с первого дня |
+| 🟡 | Средний | Требуют понимания внутреннего устройства инструментов или платформенных концепций |
+| 🔴 | Продвинутый | Глубокое знание инструментов, nightly-функции или оркестрация нескольких инструментов |
 
-### Pacing Guide
+### План изучения
 
-| Part | Chapters | Est. Time | Key Outcome |
-|------|----------|:---------:|-------------|
-| **I — Build & Ship** | ch01–02 | 3–4 h | Build metadata, cross-compilation, static binaries |
-| **II — Measure & Verify** | ch03–05 | 4–5 h | Statistical benchmarking, coverage gates, Miri/sanitizers |
-| **III — Harden & Optimize** | ch06–10 | 6–8 h | Supply chain security, release profiles, compile-time tools, `no_std`, Windows |
-| **IV — Integrate** | ch11–13 | 3–4 h | Production CI/CD pipeline, tricks, capstone exercise |
-| | | **16–21 h** | **Full production engineering pipeline** |
+| Часть | Главы | Примерное время | Ключевой результат |
+|-------|-------|:---------------:|--------------------|
+| **I — Сборка и поставка** | ch01–02 | 3–4 ч | Метаданные сборки, кросс-компиляция, статические бинарные файлы |
+| **II — Измерение и верификация** | ch03–05 | 4–5 ч | Статистический бенчмаркинг, пороги покрытия, Miri и санитайзеры |
+| **III — Укрепление и оптимизация** | ch06–10 | 6–8 ч | Безопасность цепочки поставок, профили релиза, инструменты времени компиляции, `no_std`, Windows |
+| **IV — Интеграция** | ch11–13 | 3–4 ч | Продакшн-конвейер CI/CD, приёмы, итоговое упражнение |
+| | | **16–21 ч** | **Полный инженерный конвейер для продакшна** |
 
-### Working Through Exercises
+### Работа с упражнениями
 
-Each chapter contains **🏋️ exercises** with difficulty indicators. Solutions are provided in expandable `<details>` blocks — try the exercise first, then check your work.
+Каждая глава содержит **🏋️ упражнения** с указанием сложности. Решения приведены в раскрывающихся блоках `<details>` — сначала попробуйте решить упражнение самостоятельно, а затем сверьтесь с решением.
 
-- 🟢 exercises can often be done in 10–15 minutes
-- 🟡 exercises require 20–40 minutes and may involve running tools locally
-- 🔴 exercises require significant setup and experimentation (1+ hour)
+- Упражнения 🟢 обычно занимают 10–15 минут
+- Упражнения 🟡 требуют 20–40 минут и могут включать запуск инструментов локально
+- Упражнения 🔴 требуют серьёзной настройки и экспериментов (от одного часа)
 
-## Prerequisites
+## Предварительные требования
 
-| Concept | Where to learn it |
-|---------|-------------------|
-| Cargo workspace layout | [Rust Book ch14.3](https://doc.rust-lang.org/book/ch14-03-cargo-workspaces.html) |
-| Feature flags | [Cargo Reference — Features](https://doc.rust-lang.org/cargo/reference/features.html) |
-| `#[cfg(test)]` and basic testing | Rust Patterns ch12 |
-| `unsafe` blocks and FFI basics | Rust Patterns ch10 |
+| Концепция | Где изучить |
+|-----------|-------------|
+| Структура воркспейса Cargo | [Книга по Rust, гл. 14.3](https://doc.rust-lang.org/book/ch14-03-cargo-workspaces.html) |
+| Флаги функций (feature flags) | [Справочник Cargo — Features](https://doc.rust-lang.org/cargo/reference/features.html) |
+| `#[cfg(test)]` и базовое тестирование | Паттерны Rust, гл. 12 |
+| Блоки `unsafe` и основы FFI | Паттерны Rust, гл. 10 |
 
-## Chapter Dependency Map
+## Карта зависимостей между главами
 
 ```text
                  ┌──────────┐
                  │ ch00     │
-                 │  Intro   │
+                 │ Введение │
                  └────┬─────┘
         ┌─────┬───┬──┴──┬──────┬──────┐
         ▼     ▼   ▼     ▼      ▼      ▼
       ch01  ch03 ch04  ch05   ch06   ch09
-      Build Bench Cov  Miri   Deps   no_std
+      Сборка Бенч Покр Miri   Зав.   no_std
         │     │    │    │      │      │
         │     └────┴────┘      │      ▼
         │          │           │    ch10
         ▼          ▼           ▼   Windows
        ch02      ch07        ch07    │
-       Cross    RelProf     RelProf  │
+       Кросс    Профиль     Профиль  │
         │          │           │     │
         │          ▼           │     │
         │        ch08          │     │
-        │      CompTime        │     │
+        │      Компил          │     │
         └──────────┴───────────┴─────┘
                    │
                    ▼
                  ch11
-               CI/CD Pipeline
+               CI/CD-конвейер
                    │
                    ▼
                 ch12 ─── ch13
-              Tricks    Quick Ref
+              Приёмы    Справка
 ```
 
-**Read in any order**: ch01, ch03, ch04, ch05, ch06, ch09 are independent.
-**Read after prerequisites**: ch02 (needs ch01), ch07–ch08 (benefit from ch03–ch06), ch10 (benefits from ch09).
-**Read last**: ch11 (ties everything together), ch12 (tricks), ch13 (reference).
+**Читать в любом порядке**: ch01, ch03, ch04, ch05, ch06 и ch09 независимы друг от друга.
+**Читать после необходимых предварительных глав**: ch02 (нужна ch01), ch07–ch08 (выигрывают от ch03–ch06), ch10 (выигрывает от ch09).
+**Читать в последнюю очередь**: ch11 (связывает всё воедино), ch12 (приёмы), ch13 (справочник).
 
-## Annotated Table of Contents
+## Аннотированное оглавление
 
-### Part I — Build & Ship
+### Часть I — Сборка и поставка
 
-| # | Chapter | Difficulty | Description |
-|---|---------|:----------:|-------------|
-| 1 | [Build Scripts — `build.rs` in Depth](ch01-build-scripts-buildrs-in-depth.md) | 🟢 | Compile-time constants, compiling C code, protobuf generation, system library linking, anti-patterns |
-| 2 | [Cross-Compilation — One Source, Many Targets](ch02-cross-compilation-one-source-many-target.md) | 🟡 | Target triples, musl static binaries, ARM cross-compile, `cross` tool, `cargo-zigbuild`, GitHub Actions |
+| № | Глава | Сложность | Описание |
+|---|-------|:---------:|----------|
+| 1 | [Build-скрипты — `build.rs` в деталях](ch01-build-scripts-buildrs-in-depth.md) | 🟢 | Константы времени компиляции, компиляция C-кода, генерация protobuf, линковка системных библиотек, антипаттерны |
+| 2 | [Кросс-компиляция — один исходник, много целей](ch02-cross-compilation-one-source-many-target.md) | 🟡 | Target triple, статические бинарные файлы на musl, кросс-компиляция для ARM, инструмент `cross`, `cargo-zigbuild`, GitHub Actions |
 
-### Part II — Measure & Verify
+### Часть II — Измерение и верификация
 
-| # | Chapter | Difficulty | Description |
-|---|---------|:----------:|-------------|
-| 3 | [Benchmarking — Measuring What Matters](ch03-benchmarking-measuring-what-matters.md) | 🟡 | Criterion.rs, Divan, `perf` flamegraphs, PGO, continuous benchmarking in CI |
-| 4 | [Code Coverage — Seeing What Tests Miss](ch04-code-coverage-seeing-what-tests-miss.md) | 🟢 | `cargo-llvm-cov`, `cargo-tarpaulin`, `grcov`, Codecov/Coveralls CI integration |
-| 5 | [Miri, Valgrind, and Sanitizers](ch05-miri-valgrind-and-sanitizers-verifying-u.md) | 🔴 | MIR interpreter, Valgrind memcheck/Helgrind, ASan/MSan/TSan, cargo-fuzz, loom |
+| № | Глава | Сложность | Описание |
+|---|-------|:---------:|----------|
+| 3 | [Бенчмаркинг — измеряем то, что важно](ch03-benchmarking-measuring-what-matters.md) | 🟡 | Criterion.rs, Divan, флеймграфы `perf`, PGO, непрерывный бенчмаркинг в CI |
+| 4 | [Покрытие кода — видим то, что пропускают тесты](ch04-code-coverage-seeing-what-tests-miss.md) | 🟢 | `cargo-llvm-cov`, `cargo-tarpaulin`, `grcov`, интеграция с Codecov/Coveralls в CI |
+| 5 | [Miri, Valgrind и санитайзеры — проверка unsafe-кода](ch05-miri-valgrind-and-sanitizers-verifying-u.md) | 🔴 | Интерпретатор MIR, Valgrind memcheck/Helgrind, ASan/MSan/TSan, cargo-fuzz, loom |
 
-### Part III — Harden & Optimize
+### Часть III — Укрепление и оптимизация
 
-| # | Chapter | Difficulty | Description |
-|---|---------|:----------:|-------------|
-| 6 | [Dependency Management and Supply Chain Security](ch06-dependency-management-and-supply-chain-s.md) | 🟢 | `cargo-audit`, `cargo-deny`, `cargo-vet`, `cargo-outdated`, `cargo-semver-checks` |
-| 7 | [Release Profiles and Binary Size](ch07-release-profiles-and-binary-size.md) | 🟡 | Release profile anatomy, LTO trade-offs, `cargo-bloat`, `cargo-udeps` |
-| 8 | [Compile-Time and Developer Tools](ch08-compile-time-and-developer-tools.md) | 🟡 | `sccache`, `mold`, `cargo-nextest`, `cargo-expand`, `cargo-geiger`, workspace lints, MSRV |
-| 9 | [`no_std` and Feature Verification](ch09-no-std-and-feature-verification.md) | 🔴 | `cargo-hack`, `core`/`alloc`/`std` layers, custom panic handlers, testing `no_std` code |
-| 10 | [Windows and Conditional Compilation](ch10-windows-and-conditional-compilation.md) | 🟡 | `#[cfg]` patterns, `windows-sys`/`windows` crates, `cargo-xwin`, platform abstraction |
+| № | Глава | Сложность | Описание |
+|---|-------|:---------:|----------|
+| 6 | [Управление зависимостями и безопасность цепочки поставок](ch06-dependency-management-and-supply-chain-s.md) | 🟢 | `cargo-audit`, `cargo-deny`, `cargo-vet`, `cargo-outdated`, `cargo-semver-checks` |
+| 7 | [Профили релиза и размер бинарного файла](ch07-release-profiles-and-binary-size.md) | 🟡 | Устройство профиля релиза, компромиссы LTO, `cargo-bloat`, `cargo-udeps` |
+| 8 | [Инструменты времени компиляции и разработки](ch08-compile-time-and-developer-tools.md) | 🟡 | `sccache`, `mold`, `cargo-nextest`, `cargo-expand`, `cargo-geiger`, линты воркспейса, MSRV |
+| 9 | [`no_std` и проверка фич](ch09-no-std-and-feature-verification.md) | 🔴 | `cargo-hack`, слои `core`/`alloc`/`std`, пользовательские обработчики паники, тестирование кода `no_std` |
+| 10 | [Windows и условная компиляция](ch10-windows-and-conditional-compilation.md) | 🟡 | Паттерны `#[cfg]`, крейты `windows-sys`/`windows`, `cargo-xwin`, абстракция платформы |
 
-### Part IV — Integrate
+### Часть IV — Интеграция
 
-| # | Chapter | Difficulty | Description |
-|---|---------|:----------:|-------------|
-| 11 | [Putting It All Together — A Production CI/CD Pipeline](ch11-putting-it-all-together-a-production-cic.md) | 🟡 | GitHub Actions workflow, `cargo-make`, pre-commit hooks, `cargo-dist`, capstone |
-| 12 | [Tricks from the Trenches](ch12-tricks-from-the-trenches.md) | 🟡 | 10 battle-tested patterns: `deny(warnings)` trap, cache tuning, dep dedup, RUSTFLAGS, more |
-| 13 | [Quick Reference Card](ch13-quick-reference-card.md) | — | Commands at a glance, 60+ decision table entries, further reading links |
-
+| № | Глава | Сложность | Описание |
+|---|-------|:---------:|----------|
+| 11 | [Собираем всё вместе — продакшн-конвейер CI/CD](ch11-putting-it-all-together-a-production-cic.md) | 🟡 | Workflow GitHub Actions, `cargo-make`, pre-commit-хуки, `cargo-dist`, итоговый пример |
+| 12 | [Проверенные на практике приёмы](ch12-tricks-from-the-trenches.md) | 🟡 | 10 проверенных паттернов: ловушка `deny(warnings)`, настройка кэша, дедупликация зависимостей, RUSTFLAGS и другие |
+| 13 | [Краткая справочная карточка](ch13-quick-reference-card.md) | — | Команды под рукой, более 60 записей таблицы решений, ссылки на дополнительную литературу |

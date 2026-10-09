@@ -1,97 +1,96 @@
-# Compile-Time and Developer Tools 🟡
+# Инструменты времени компиляции и разработки 🟡
 
-> **What you'll learn:**
-> - Compilation caching with `sccache` for local and CI builds
-> - Faster linking with `mold` (3-10× faster than the default linker)
-> - `cargo-nextest`: a faster, more informative test runner
-> - Developer visibility tools: `cargo-expand`, `cargo-geiger`, `cargo-watch`
-> - Workspace lints, MSRV policy, and documentation-as-CI
+> **Чему вы научитесь:**
+> - Кеширование компиляции с помощью `sccache` для локальных сборок и CI
+> - Более быстрая линковка с `mold` (в 3–10× быстрее линкера по умолчанию)
+> - `cargo-nextest`: более быстрый и информативный запускатель тестов
+> - Инструменты наблюдения за разработкой: `cargo-expand`, `cargo-geiger`, `cargo-watch`
+> - Линты воркспейса, политика MSRV и документация как часть CI
 >
-> **Cross-references:** [Release Profiles](ch07-release-profiles-and-binary-size.md) — LTO and binary size optimization · [CI/CD Pipeline](ch11-putting-it-all-together-a-production-cic.md) — these tools integrate into your pipeline · [Dependencies](ch06-dependency-management-and-supply-chain-s.md) — fewer deps = faster compiles
+> **Перекрёстные ссылки:** [Профили релиза](ch07-release-profiles-and-binary-size.md) — LTO и оптимизация размера бинарника · [CI/CD-конвейер](ch11-putting-it-all-together-a-production-cic.md) — эти инструменты встраиваются в ваш конвейер · [Зависимости](ch06-dependency-management-and-supply-chain-s.md) — меньше зависимостей = быстрее компиляция
 
-### Compile-Time Optimization: sccache, mold, cargo-nextest
+### Оптимизация времени компиляции: sccache, mold, cargo-nextest
 
-Long compile times are the #1 developer pain point in Rust. These tools
-collectively can cut iteration time by 50-80%:
+Долгая компиляция — главная боль разработчиков на Rust. Эти инструменты вместе могут
+сократить время итерации на 50–80%:
 
-**`sccache` — Shared compilation cache:**
+**`sccache` — общий кеш компиляции:**
 
 ```bash
-# Install
+# Установка
 cargo install sccache
 
-# Configure as the Rust wrapper
+# Настраиваем как обёртку rustc
 export RUSTC_WRAPPER=sccache
 
-# Or set permanently in .cargo/config.toml:
+# Или задаём постоянно в .cargo/config.toml:
 # [build]
 # rustc-wrapper = "sccache"
 
-# First build: normal speed (populates cache)
-cargo build --release  # 3 minutes
+# Первая сборка: обычная скорость (заполняет кеш)
+cargo build --release  # 3 минуты
 
-# Clean + rebuild: cache hits for unchanged crates
-cargo clean && cargo build --release  # 45 seconds
+# Очистка и пересборка: попадания в кеш для неизменившихся крейтов
+cargo clean && cargo build --release  # 45 секунд
 
-# Check cache statistics
+# Проверка статистики кеша
 sccache --show-stats
 # Compile requests        1,234
 # Cache hits               987 (80%)
 # Cache misses             247
 ```
 
-`sccache` supports shared caches (S3, GCS, Azure Blob) for team-wide and CI
-cache sharing.
+`sccache` поддерживает общие кеши (S3, GCS, Azure Blob) для обмена кешем в команде и в CI.
 
-**`mold` — A faster linker:**
+**`mold` — более быстрый линкер:**
 
-Linking is often the slowest phase. `mold` is 3-5× faster than `lld` and
-10-20× faster than the default GNU `ld`:
+Линковка часто оказывается самой медленной фазой. `mold` в 3–5× быстрее `lld` и в 10–20×
+быстрее стандартного GNU `ld`:
 
 ```bash
-# Install
+# Установка
 sudo apt install mold  # Ubuntu 22.04+
-# Note: mold is for ELF targets (Linux). macOS uses Mach-O, not ELF.
-# The macOS linker (ld64) is already quite fast; if you need faster:
-# brew install sold     # sold = mold for Mach-O (experimental, less mature)
-# In practice, macOS link times are rarely a bottleneck.
+# Примечание: mold предназначен для целей ELF (Linux). macOS использует Mach-O, а не ELF.
+# Линкер macOS (ld64) и так довольно быстрый; если нужен более быстрый:
+# brew install sold     # sold = mold для Mach-O (экспериментально, менее зрелый)
+# На практике время линковки на macOS редко становится узким местом.
 ```
 
 ```toml
-# Use mold for linking
+# Используем mold для линковки
 # .cargo/config.toml
 [target.x86_64-unknown-linux-gnu]
 rustflags = ["-C", "link-arg=-fuse-ld=mold"]
 ```
 
 ```bash
-# See https://github.com/rui314/mold/blob/main/docs/mold.md#environment-variables
+# См. https://github.com/rui314/mold/blob/main/docs/mold.md#environment-variables
 export MOLD_JOBS=1
 
-# Verify mold is being used
+# Проверяем, что используется mold
 cargo build -v 2>&1 | grep mold
 ```
 
-**`cargo-nextest` — A faster test runner:**
+**`cargo-nextest` — более быстрый запускатель тестов:**
 
 ```bash
-# Install
+# Установка
 cargo install cargo-nextest
 
-# Run tests (parallel by default, per-test timeout, retry)
+# Запуск тестов (по умолчанию параллельно, с таймаутом на тест и повторами)
 cargo nextest run
 
-# Key advantages over cargo test:
-# - Each test runs in its own process → better isolation
-# - Parallel execution with smart scheduling
-# - Per-test timeouts (no more hanging CI)
-# - JUnit XML output for CI
-# - Retry failed tests
+# Ключевые преимущества перед cargo test:
+# - Каждый тест выполняется в своём процессе → лучше изоляция
+# - Параллельное выполнение с умным планированием
+# - Таймауты на тест (больше никаких зависших CI)
+# - Вывод в JUnit XML для CI
+# - Повтор упавших тестов
 
-# Configuration
+# Конфигурация
 cargo nextest run --retries 2 --fail-fast
 
-# Archive test binaries (useful for CI: build once, test on multiple machines)
+# Архивируем тестовые бинарники (полезно для CI: собрать один раз, тестировать на нескольких машинах)
 cargo nextest archive --archive-file tests.tar.zst
 cargo nextest run --archive-file tests.tar.zst
 ```
@@ -109,48 +108,48 @@ fail-fast = false
 junit = { path = "test-results.xml" }
 ```
 
-**Combined dev configuration:**
+**Общая конфигурация для разработки:**
 
 ```toml
-# .cargo/config.toml — optimize the development inner loop
+# .cargo/config.toml — оптимизируем внутренний цикл разработки
 [build]
-rustc-wrapper = "sccache"       # Cache compilation artifacts
+rustc-wrapper = "sccache"       # Кешировать артефакты компиляции
 
 [target.x86_64-unknown-linux-gnu]
-rustflags = ["-C", "link-arg=-fuse-ld=mold"]  # Faster linking
+rustflags = ["-C", "link-arg=-fuse-ld=mold"]  # Более быстрая линковка
 
-# Dev profile: optimize deps but not your code
-# (put in Cargo.toml)
+# Dev-профиль: оптимизируем зависимости, но не свой код
+# (поместить в Cargo.toml)
 # [profile.dev.package."*"]
 # opt-level = 2
 ```
 
-### cargo-expand and cargo-geiger — Visibility Tools
+### cargo-expand и cargo-geiger — инструменты наблюдения
 
-**`cargo-expand`** — see what macros generate:
+**`cargo-expand`** — посмотреть, что генерируют макросы:
 
 ```bash
 cargo install cargo-expand
 
-# Expand all macros in a specific module
+# Раскрыть все макросы в конкретном модуле
 cargo expand --lib accel_diag::vendor
 
-# Expand a specific derive
-# Given: #[derive(Debug, Serialize, Deserialize)]
-# cargo expand shows the generated impl blocks
+# Раскрыть конкретный derive
+# Дано: #[derive(Debug, Serialize, Deserialize)]
+# cargo expand покажет сгенерированные блоки impl
 cargo expand --lib --tests
 ```
 
-Invaluable for debugging `#[derive]` macro output, `macro_rules!` expansions,
-and understanding what `serde` generates for your types.
+Незаменим для отладки вывода макросов `#[derive]`, раскрытий `macro_rules!` и для понимания
+того, что генерирует `serde` для ваших типов.
 
-In addition to `cargo-expand`, you can also use rust-analyzer to expand macros:
+Помимо `cargo-expand`, раскрыть макросы можно и с помощью rust-analyzer:
 
-1. Move cursor to the macro you want to check.
-2. Open command palette (e.g. `F1` on VSCode).
-3. Search for `rust-analyzer: Expand macro recursively at caret`.
+1. Установите курсор на макрос, который хотите проверить.
+2. Откройте палитру команд (например, `F1` в VSCode).
+3. Найдите `rust-analyzer: Expand macro recursively at caret`.
 
-**`cargo-geiger`** — count `unsafe` usage across your dependency tree:
+**`cargo-geiger`** — подсчёт использования `unsafe` во всём дереве зависимостей:
 
 ```bash
 cargo install cargo-geiger
@@ -167,265 +166,263 @@ cargo geiger
 # 3/3        14/14        0/0    0/0     2/2      ❗ libc
 # 15/15      142/142      4/4    0/0     12/12    ☢️ ring
 
-# The symbols:
-# ✅ = no unsafe used
-# ❗ = some unsafe used
-# ☢️ = heavily unsafe
+# Обозначения:
+# ✅ = unsafe не используется
+# ❗ = используется некоторое количество unsafe
+# ☢️ = сильно использует unsafe
 ```
 
-For the project's zero-unsafe policy, `cargo geiger` verifies that no
-dependency introduces unsafe code into the call graph that your code actually
-exercises.
+Для политики проекта «без unsafe» `cargo geiger` проверяет, что ни одна зависимость не
+вносит в граф вызовов, который реально выполняет ваш код, unsafe-код.
 
-### Workspace Lints — `[workspace.lints]`
+### Линты воркспейса — `[workspace.lints]`
 
-Since Rust 1.74, you can configure Clippy and compiler lints centrally in
-`Cargo.toml` — no more `#![deny(...)]` at the top of every crate:
+Начиная с Rust 1.74, Clippy и линты компилятора можно настраивать централизованно в
+`Cargo.toml` — больше не нужны `#![deny(...)]` в начале каждого крейта:
 
 ```toml
-# Root Cargo.toml — lint configuration for all crates
+# Корневой Cargo.toml — конфигурация линтов для всех крейтов
 [workspace.lints.clippy]
-unwrap_used = "warn"         # Prefer ? or expect("reason")
-dbg_macro = "deny"           # No dbg!() in committed code
-todo = "warn"                # Track incomplete implementations
-large_enum_variant = "warn"  # Catch accidental size bloat
+unwrap_used = "warn"         # Предпочитайте ? или expect("причина")
+dbg_macro = "deny"           # Не допускаем dbg!() в закоммиченном коде
+todo = "warn"                # Отслеживаем незавершённые реализации
+large_enum_variant = "warn"  # Ловим случайное раздувание размера
 
 [workspace.lints.rust]
-unsafe_code = "deny"         # Enforce zero-unsafe policy
-missing_docs = "warn"        # Encourage documentation
+unsafe_code = "deny"         # Обеспечиваем политику «без unsafe»
+missing_docs = "warn"        # Поощряем документирование
 ```
 
 ```toml
-# Each crate's Cargo.toml — opt into workspace lints
+# Cargo.toml каждого крейта — подключаем линты воркспейса
 [lints]
 workspace = true
 ```
 
-This replaces scattered `#![deny(clippy::unwrap_used)]` attributes and ensures
-consistent policy across the entire workspace.
+Это заменяет разрозненные атрибуты `#![deny(clippy::unwrap_used)]` и обеспечивает единую
+политику во всём воркспейсе.
 
-**Auto-fixing Clippy warnings:**
+**Автоисправление предупреждений Clippy:**
 
 ```bash
-# Let Clippy automatically fix machine-applicable suggestions
+# Пусть Clippy автоматически применит предложения, которые можно применить механически
 cargo clippy --fix --workspace --all-targets --allow-dirty
 
-# Fix and also apply suggestions that may change behavior (review carefully!)
+# Исправляем и применяем предложения, которые могут изменить поведение (проверяйте внимательно!)
 cargo clippy --fix --workspace --all-targets --allow-dirty -- -W clippy::pedantic
 ```
 
-> **Tip**: Run `cargo clippy --fix` before committing. It handles trivial
-> issues (unused imports, redundant clones, type simplifications) that are
-> tedious to fix by hand.
+> **Совет**: запускайте `cargo clippy --fix` перед коммитом. Он обрабатывает тривиальные
+> проблемы (неиспользуемые импорты, избыточные клоны, упрощения типов), которые вручную
+> исправлять скучно.
 
-### MSRV Policy and rust-version
+### Политика MSRV и rust-version
 
-Minimum Supported Rust Version (MSRV) ensures your crate compiles on older
-toolchains. This matters when deploying to systems with frozen Rust versions.
+Minimum Supported Rust Version (MSRV) гарантирует, что ваш крейт компилируется на старых
+тулчейнах. Это важно при развёртывании на системах с замороженной версией Rust.
 
 ```toml
 # Cargo.toml
 [package]
 name = "diag_tool"
 version = "0.1.0"
-rust-version = "1.75"    # Minimum Rust version required
+rust-version = "1.75"    # Минимальная требуемая версия Rust
 ```
 
 ```bash
-# Verify MSRV compliance
+# Проверка соответствия MSRV
 cargo +1.75.0 check --workspace
 
-# Automated MSRV discovery
+# Автоматический поиск MSRV
 cargo install cargo-msrv
 cargo msrv find
 # Output: Minimum Supported Rust Version is 1.75.0
 
-# Verify in CI
+# Проверка в CI
 cargo msrv verify
 ```
 
-**MSRV in CI:**
+**MSRV в CI:**
 
 ```yaml
 jobs:
   msrv:
-    name: Check MSRV
+    name: Проверка MSRV
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: "1.75.0"    # Match rust-version in Cargo.toml
+          toolchain: "1.75.0"    # Совпадает с rust-version в Cargo.toml
       - run: cargo check --workspace
 ```
 
-**MSRV strategy:**
-- **Binary applications** (like a large project): Use latest stable. No MSRV needed.
-- **Library crates** (published to crates.io): Set MSRV to oldest Rust version
-  that supports all features you use. Commonly `N-2` (two versions behind current).
-- **Enterprise deployments**: Set MSRV to match the oldest Rust version installed
-  on your fleet.
+**Стратегия MSRV:**
+- **Бинарные приложения** (как большой проект): используйте последний stable. MSRV не нужен.
+- **Библиотечные крейты** (публикуемые на crates.io): задайте MSRV как самую старую версию
+  Rust, которая поддерживает все используемые фичи. Обычно это `N-2` (на две версии позади текущей).
+- **Корпоративные развёртывания**: задайте MSRV по самой старой версии Rust, установленной на вашем парке.
 
-### Application: Production Binary Profile
+### Применение: профиль продакшн-бинарника
 
-The project already has an excellent [release profile](ch07-release-profiles-and-binary-size.md):
+В проекте уже есть отличный [профиль релиза](ch07-release-profiles-and-binary-size.md):
 
 ```toml
-# Current workspace Cargo.toml
+# Текущий Cargo.toml воркспейса
 [profile.release]
-lto = true           # ✅ Full cross-crate optimization
-codegen-units = 1    # ✅ Maximum optimization
-panic = "abort"      # ✅ No unwinding overhead
-strip = true         # ✅ Remove symbols for deployment
+lto = true           # ✅ Полная оптимизация между крейтами
+codegen-units = 1    # ✅ Максимальная оптимизация
+panic = "abort"      # ✅ Нет накладных расходов на раскрутку
+strip = true         # ✅ Удаляем символы для развёртывания
 
 [profile.dev]
-opt-level = 0        # ✅ Fast compilation
-debug = true         # ✅ Full debug info
+opt-level = 0        # ✅ Быстрая компиляция
+debug = true         # ✅ Полная отладочная информация
 ```
 
-**Recommended additions:**
+**Рекомендуемые дополнения:**
 
 ```toml
-# Optimize dependencies in dev mode (faster test execution)
+# Оптимизируем зависимости в dev-режиме (быстрее выполнение тестов)
 [profile.dev.package."*"]
 opt-level = 2
 
-# Test profile: some optimization to prevent timeout in slow tests
+# Профиль тестов: немного оптимизации, чтобы медленные тесты не упирались в таймаут
 [profile.test]
 opt-level = 1
 
-# Keep overflow checks in release (safety)
+# Оставляем проверки переполнения в release (безопасность)
 [profile.release]
 lto = true
 codegen-units = 1
 panic = "abort"
 strip = true
-overflow-checks = true    # ← add this: catch integer overflows
-debug = "line-tables-only" # ← add this: backtraces without full DWARF
+overflow-checks = true    # ← добавьте: ловим переполнения целых чисел
+debug = "line-tables-only" # ← добавьте: бэктрейсы без полного DWARF
 ```
 
-**Recommended developer tooling:**
+**Рекомендуемые инструменты для разработчика:**
 
 ```toml
-# .cargo/config.toml (proposed)
+# .cargo/config.toml (предлагаемый)
 [build]
-rustc-wrapper = "sccache"  # 80%+ cache hit after first build
+rustc-wrapper = "sccache"  # 80%+ попаданий в кеш после первой сборки
 
 [target.x86_64-unknown-linux-gnu]
-rustflags = ["-C", "link-arg=-fuse-ld=mold"]  # 3-5× faster linking
+rustflags = ["-C", "link-arg=-fuse-ld=mold"]  # В 3–5× быстрее линковка
 ```
 
-**Expected impact on the project:**
+**Ожидаемый эффект на проект:**
 
-| Metric | Current | With Additions |
-|--------|---------|----------------|
-| Release binary | ~10 MB (stripped, LTO) | Same |
-| Dev build time | ~45s | ~25s (sccache + mold) |
-| Rebuild (1 file change) | ~15s | ~5s (sccache + mold) |
-| Test execution | `cargo test` | `cargo nextest` — 2× faster |
-| Dep vulnerability scanning | None | `cargo audit` in CI |
-| License compliance | Manual | `cargo deny` automated |
-| Unused dependency detection | Manual | `cargo udeps` in CI |
+| Метрика | Сейчас | С дополнениями |
+|---------|--------|----------------|
+| Release-бинарник | ~10 МБ (stripped, LTO) | То же |
+| Время dev-сборки | ~45 с | ~25 с (sccache + mold) |
+| Пересборка (изменение одного файла) | ~15 с | ~5 с (sccache + mold) |
+| Запуск тестов | `cargo test` | `cargo nextest` — в 2× быстрее |
+| Сканирование уязвимостей зависимостей | Нет | `cargo audit` в CI |
+| Соответствие лицензиям | Вручную | `cargo deny` автоматически |
+| Поиск неиспользуемых зависимостей | Вручную | `cargo udeps` в CI |
 
-### `cargo-watch` — Auto-Rebuild on File Changes
+### `cargo-watch` — автоматическая пересборка при изменении файлов
 
-[`cargo-watch`](https://github.com/watchexec/cargo-watch) re-runs a command
-every time a source file changes — essential for tight feedback loops:
+[`cargo-watch`](https://github.com/watchexec/cargo-watch) перезапускает команду при каждом
+изменении исходного файла — незаменим для быстрого цикла обратной связи:
 
 ```bash
-# Install
+# Установка
 cargo install cargo-watch
 
-# Re-check on every save (instant feedback)
+# Повторная проверка при каждом сохранении (мгновенная обратная связь)
 cargo watch -x check
 
-# Run clippy + tests on change
+# Запуск clippy и тестов при изменении
 cargo watch -x 'clippy --workspace --all-targets' -x 'test --workspace --lib'
 
-# Watch only specific crates (faster for large workspaces)
+# Следим только за конкретными крейтами (быстрее для больших воркспейсов)
 cargo watch -w accel_diag/src -x 'test -p accel_diag'
 
-# Clear screen between runs
+# Очищать экран между запусками
 cargo watch -c -x check
 ```
 
-> **Tip**: Combine with `mold` + `sccache` from above for sub-second
-> re-check times on incremental changes.
+> **Совет**: сочетайте с `mold` и `sccache` из примеров выше, чтобы инкрементальная проверка
+> занимала меньше секунды.
 
-### `cargo doc` and Workspace Documentation
+### `cargo doc` и документация воркспейса
 
-For a large workspace, generated documentation is essential for
-discoverability. `cargo doc` uses rustdoc to produce HTML docs from
-doc-comments and type signatures:
+Для большого воркспейса сгенерированная документация необходима, чтобы API было легко
+найти. `cargo doc` использует rustdoc, чтобы создать HTML-документацию из doc-комментариев
+и сигнатур типов:
 
 ```bash
-# Generate docs for all workspace crates (opens in browser)
+# Генерация документации для всех крейтов воркспейса (откроется в браузере)
 cargo doc --workspace --no-deps --open
 
-# Include private items (useful during development)
+# Включить приватные элементы (полезно при разработке)
 cargo doc --workspace --no-deps --document-private-items
 
-# Check doc-links without generating HTML (fast CI check)
+# Проверить ссылки в документации без генерации HTML (быстрая проверка в CI)
 cargo doc --workspace --no-deps 2>&1 | grep -E 'warning|error'
 ```
 
-**Intra-doc links** — link between types across crates without URLs:
+**Внутридокументные ссылки** — ссылки между типами разных крейтов без URL:
 
 ```rust
-/// Runs GPU diagnostics using [`GpuConfig`] settings.
+/// Запускает диагностику GPU с настройками из [`GpuConfig`].
 ///
-/// See [`crate::accel_diag::run_diagnostics`] for the implementation.
-/// Returns [`DiagResult`] which can be serialized to the
-/// [`DerReport`](crate::core_lib::DerReport) format.
+/// Реализацию см. в [`crate::accel_diag::run_diagnostics`].
+/// Возвращает [`DiagResult`], который можно сериализовать
+/// в формат [`DerReport`](crate::core_lib::DerReport).
 pub fn run_accel_diag(config: &GpuConfig) -> DiagResult {
     // ...
 }
 ```
 
-**Show platform-specific APIs in docs:**
+**Показываем платформенно-специфичные API в документации:**
 
 ```rust
 // Cargo.toml: [package.metadata.docs.rs]
 // all-features = true
 // rustdoc-args = ["--cfg", "docsrs"]
 
-/// Windows-only: read battery status via Win32 API.
+/// Только для Windows: читает состояние батареи через Win32 API.
 ///
-/// Only available on `cfg(windows)` builds.
+/// Доступно только в сборках `cfg(windows)`.
 #[cfg(windows)]
-#[doc(cfg(windows))]  // Shows "Available on Windows only" badge in docs
+#[doc(cfg(windows))]  // Показывает бейдж «Доступно только в Windows» в документации
 pub fn get_battery_status() -> Option<u8> {
     // ...
 }
 ```
 
-**CI documentation check:**
+**Проверка документации в CI:**
 
 ```yaml
-# Add to CI workflow
-- name: Check documentation
+# Добавьте в workflow CI
+- name: Проверка документации
   run: RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps
-  # Treats broken intra-doc links as errors
+  # Считает битые внутридокументные ссылки ошибками
 ```
 
-> **For the project**: With many crates, `cargo doc --workspace` is the best
-> way for new team members to discover the API surface. Add
-> `RUSTDOCFLAGS="-D warnings"` to CI to catch broken doc-links before merge.
+> **Для проекта**: при большом количестве крейтов `cargo doc --workspace` — лучший способ
+> для новых участников команды увидеть поверхность API. Добавьте `RUSTDOCFLAGS="-D warnings"`
+> в CI, чтобы ловить битые ссылки до слияния.
 
-### Compile-Time Decision Tree
+### Дерево решений по времени компиляции
 
 ```mermaid
 flowchart TD
-    START["Compile too slow?"] --> WHERE{"Where's the time?"}
+    START["Компиляция слишком медленная?"] --> WHERE{"Где тратится время?"}
 
-    WHERE -->|"Recompiling<br/>unchanged crates"| SCCACHE["sccache<br/>Shared compilation cache"]
-    WHERE -->|"Linking phase"| MOLD["mold linker<br/>3-10× faster linking"]
-    WHERE -->|"Running tests"| NEXTEST["cargo-nextest<br/>Parallel test runner"]
-    WHERE -->|"Everything"| COMBO["All of the above +<br/>cargo-udeps to trim deps"]
+    WHERE -->|"Перекомпиляция<br/>неизменённых крейтов"| SCCACHE["sccache<br/>Общий кеш компиляции"]
+    WHERE -->|"Фаза линковки"| MOLD["Линкер mold<br/>линковка в 3–10× быстрее"]
+    WHERE -->|"Запуск тестов"| NEXTEST["cargo-nextest<br/>Параллельный запускатель тестов"]
+    WHERE -->|"Всё сразу"| COMBO["Всё перечисленное +<br/>cargo-udeps для сокращения зависимостей"]
 
-    SCCACHE --> CI_CACHE{"CI or local?"}
-    CI_CACHE -->|"CI"| S3["S3/GCS shared cache"]
-    CI_CACHE -->|"Local"| LOCAL["Local disk cache<br/>auto-configured"]
+    SCCACHE --> CI_CACHE{"CI или локально?"}
+    CI_CACHE -->|"CI"| S3["Общий кеш S3/GCS"]
+    CI_CACHE -->|"Локально"| LOCAL["Локальный дисковый кеш<br/>настраивается автоматически"]
 
     style SCCACHE fill:#91e5a3,color:#000
     style MOLD fill:#e3f2fd,color:#000
@@ -433,21 +430,22 @@ flowchart TD
     style COMBO fill:#b39ddb,color:#000
 ```
 
-### 🏋️ Exercises
+### 🏋️ Упражнения
 
-#### 🟢 Exercise 1: Set Up sccache + mold
+#### 🟢 Упражнение 1: настройте sccache и mold
 
-Install `sccache` and `mold`, configure them in `.cargo/config.toml`, then measure the compile time improvement on a clean rebuild.
+Установите `sccache` и `mold`, настройте их в `.cargo/config.toml`, затем измерьте выигрыш
+по времени компиляции при чистой пересборке.
 
 <details>
-<summary>Solution</summary>
+<summary>Решение</summary>
 
 ```bash
-# Install
+# Установка
 cargo install sccache
 sudo apt install mold  # Ubuntu 22.04+
 
-# Configure .cargo/config.toml:
+# Настраиваем .cargo/config.toml:
 cat > .cargo/config.toml << 'EOF'
 [build]
 rustc-wrapper = "sccache"
@@ -457,49 +455,50 @@ linker = "clang"
 rustflags = ["-C", "link-arg=-fuse-ld=mold"]
 EOF
 
-# First build (populates cache)
-time cargo build --release  # e.g., 180s
+# Первая сборка (заполняет кеш)
+time cargo build --release  # например, 180 с
 
-# Clean + rebuild (cache hits)
+# Очистка и пересборка (попадания в кеш)
 cargo clean
-time cargo build --release  # e.g., 45s
+time cargo build --release  # например, 45 с
 
 sccache --show-stats
-# Cache hits should be 60-80%+
+# Попаданий в кеш должно быть 60–80%+
 ```
 </details>
 
-#### 🟡 Exercise 2: Switch to cargo-nextest
+#### 🟡 Упражнение 2: переходим на cargo-nextest
 
-Install `cargo-nextest` and run your test suite. Compare wall-clock time with `cargo test`. What's the speedup?
+Установите `cargo-nextest` и запустите набор тестов. Сравните реальное время с `cargo test`.
+Каков прирост скорости?
 
 <details>
-<summary>Solution</summary>
+<summary>Решение</summary>
 
 ```bash
 cargo install cargo-nextest
 
-# Standard test runner
+# Стандартный запускатель тестов
 time cargo test --workspace 2>&1 | tail -5
 
-# nextest (parallel per-test-binary execution)
+# nextest (параллельное выполнение по тестовым бинарникам)
 time cargo nextest run --workspace 2>&1 | tail -5
 
-# Typical speedup: 2-5× for large workspaces
-# nextest also provides:
-# - Per-test timing
-# - Retries for flaky tests
-# - JUnit XML output for CI
+# Типичный прирост: в 2–5× для больших воркспейсов
+# nextest также предоставляет:
+# - время выполнения каждого теста
+# - повторы для нестабильных тестов
+# - вывод JUnit XML для CI
 cargo nextest run --workspace --retries 2
 ```
 </details>
 
-### Key Takeaways
+### Ключевые выводы
 
-- `sccache` with S3/GCS backend shares compilation cache across team and CI
-- `mold` is the fastest ELF linker — link times drop from seconds to milliseconds
-- `cargo-nextest` runs tests in parallel per-binary with better output and retry support
-- `cargo-geiger` counts `unsafe` usage — run it before accepting new dependencies
-- `[workspace.lints]` centralizes Clippy and rustc lint configuration across a multi-crate workspace
+- `sccache` с бэкендом S3/GCS разделяет кеш компиляции между командой и CI
+- `mold` — самый быстрый линкер для ELF: время линковки падает с секунд до миллисекунд
+- `cargo-nextest` запускает тесты параллельно по бинарникам, с лучшим выводом и поддержкой повторов
+- `cargo-geiger` считает использование `unsafe` — запускайте его перед тем, как принимать новые зависимости
+- `[workspace.lints]` централизует настройку линтов Clippy и rustc во всём многокрейтовом воркспейсе
 
 ---

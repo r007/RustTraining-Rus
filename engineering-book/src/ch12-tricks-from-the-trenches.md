@@ -1,32 +1,31 @@
-# Tricks from the Trenches 🟡
+# Проверенные на практике приёмы 🟡
 
-> **What you'll learn:**
-> - Battle-tested patterns that don't fit neatly into one chapter
-> - Common pitfalls and their fixes — from CI flake to binary bloat
-> - Quick-win techniques you can apply to any Rust project today
+> **Чему вы научитесь:**
+> - Проверенные в бою паттерны, которые не умещаются в одну главу
+> - Типичные ловушки и способы их обойти — от нестабильного CI до раздувания бинарника
+> - Быстрые приёмы, которые можно применить к любому проекту на Rust уже сегодня
 >
-> **Cross-references:** Every chapter in this book — these tricks cut across all topics
+> **Перекрёстные ссылки:** каждая глава этой книги — приёмы затрагивают все темы
 
-This chapter collects engineering patterns that come up repeatedly in
-production Rust codebases. Each trick is self-contained — read them in
-any order.
+Эта глава собирает инженерные паттерны, которые регулярно встречаются в продакшн-кодовых базах
+на Rust. Каждый приём самостоятельный — читайте их в любом порядке.
 
 ---
 
-### 1. The `deny(warnings)` Trap
+### 1. Ловушка `deny(warnings)`
 
-**Problem**: `#![deny(warnings)]` in source code breaks builds when Clippy
-adds new lints — your code that compiled yesterday fails today.
+**Проблема**: `#![deny(warnings)]` в исходном коде ломает сборку, когда Clippy добавляет новые
+линты: код, который компилировался вчера, сегодня не собирается.
 
-**Fix**: Use `CARGO_ENCODED_RUSTFLAGS` in CI instead of a source-level attribute:
+**Решение**: используйте `CARGO_ENCODED_RUSTFLAGS` в CI вместо атрибута на уровне исходного кода:
 
 ```yaml
-# CI: treat warnings as errors without touching source
+# CI: считаем предупреждения ошибками, не трогая исходный код
 env:
   CARGO_ENCODED_RUSTFLAGS: "-Dwarnings"
 ```
 
-Or use `[workspace.lints]` for finer control:
+Или используйте `[workspace.lints]` для более точной настройки:
 
 ```toml
 # Cargo.toml
@@ -38,93 +37,93 @@ all = { level = "deny", priority = -1 }
 pedantic = { level = "warn", priority = -1 }
 ```
 
-> See [Compile-Time Tools, Workspace Lints](ch08-compile-time-and-developer-tools.md) for the full pattern.
+> См. [Инструменты времени компиляции, линты воркспейса](ch08-compile-time-and-developer-tools.md) для полного паттерна.
 
 ---
 
-### 2. Compile Once, Test Everywhere
+### 2. Компилируем один раз, тестируем везде
 
-**Problem**: `cargo test` recompiles when switching between `--lib`, `--doc`,
-and `--test` because they use different profiles.
+**Проблема**: `cargo test` пересобирает код при переключении между `--lib`, `--doc` и `--test`,
+потому что они используют разные профили.
 
-**Fix**: Use `cargo nextest` for unit/integration tests and run doc-tests
-separately:
+**Решение**: используйте `cargo nextest` для модульных и интеграционных тестов, а doc-тесты
+запускайте отдельно:
 
 ```bash
-cargo nextest run --workspace        # Fast: parallel, cached
-cargo test --workspace --doc         # Doc-tests (nextest can't run these)
+cargo nextest run --workspace        # Быстро: параллельно, с кешем
+cargo test --workspace --doc         # Doc-тесты (nextest их запустить не может)
 ```
 
-> See [Compile-Time Tools](ch08-compile-time-and-developer-tools.md) for `cargo-nextest` setup.
+> См. [Инструменты времени компиляции](ch08-compile-time-and-developer-tools.md) для настройки `cargo-nextest`.
 
 ---
 
-### 3. Feature Flag Hygiene
+### 3. Гигиена фич
 
-**Problem**: A library crate has `default = ["std"]` but nobody tests
-`--no-default-features`. One day an embedded user reports it doesn't compile.
+**Проблема**: у библиотечного крейта `default = ["std"]`, но никто не тестирует
+`--no-default-features`. Однажды пользователь для встраиваемых систем сообщает, что крейт
+не компилируется.
 
-**Fix**: Add `cargo-hack` to CI:
+**Решение**: добавьте `cargo-hack` в CI:
 
 ```yaml
-- name: Feature matrix
+- name: Матрица фич
   run: |
     cargo hack check --each-feature --no-dev-deps
     cargo check --no-default-features
     cargo check --all-features
 ```
 
-> See [`no_std` and Feature Verification](ch09-no-std-and-feature-verification.md) for the full pattern.
+> См. [`no_std` и проверка фич](ch09-no-std-and-feature-verification.md) для полного паттерна.
 
 ---
 
-### 4. The Lock File Debate — Commit or Ignore?
+### 4. Дебаты о lock-файле — коммитить или игнорировать?
 
-**Rule of thumb:**
+**Простое правило:**
 
-| Crate Type | Commit `Cargo.lock`? | Why |
-|------------|---------------------|-----|
-| Binary / application | **Yes** | Reproducible builds |
-| Library | **No** (`.gitignore`) | Let downstream choose versions |
-| Workspace with both | **Yes** | Binary wins |
+| Тип крейта | Коммитить `Cargo.lock`? | Почему |
+|------------|-------------------------|--------|
+| Бинарник / приложение | **Да** | Воспроизводимые сборки |
+| Библиотека | **Нет** (`.gitignore`) | Пусть потребители выбирают версии |
+| Воркспейс, содержащий оба типа | **Да** | Побеждает бинарник |
 
-Add a CI check to ensure the lock file stays up-to-date:
+Добавьте проверку в CI, чтобы lock-файл оставался актуальным:
 
 ```yaml
-- name: Check lock file
-  run: cargo update --locked  # Fails if Cargo.lock is stale
+- name: Проверка lock-файла
+  run: cargo update --locked  # Падает, если Cargo.lock устарел
 ```
 
 ---
 
-### 5. Debug Builds with Optimized Dependencies
+### 5. Отладочные сборки с оптимизированными зависимостями
 
-**Problem**: Debug builds are painfully slow because dependencies (especially
-`serde`, `regex`) aren't optimized.
+**Проблема**: отладочные сборки мучительно медленные, потому что зависимости (особенно `serde`,
+`regex`) не оптимизированы.
 
-**Fix**: Optimize deps in dev profile while keeping your code unoptimized
-for fast recompilation:
+**Решение**: оптимизируйте зависимости в dev-профиле, оставив свой код неоптимизированным для
+быстрой пересборки:
 
 ```toml
 # Cargo.toml
 [profile.dev.package."*"]
-opt-level = 2  # Optimize all dependencies in dev mode
+opt-level = 2  # Оптимизировать все зависимости в dev-режиме
 ```
 
-This slows the first build slightly but makes runtime dramatically faster
-during development. Particularly impactful for database-backed services and
-parsers.
+Это немного замедляет первую сборку, зато заметно ускоряет выполнение во время разработки.
+Особенно полезно для сервисов с базами данных и парсеров.
 
-> See [Release Profiles](ch07-release-profiles-and-binary-size.md) for per-crate profile overrides.
+> См. [Профили релиза](ch07-release-profiles-and-binary-size.md) для переопределений профиля по отдельным крейтам.
 
 ---
 
-### 6. CI Cache Thrashing
+### 6. Постоянная перезапись кеша CI
 
-**Problem**: `Swatinem/rust-cache@v2` saves a new cache on every PR, bloating
-storage and slowing restore times.
+**Проблема**: `Swatinem/rust-cache@v2` сохраняет новый кеш при каждом PR, раздувая хранилище
+и замедляя восстановление.
 
-**Fix**: Only save cache from `main`, restore from anywhere:
+**Решение**: сохраняйте кеш только из `main`, а восстанавливать его можно откуда угодно:
 
 ```yaml
 - uses: Swatinem/rust-cache@v2
@@ -132,7 +131,7 @@ storage and slowing restore times.
     save-if: ${{ github.ref == 'refs/heads/main' }}
 ```
 
-For workspaces with multiple binaries, add a `shared-key`:
+Для воркспейсов с несколькими бинарниками добавьте `shared-key`:
 
 ```yaml
 - uses: Swatinem/rust-cache@v2
@@ -141,39 +140,37 @@ For workspaces with multiple binaries, add a `shared-key`:
     save-if: ${{ github.ref == 'refs/heads/main' }}
 ```
 
-> See [CI/CD Pipeline](ch11-putting-it-all-together-a-production-cic.md) for the full workflow.
+> См. [Собираем всё вместе](ch11-putting-it-all-together-a-production-cic.md) для полного workflow.
 
 ---
 
-### 7. `RUSTFLAGS` vs `CARGO_ENCODED_RUSTFLAGS`
+### 7. `RUSTFLAGS` против `CARGO_ENCODED_RUSTFLAGS`
 
-**Problem**: `RUSTFLAGS="-Dwarnings"` applies to *everything* — including
-build scripts and proc-macros. A warning in `serde_derive`'s build.rs
-fails your CI.
+**Проблема**: `RUSTFLAGS="-Dwarnings"` применяется ко *всему* — включая build-скрипты и
+процедурные макросы. Предупреждение в build.rs крейта `serde_derive` роняет ваш CI.
 
-**Fix**: Use `CARGO_ENCODED_RUSTFLAGS` which only applies to the top-level
-crate:
+**Решение**: используйте `CARGO_ENCODED_RUSTFLAGS`, который действует только на верхнеуровневый крейт:
 
 ```bash
-# BAD — breaks on third-party build script warnings
+# ПЛОХО — ломается из-за предупреждений build-скриптов сторонних крейтов
 RUSTFLAGS="-Dwarnings" cargo build
 
-# GOOD — only affects your crate
+# ХОРОШО — затрагивает только ваш крейт
 CARGO_ENCODED_RUSTFLAGS="-Dwarnings" cargo build
 
-# ALSO GOOD — workspace lints (Cargo.toml)
+# ТОЖЕ ХОРОШО — линты воркспейса (Cargo.toml)
 [workspace.lints.rust]
 warnings = "deny"
 ```
 
 ---
 
-### 8. Reproducible Builds with `SOURCE_DATE_EPOCH`
+### 8. Воспроизводимые сборки с `SOURCE_DATE_EPOCH`
 
-**Problem**: Embedding `chrono::Utc::now()` in `build.rs` makes builds
-non-reproducible — every build produces a different binary hash.
+**Проблема**: встраивание `chrono::Utc::now()` в `build.rs` делает сборки невоспроизводимыми:
+каждая сборка даёт другой хеш бинарника.
 
-**Fix**: Honor `SOURCE_DATE_EPOCH`:
+**Решение**: учитывайте `SOURCE_DATE_EPOCH`:
 
 ```rust
 // build.rs
@@ -184,49 +181,50 @@ let timestamp = std::env::var("SOURCE_DATE_EPOCH")
 println!("cargo:rustc-env=BUILD_TIMESTAMP={timestamp}");
 ```
 
-> See [Build Scripts](ch01-build-scripts-buildrs-in-depth.md) for the full build.rs patterns.
+> См. [Build-скрипты](ch01-build-scripts-buildrs-in-depth.md) для полных паттернов build.rs.
 
 ---
 
-### 9. The `cargo tree` Deduplication Workflow
+### 9. Workflow дедупликации `cargo tree`
 
-**Problem**: `cargo tree --duplicates` shows 5 versions of `syn` and 3 of
-`tokio-util`. Compile time is painful.
+**Проблема**: `cargo tree --duplicates` показывает 5 версий `syn` и 3 версии `tokio-util`.
+Время компиляции мучительно большое.
 
-**Fix**: Systematic deduplication:
+**Решение**: систематическая дедупликация:
 
 ```bash
-# Step 1: Find duplicates
+# Шаг 1: находим дубликаты
 cargo tree --duplicates
 
-# Step 2: Find who pulls the old version
+# Шаг 2: находим, кто тянет старую версию
 cargo tree --invert --package syn@1.0.109
 
-# Step 3: Update the culprit
-cargo update -p serde_derive  # Might pull in syn 2.x
+# Шаг 3: обновляем виновника
+cargo update -p serde_derive  # Может подтянуть syn 2.x
 
-# Step 4: If no update available, pin in [patch]
+# Шаг 4: если обновления нет, фиксируем через [patch]
 # [patch.crates-io]
 # old-crate = { git = "...", branch = "syn2-migration" }
 
-# Step 5: Verify
-cargo tree --duplicates  # Should be shorter
+# Шаг 5: проверяем
+cargo tree --duplicates  # Должно стать короче
 ```
 
-> See [Dependency Management](ch06-dependency-management-and-supply-chain-s.md) for `cargo-deny` and supply chain security.
+> См. [Управление зависимостями](ch06-dependency-management-and-supply-chain-s.md) для `cargo-deny`
+> и безопасности цепочки поставок.
 
 ---
 
-### 10. Pre-Push Smoke Test
+### 10. Дымовой тест перед push
 
-**Problem**: You push, CI takes 10 minutes, fails on a formatting issue.
+**Проблема**: вы делаете push, CI работает 10 минут и падает из-за проблемы с форматированием.
 
-**Fix**: Run the fast checks locally before push:
+**Решение**: запускайте быстрые проверки локально перед push:
 
 ```toml
 # Makefile.toml (cargo-make)
 [tasks.pre-push]
-description = "Local smoke test before pushing"
+description = "Локальный дымовой тест перед push"
 script = '''
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
@@ -235,11 +233,11 @@ cargo test --workspace --lib
 ```
 
 ```bash
-cargo make pre-push  # < 30 seconds
+cargo make pre-push  # < 30 секунд
 git push
 ```
 
-Or use a git pre-push hook:
+Или используйте git-хук pre-push:
 
 ```bash
 #!/bin/sh
@@ -247,73 +245,77 @@ Or use a git pre-push hook:
 cargo fmt --all -- --check && cargo clippy --workspace -- -D warnings
 ```
 
-> See [CI/CD Pipeline](ch11-putting-it-all-together-a-production-cic.md) for `Makefile.toml` patterns.
+> См. [Собираем всё вместе](ch11-putting-it-all-together-a-production-cic.md) для паттернов `Makefile.toml`.
 
 ---
 
-### 🏋️ Exercises
+### 🏋️ Упражнения
 
-#### 🟢 Exercise 1: Apply Three Tricks
+#### 🟢 Упражнение 1: примените три приёма
 
-Pick three tricks from this chapter and apply them to an existing Rust project. Which had the biggest impact?
+Выберите три приёма из этой главы и примените их к существующему проекту на Rust. Какой
+оказал наибольший эффект?
 
 <details>
-<summary>Solution</summary>
+<summary>Решение</summary>
 
-Typical high-impact combination:
+Типичная комбинация с наибольшим эффектом:
 
-1. **`[profile.dev.package."*"] opt-level = 2`** — Immediate improvement in dev-mode runtime (2-10× faster for parsing-heavy code)
+1. **`[profile.dev.package."*"] opt-level = 2`** — немедленное улучшение скорости выполнения
+   в dev-режиме (в 2–10× быстрее для кода, который много парсит)
 
-2. **`CARGO_ENCODED_RUSTFLAGS`** — Eliminates false CI failures from third-party warnings
+2. **`CARGO_ENCODED_RUSTFLAGS`** — устраняет ложные падения CI из-за предупреждений сторонних крейтов
 
-3. **`cargo-hack --each-feature`** — Usually finds at least one broken feature combination in any project with 3+ features
+3. **`cargo-hack --each-feature`** — обычно находит хотя бы одну нерабочую комбинацию фич
+   в любом проекте с 3+ фичами
 
 ```bash
-# Apply trick 5:
+# Применяем приём 5:
 echo '[profile.dev.package."*"]' >> Cargo.toml
 echo 'opt-level = 2' >> Cargo.toml
 
-# Apply trick 7 in CI:
-# Replace RUSTFLAGS with CARGO_ENCODED_RUSTFLAGS
+# Применяем приём 7 в CI:
+# Заменяем RUSTFLAGS на CARGO_ENCODED_RUSTFLAGS
 
-# Apply trick 3:
+# Применяем приём 3:
 cargo install cargo-hack
 cargo hack check --each-feature --no-dev-deps
 ```
 </details>
 
-#### 🟡 Exercise 2: Deduplicate Your Dependency Tree
+#### 🟡 Упражнение 2: устраните дубликаты в дереве зависимостей
 
-Run `cargo tree --duplicates` on a real project. Eliminate at least one duplicate. Measure compile-time before and after.
+Запустите `cargo tree --duplicates` на реальном проекте. Устраните хотя бы один дубликат.
+Замерьте время компиляции до и после.
 
 <details>
-<summary>Solution</summary>
+<summary>Решение</summary>
 
 ```bash
-# Before
+# До
 time cargo build --release 2>&1 | tail -1
-cargo tree --duplicates | wc -l  # Count duplicate lines
+cargo tree --duplicates | wc -l  # Считаем строки с дубликатами
 
-# Find and fix one duplicate
+# Находим и исправляем один дубликат
 cargo tree --duplicates
 cargo tree --invert --package <duplicate-crate>@<old-version>
 cargo update -p <parent-crate>
 
-# After
+# После
 time cargo build --release 2>&1 | tail -1
-cargo tree --duplicates | wc -l  # Should be fewer
+cargo tree --duplicates | wc -l  # Должно стать меньше
 
-# Typical result: 5-15% compile time reduction per eliminated
-# duplicate (especially for heavy crates like syn, tokio)
+# Типичный результат: снижение времени компиляции на 5–15% за каждый устранённый
+# дубликат (особенно для тяжёлых крейтов вроде syn, tokio)
 ```
 </details>
 
-### Key Takeaways
+### Ключевые выводы
 
-- Use `CARGO_ENCODED_RUSTFLAGS` instead of `RUSTFLAGS` to avoid breaking third-party build scripts
-- `[profile.dev.package."*"] opt-level = 2` is the single highest-impact dev experience trick
-- Cache tuning (`save-if` on main only) prevents CI cache bloat on active repositories
-- `cargo tree --duplicates` + `cargo update` is a free compile-time win — do it monthly
-- Run fast checks locally with `cargo make pre-push` to avoid CI round-trip waste
+- Используйте `CARGO_ENCODED_RUSTFLAGS` вместо `RUSTFLAGS`, чтобы не ломать build-скрипты сторонних крейтов
+- `[profile.dev.package."*"] opt-level = 2` — самый эффективный приём для улучшения опыта разработки
+- Настройка кеша (`save-if` только для main) предотвращает раздувание кеша CI в активных репозиториях
+- `cargo tree --duplicates` + `cargo update` — бесплатный выигрыш во времени компиляции: делайте это раз в месяц
+- Запускайте быстрые проверки локально через `cargo make pre-push`, чтобы не тратить время на круги через CI
 
 ---

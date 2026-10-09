@@ -1,21 +1,20 @@
-# Windows and Conditional Compilation 🟡
+# Windows и условная компиляция 🟡
 
-> **What you'll learn:**
-> - Windows support patterns: `windows-sys`/`windows` crates, `cargo-xwin`
-> - Conditional compilation with `#[cfg]` — checked by the compiler, not the preprocessor
-> - Platform abstraction architecture: when `#[cfg]` blocks suffice vs when to use traits
-> - Cross-compiling for Windows from Linux
+> **Чему вы научитесь:**
+> - Паттерны поддержки Windows: крейты `windows-sys`/`windows`, `cargo-xwin`
+> - Условная компиляция через `#[cfg]` — её проверяет компилятор, а не препроцессор
+> - Архитектура платформенных абстракций: когда хватает блоков `#[cfg]`, а когда нужны трейты
+> - Кросс-компиляция под Windows из Linux
 >
-> **Cross-references:** [`no_std` & Features](ch09-no-std-and-feature-verification.md) — `cargo-hack` and feature verification · [Cross-Compilation](ch02-cross-compilation-one-source-many-target.md) — general cross-build setup · [Build Scripts](ch01-build-scripts-buildrs-in-depth.md) — `cfg` flags emitted by `build.rs`
+> **Перекрёстные ссылки:** [`no_std` и фичи](ch09-no-std-and-feature-verification.md) — `cargo-hack` и проверка фич · [Кросс-компиляция](ch02-cross-compilation-one-source-many-target.md) — общая настройка кросс-сборки · [Build-скрипты](ch01-build-scripts-buildrs-in-depth.md) — `cfg`-флаги, которые выводит `build.rs`
 
-### Windows Support — Platform Abstractions
+### Поддержка Windows — платформенные абстракции
 
-Rust's `#[cfg()]` attributes and Cargo features allow a single codebase to
-target both Linux and Windows cleanly. The project already
-demonstrates this pattern in `platform::run_command`:
+Атрибуты `#[cfg()]` в Rust и фичи Cargo позволяют одной кодовой базе аккуратно работать
+и на Linux, и на Windows. В проекте этот паттерн уже есть в `platform::run_command`:
 
 ```rust
-// Real pattern from the project — platform-specific shell invocation
+// Реальный паттерн из проекта — запуск оболочки в зависимости от платформы
 pub fn exec_cmd(cmd: &str, timeout_secs: Option<u64>) -> Result<CommandResult, CommandError> {
     #[cfg(windows)]
     let mut child = Command::new("cmd")
@@ -31,50 +30,50 @@ pub fn exec_cmd(cmd: &str, timeout_secs: Option<u64>) -> Result<CommandResult, C
         .stderr(Stdio::piped())
         .spawn()?;
 
-    // ... rest is platform-independent ...
+    // ... остальной код не зависит от платформы ...
 }
 ```
 
-**Available `cfg` predicates:**
+**Доступные предикаты `cfg`:**
 
 ```rust
-// Operating system
-#[cfg(target_os = "linux")]         // Linux specifically
+// Операционная система
+#[cfg(target_os = "linux")]         // Именно Linux
 #[cfg(target_os = "windows")]       // Windows
 #[cfg(target_os = "macos")]         // macOS
-#[cfg(unix)]                        // Linux, macOS, BSDs, etc.
-#[cfg(windows)]                     // Windows (shorthand)
+#[cfg(unix)]                        // Linux, macOS, BSD и т. д.
+#[cfg(windows)]                     // Windows (сокращённая запись)
 
-// Architecture
-#[cfg(target_arch = "x86_64")]      // x86 64-bit
-#[cfg(target_arch = "aarch64")]     // ARM 64-bit
-#[cfg(target_arch = "x86")]         // x86 32-bit
+// Архитектура
+#[cfg(target_arch = "x86_64")]      // x86 64-бит
+#[cfg(target_arch = "aarch64")]     // ARM 64-бит
+#[cfg(target_arch = "x86")]         // x86 32-бит
 
-// Pointer width (portable alternative to arch)
-#[cfg(target_pointer_width = "64")] // Any 64-bit platform
-#[cfg(target_pointer_width = "32")] // Any 32-bit platform
+// Ширина указателя (переносимая альтернатива архитектуре)
+#[cfg(target_pointer_width = "64")] // Любая 64-битная платформа
+#[cfg(target_pointer_width = "32")] // Любая 32-битная платформа
 
-// Environment / C library
+// Окружение / C-библиотека
 #[cfg(target_env = "gnu")]          // glibc
 #[cfg(target_env = "musl")]         // musl libc
-#[cfg(target_env = "msvc")]         // MSVC on Windows
+#[cfg(target_env = "msvc")]         // MSVC в Windows
 
-// Endianness
+// Порядок байтов
 #[cfg(target_endian = "little")]
 #[cfg(target_endian = "big")]
 
-// Combinations with any(), all(), not()
+// Комбинации через any(), all(), not()
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 #[cfg(not(windows))]
 ```
 
-### The `windows-sys` and `windows` Crates
+### Крейты `windows-sys` и `windows`
 
-For calling Windows APIs directly:
+Для прямых вызовов API Windows:
 
 ```toml
-# Cargo.toml — use windows-sys for raw FFI (lighter, no abstraction)
+# Cargo.toml — windows-sys для сырого FFI (легче, без абстракций)
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.59", features = [
     "Win32_Foundation",
@@ -82,12 +81,11 @@ windows-sys = { version = "0.59", features = [
     "Win32_System_Registry",
     "Win32_System_Power",
 ] }
-# NOTE: windows-sys uses semver-incompatible releases (0.48 → 0.52 → 0.59).
-# Pin to a single minor version — each release may remove or rename API bindings.
-# Check https://github.com/microsoft/windows-rs for the latest version
-# before starting a new project.
+# ПРИМЕЧАНИЕ: windows-sys выпускает несовместимые по semver релизы (0.48 → 0.52 → 0.59).
+# Зафиксируйте одну минорную версию — в каждом релизе могут удаляться или переименовываться привязки API.
+# Перед началом нового проекта проверьте актуальную версию на https://github.com/microsoft/windows-rs
 
-# Or use the windows crate for safe wrappers (heavier, more ergonomic)
+# Или используйте крейт windows для безопасных обёрток (тяжелее, зато удобнее)
 # windows = { version = "0.59", features = [...] }
 ```
 
@@ -101,8 +99,8 @@ mod win {
 
     pub fn get_battery_status() -> Option<u8> {
         let mut status = SYSTEM_POWER_STATUS::default();
-        // SAFETY: GetSystemPowerStatus writes to the provided buffer.
-        // The buffer is correctly sized and aligned.
+        // SAFETY: GetSystemPowerStatus записывает в переданный буфер.
+        // Буфер корректного размера и выравнивания.
         let ok = unsafe { GetSystemPowerStatus(&mut status) };
         if ok != 0 {
             Some(status.BatteryLifePercent)
@@ -113,53 +111,53 @@ mod win {
 }
 ```
 
-**`windows-sys` vs `windows` crate:**
+**`windows-sys` и крейт `windows`:**
 
-| Aspect | `windows-sys` | `windows` |
-|--------|---------------|----------|
-| API style | Raw FFI (`unsafe` calls) | Safe Rust wrappers |
-| Binary size | Minimal (just extern declarations) | Larger (wrapper code) |
-| Compile time | Fast | Slower |
-| Ergonomics | C-style, manual safety | Rust-idiomatic |
-| Error handling | Raw `BOOL` / `HRESULT` | `Result<T, windows::core::Error>` |
-| Use when | Performance-critical, thin wrapper | Application code, ease of use |
+| Аспект | `windows-sys` | `windows` |
+|--------|---------------|-----------|
+| Стиль API | Сырой FFI (вызовы через `unsafe`) | Безопасные обёртки на Rust |
+| Размер бинарника | Минимальный (только объявления extern) | Больше (код обёрток) |
+| Время компиляции | Быстрое | Медленнее |
+| Эргономика | В стиле C, безопасность вручную | Идиоматично для Rust |
+| Обработка ошибок | Сырые `BOOL` / `HRESULT` | `Result<T, windows::core::Error>` |
+| Когда использовать | Критичная к производительности тонкая обёртка | Прикладной код, удобство |
 
-### Cross-Compiling for Windows from Linux
+### Кросс-компиляция под Windows из Linux
 
 ```bash
-# Option 1: MinGW (GNU ABI)
+# Вариант 1: MinGW (GNU ABI)
 rustup target add x86_64-pc-windows-gnu
 sudo apt install gcc-mingw-w64-x86-64
 cargo build --target x86_64-pc-windows-gnu
-# Produces a .exe — runs on Windows, links against msvcrt
+# Получаем .exe — запускается на Windows, линкуется с msvcrt
 
-# Option 2: MSVC ABI via xwin (for full MSVC compatibility)
+# Вариант 2: ABI MSVC через xwin (для полной совместимости с MSVC)
 cargo install cargo-xwin
 cargo xwin build --target x86_64-pc-windows-msvc
-# Uses Microsoft's CRT and SDK headers downloaded automatically
+# Использует CRT и заголовки SDK от Microsoft, которые скачиваются автоматически
 
-# Option 3: Zig-based cross-compilation
+# Вариант 3: кросс-компиляция на основе Zig
 cargo zigbuild --target x86_64-pc-windows-gnu
 ```
 
-**GNU vs MSVC ABI on Windows:**
+**GNU и MSVC ABI в Windows:**
 
-| Aspect | `x86_64-pc-windows-gnu` | `x86_64-pc-windows-msvc` |
-|--------|-------------------------|---------------------------|
-| Linker | MinGW `ld` | MSVC `link.exe` or `lld-link` |
-| C runtime | `msvcrt.dll` (universal) | `ucrtbase.dll` (modern) |
-| C++ interop | GCC ABI | MSVC ABI |
-| Cross-compile from Linux | Easy (MinGW) | Possible (`cargo-xwin`) |
-| Windows API support | Full | Full |
-| Debug info format | DWARF | PDB |
-| Recommended for | Simple tools, CI builds | Full Windows integration |
+| Аспект | `x86_64-pc-windows-gnu` | `x86_64-pc-windows-msvc` |
+|--------|-------------------------|--------------------------|
+| Линкер | MinGW `ld` | MSVC `link.exe` или `lld-link` |
+| C-рантайм | `msvcrt.dll` (универсальный) | `ucrtbase.dll` (современный) |
+| Совместимость с C++ | ABI GCC | ABI MSVC |
+| Кросс-компиляция из Linux | Просто (MinGW) | Возможна (`cargo-xwin`) |
+| Поддержка Windows API | Полная | Полная |
+| Формат отладочной информации | DWARF | PDB |
+| Рекомендуется для | Простых инструментов, сборок CI | Полной интеграции с Windows |
 
-### Conditional Compilation Patterns
+### Паттерны условной компиляции
 
-**Pattern 1: Platform module selection**
+**Паттерн 1: выбор платформенного модуля**
 
 ```rust
-// src/platform/mod.rs — compile different modules per OS
+// src/platform/mod.rs — компилируем разные модули для разных ОС
 #[cfg(target_os = "linux")]
 mod linux;
 #[cfg(target_os = "linux")]
@@ -170,34 +168,34 @@ mod windows;
 #[cfg(target_os = "windows")]
 pub use windows::*;
 
-// Both modules implement the same public API:
+// Оба модуля реализуют один и тот же публичный API:
 // pub fn get_cpu_temperature() -> Result<f64, PlatformError>
 // pub fn list_pci_devices() -> Result<Vec<PciDevice>, PlatformError>
 ```
 
-**Pattern 2: Feature-gated platform support**
+**Паттерн 2: платформенная поддержка за фичами**
 
 ```toml
 # Cargo.toml
 [features]
 default = ["linux"]
-linux = []              # Linux-specific hardware access
-windows = ["dep:windows-sys"]  # Windows-specific APIs
+linux = []              # Доступ к железу, специфичный для Linux
+windows = ["dep:windows-sys"]  # API, специфичные для Windows
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.59", features = [...], optional = true }
 ```
 
 ```rust
-// Compile error if someone tries to build for Windows without the feature:
+// Ошибка компиляции, если кто-то пытается собрать под Windows без фичи:
 #[cfg(all(target_os = "windows", not(feature = "windows")))]
-compile_error!("Enable the 'windows' feature to build for Windows");
+compile_error!("Включите фичу 'windows', чтобы собрать проект для Windows");
 ```
 
-**Pattern 3: Trait-based platform abstraction**
+**Паттерн 3: платформенная абстракция на трейтах**
 
 ```rust
-/// Platform-independent interface for hardware access.
+/// Не зависящий от платформы интерфейс доступа к железу.
 pub trait HardwareAccess {
     type Error: std::error::Error;
 
@@ -215,7 +213,7 @@ impl HardwareAccess for LinuxHardware {
     type Error = LinuxHwError;
 
     fn read_cpu_temperature(&self) -> Result<f64, Self::Error> {
-        // Read from /sys/class/thermal/thermal_zone0/temp
+        // Читаем из /sys/class/thermal/thermal_zone0/temp
         let raw = std::fs::read_to_string("/sys/class/thermal/thermal_zone0/temp")?;
         Ok(raw.trim().parse::<f64>()? / 1000.0)
     }
@@ -230,13 +228,13 @@ impl HardwareAccess for WindowsHardware {
     type Error = WindowsHwError;
 
     fn read_cpu_temperature(&self) -> Result<f64, Self::Error> {
-        // Read via WMI (Win32_TemperatureProbe) or Open Hardware Monitor
-        todo!("WMI temperature query")
+        // Читаем через WMI (Win32_TemperatureProbe) или Open Hardware Monitor
+        todo!("запрос температуры через WMI")
     }
     // ...
 }
 
-/// Create the platform-appropriate implementation
+/// Создаём реализацию, подходящую для текущей платформы
 pub fn create_hardware() -> impl HardwareAccess {
     #[cfg(target_os = "linux")]
     { LinuxHardware }
@@ -245,24 +243,25 @@ pub fn create_hardware() -> impl HardwareAccess {
 }
 ```
 
-### Platform Abstraction Architecture
+### Архитектура платформенной абстракции
 
-For a project that targets multiple platforms, organize code into three layers:
+Для проекта, который работает на нескольких платформах, код стоит разложить по трём слоям:
 
 ```text
 ┌──────────────────────────────────────────────────┐
-│ Application Logic (platform-independent)          │
-│  diag_tool, accel_diag, network_diag, event_log, etc.      │
-│  Uses only the platform abstraction trait          │
+│ Прикладная логика (не зависит от платформы)      │
+│  diag_tool, accel_diag, network_diag, event_log  │
+│  Использует только трейт абстракции платформы    │
 ├──────────────────────────────────────────────────┤
-│ Platform Abstraction Layer (trait definitions)    │
-│  trait HardwareAccess { ... }                     │
-│  trait CommandRunner { ... }                      │
-│  trait FileSystem { ... }                         │
+│ Слой абстракции платформы (определения трейтов)  │
+│  trait HardwareAccess { ... }                    │
+│  trait CommandRunner { ... }                     │
+│  trait FileSystem { ... }                        │
 ├──────────────────────────────────────────────────┤
-│ Platform Implementations (cfg-gated)              │
+│ Платформенные реализации (через cfg)             │
 │  ┌──────────────┐  ┌──────────────┐              │
-│  │ Linux impl   │  │ Windows impl │              │
+│  │ Реализация   │  │ Реализация   │              │
+│  │ для Linux    │  │ для Windows  │              │
 │  │ /sys, /proc  │  │ WMI, Registry│              │
 │  │ ipmitool     │  │ ipmiutil     │              │
 │  │ lspci        │  │ devcon       │              │
@@ -270,7 +269,7 @@ For a project that targets multiple platforms, organize code into three layers:
 └──────────────────────────────────────────────────┘
 ```
 
-**Testing the abstraction**: Mock the platform trait for unit tests:
+**Тестирование абстракции**: мокайте платформенный трейт в модульных тестах:
 
 ```rust
 #[cfg(test)]
@@ -294,12 +293,12 @@ mod tests {
                 .copied()
                 .ok_or_else(|| std::io::Error::new(
                     std::io::ErrorKind::NotFound,
-                    format!("GPU {index} not found")
+                    format!("GPU {index} не найден")
                 ))
         }
 
         fn list_pci_devices(&self) -> Result<Vec<PciDevice>, Self::Error> {
-            Ok(vec![]) // Mock returns empty
+            Ok(vec![]) // Мок возвращает пустой результат
         }
 
         fn send_ipmi_command(&self, _cmd: &IpmiCmd) -> Result<IpmiResponse, Self::Error> {
@@ -319,87 +318,87 @@ mod tests {
 }
 ```
 
-### Application: Linux-First, Windows-Ready
+### Приложение: сначала Linux, готовность к Windows
 
-The project is already partially Windows-ready. Use
-[`cargo-hack`](ch09-no-std-and-feature-verification.md) to verify all feature
-combinations, and [cross-compile](ch02-cross-compilation-one-source-many-target.md)
-to test on Windows from Linux:
+Проект уже частично готов к Windows. Используйте
+[`cargo-hack`](ch09-no-std-and-feature-verification.md), чтобы проверить все комбинации фич,
+и [кросс-компиляцию](ch02-cross-compilation-one-source-many-target.md), чтобы тестировать
+под Windows из Linux:
 
-**Already done:**
-- `platform::run_command` uses `#[cfg(windows)]` for shell selection
-- Tests use `#[cfg(windows)]` / `#[cfg(not(windows))]` for platform-appropriate
-  test commands
+**Уже сделано:**
+- `platform::run_command` использует `#[cfg(windows)]` для выбора оболочки
+- Тесты используют `#[cfg(windows)]` / `#[cfg(not(windows))]`, чтобы подбирать команды,
+  подходящие для платформы
 
-**Recommended evolution path for Windows support:**
+**Рекомендуемый путь развития поддержки Windows:**
 
 ```text
-Phase 1: Extract platform abstraction trait (current → 2 weeks)
-  ├─ Define HardwareAccess trait in core_lib
-  ├─ Wrap current Linux code behind LinuxHardware impl
-  └─ All diagnostic modules depend on trait, not Linux specifics
+Фаза 1: выделяем трейт платформенной абстракции (текущий этап → 2 недели)
+  ├─ определяем трейт HardwareAccess в core_lib
+  ├─ оборачиваем текущий код для Linux в реализацию LinuxHardware
+  └─ все диагностические модули зависят от трейта, а не от особенностей Linux
 
-Phase 2: Add Windows stubs (2 weeks)
-  ├─ Implement WindowsHardware with TODO stubs
-  ├─ CI builds for x86_64-pc-windows-msvc (compile check only)
-  └─ Tests pass with MockHardware on all platforms
+Фаза 2: добавляем заглушки для Windows (2 недели)
+  ├─ реализуем WindowsHardware с заглушками TODO
+  ├─ CI собирает проект для x86_64-pc-windows-msvc (только проверка компиляции)
+  └─ тесты проходят с MockHardware на всех платформах
 
-Phase 3: Windows implementation (ongoing)
-  ├─ IPMI via ipmiutil.exe or OpenIPMI Windows driver
-  ├─ GPU via accel-mgmt (accel-api.dll) — same API as Linux
-  ├─ PCIe via Windows Setup API (SetupDiEnumDeviceInfo)
-  └─ NIC via WMI (Win32_NetworkAdapter)
+Фаза 3: реализация для Windows (постоянная работа)
+  ├─ IPMI через ipmiutil.exe или драйвер OpenIPMI для Windows
+  ├─ GPU через accel-mgmt (accel-api.dll) — тот же API, что и в Linux
+  ├─ PCIe через Windows Setup API (SetupDiEnumDeviceInfo)
+  └─ NIC через WMI (Win32_NetworkAdapter)
 ```
 
-**Cross-platform CI addition:**
+**Дополнение к кросс-платформенному CI:**
 
 ```yaml
-# Add to CI matrix
+# Добавьте в матрицу CI
 - target: x86_64-pc-windows-msvc
   os: windows-latest
   name: windows-x86_64
 ```
 
-This ensures the codebase compiles on Windows even before full Windows
-implementation is complete — catching `cfg` mistakes early.
+Это гарантирует, что кодовая база компилируется под Windows ещё до завершения полной
+реализации, а ошибки в `cfg` выявляются рано.
 
-> **Key insight**: The abstraction doesn't need to be perfect on day one.
-> Start with `#[cfg]` blocks in leaf functions (like `exec_cmd` already does),
-> then refactor to traits when you have two or more platform implementations.
-> Premature abstraction is worse than `#[cfg]` blocks.
+> **Ключевая мысль**: абстракция не обязана быть идеальной с первого дня. Начинайте с блоков
+> `#[cfg]` в листовых функциях (как уже делает `exec_cmd`), а переходите к трейтам, когда
+> появятся две и более платформенные реализации. Преждевременная абстракция хуже, чем блоки `#[cfg]`.
 
-### Conditional Compilation Decision Tree
+### Дерево решений по условной компиляции
 
 ```mermaid
 flowchart TD
-    START["Platform-specific code?"] --> HOW_MANY{"How many platforms?"}
-    
-    HOW_MANY -->|"2 (Linux + Windows)"| CFG_BLOCKS["#[cfg] blocks<br/>in leaf functions"]
-    HOW_MANY -->|"3+"| TRAIT_APPROACH["Platform trait<br/>+ per-platform impl"]
-    
-    CFG_BLOCKS --> WINAPI{"Need Windows APIs?"}
-    WINAPI -->|"Minimal"| WIN_SYS["windows-sys<br/>Raw FFI bindings"]
-    WINAPI -->|"Rich (COM, etc)"| WIN_RS["windows crate<br/>Safe idiomatic wrappers"]
-    WINAPI -->|"None<br/>(just #[cfg])"| NATIVE["cfg(windows)<br/>cfg(unix)"]
-    
+    START["Платформенно-специфичный код?"] --> HOW_MANY{"Сколько платформ?"}
+
+    HOW_MANY -->|"2 (Linux + Windows)"| CFG_BLOCKS["Блоки #[cfg]<br/>в листовых функциях"]
+    HOW_MANY -->|"3+"| TRAIT_APPROACH["Трейт платформы<br/>+ реализация для каждой"]
+
+    CFG_BLOCKS --> WINAPI{"Нужны API Windows?"}
+    WINAPI -->|"Минимально"| WIN_SYS["windows-sys<br/>Привязки сырого FFI"]
+    WINAPI -->|"Развёрнуто (COM и др.)"| WIN_RS["Крейт windows<br/>Безопасные идиоматичные обёртки"]
+    WINAPI -->|"Не нужны<br/>(только #[cfg])"| NATIVE["cfg(windows)<br/>cfg(unix)"]
+
     TRAIT_APPROACH --> CI_CHECK["cargo-hack<br/>--each-feature"]
     CFG_BLOCKS --> CI_CHECK
-    CI_CHECK --> XCOMPILE["Cross-compile in CI<br/>cargo-xwin or<br/>native runners"]
-    
+    CI_CHECK --> XCOMPILE["Кросс-компиляция в CI<br/>cargo-xwin или<br/>нативные раннеры"]
+
     style CFG_BLOCKS fill:#91e5a3,color:#000
     style TRAIT_APPROACH fill:#ffd43b,color:#000
     style WIN_SYS fill:#e3f2fd,color:#000
     style WIN_RS fill:#e3f2fd,color:#000
 ```
 
-### 🏋️ Exercises
+### 🏋️ Упражнения
 
-#### 🟢 Exercise 1: Platform-Conditional Module
+#### 🟢 Упражнение 1: платформенно-условный модуль
 
-Create a module with `#[cfg(unix)]` and `#[cfg(windows)]` implementations of a `get_hostname()` function. Verify both compile with `cargo check` and `cargo check --target x86_64-pc-windows-msvc`.
+Создайте модуль с реализациями `get_hostname()` под `#[cfg(unix)]` и `#[cfg(windows)]`.
+Проверьте, что обе компилируются через `cargo check` и `cargo check --target x86_64-pc-windows-msvc`.
 
 <details>
-<summary>Solution</summary>
+<summary>Решение</summary>
 
 ```rust
 // src/hostname.rs
@@ -431,44 +430,44 @@ mod tests {
 ```
 
 ```bash
-# Verify Linux compilation
+# Проверка компиляции под Linux
 cargo check
 
-# Verify Windows compilation (cross-check)
+# Проверка компиляции под Windows (кросс-проверка)
 rustup target add x86_64-pc-windows-msvc
 cargo check --target x86_64-pc-windows-msvc
 ```
 </details>
 
-#### 🟡 Exercise 2: Cross-Compile for Windows with cargo-xwin
+#### 🟡 Упражнение 2: кросс-компиляция под Windows с cargo-xwin
 
-Install `cargo-xwin` and build a simple binary for `x86_64-pc-windows-msvc` from Linux. Verify the output is a `.exe`.
+Установите `cargo-xwin` и соберите простой бинарник для `x86_64-pc-windows-msvc` из Linux.
+Убедитесь, что результат — `.exe`.
 
 <details>
-<summary>Solution</summary>
+<summary>Решение</summary>
 
 ```bash
 cargo install cargo-xwin
 rustup target add x86_64-pc-windows-msvc
 
 cargo xwin build --release --target x86_64-pc-windows-msvc
-# Downloads Windows SDK headers/libs automatically
+# Заголовки и библиотеки Windows SDK скачиваются автоматически
 
 file target/x86_64-pc-windows-msvc/release/my-binary.exe
-# Output: PE32+ executable (console) x86-64, for MS Windows
+# Вывод: PE32+ executable (console) x86-64, for MS Windows
 
-# You can also test with Wine:
+# Можно также проверить через Wine:
 wine target/x86_64-pc-windows-msvc/release/my-binary.exe
 ```
 </details>
 
-### Key Takeaways
+### Ключевые выводы
 
-- Start with `#[cfg]` blocks in leaf functions; refactor to traits only when three or more platforms diverge
-- `windows-sys` is for raw FFI; the `windows` crate provides safe, idiomatic wrappers
-- `cargo-xwin` cross-compiles to Windows MSVC ABI from Linux — no Windows machine needed
-- Always check `--target x86_64-pc-windows-msvc` in CI even if you only ship on Linux
-- Combine `#[cfg]` with Cargo features for optional platform support (e.g., `feature = "windows"`)
+- Начинайте с блоков `#[cfg]` в листовых функциях; переходите к трейтам, когда три и более платформ начинают расходиться
+- `windows-sys` — для сырого FFI; крейт `windows` предоставляет безопасные идиоматичные обёртки
+- `cargo-xwin` кросс-компилирует под ABI MSVC Windows из Linux — машина с Windows не нужна
+- Всегда проверяйте `--target x86_64-pc-windows-msvc` в CI, даже если выпускаете только под Linux
+- Комбинируйте `#[cfg]` с фичами Cargo для необязательной поддержки платформ (например, `feature = "windows"`)
 
 ---
-
