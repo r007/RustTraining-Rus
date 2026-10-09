@@ -1,16 +1,16 @@
-# 6. Building Futures by Hand 🟡
+# 6. Создаём фьючи вручную 🟡
 
-> **What you'll learn:**
-> - Implementing a `TimerFuture` with thread-based waking
-> - Building a `Join` combinator: run two futures concurrently
-> - Building a `Select` combinator: race two futures
-> - How combinators compose — futures all the way down
+> **Что вы узнаете:**
+> - Реализация `TimerFuture` с пробуждением через поток
+> - Построение комбинатора `Join`: одновременный запуск двух фьючей
+> - Построение комбинатора `Select`: гонка двух фьючей
+> - Как комбинаторы компонуются — фьючи внутри фьючей до самого низа
 
-## A Simple Timer Future
+## Простой таймер-фьюча
 
-Now let's build real, useful futures from scratch. This cements the theory from chapters 2-5.
+Теперь построим настоящие, полезные фьючи с нуля. Это закрепит теорию из глав 2–5.
 
-### TimerFuture: A Complete Example
+### TimerFuture: полный пример
 
 ```rust
 use std::future::Future;
@@ -36,14 +36,14 @@ impl TimerFuture {
             waker: None,
         }));
 
-        // Spawn a thread that sets completed=true after the duration
+        // Запускаем поток, который через duration выставит completed=true
         let thread_shared_state = Arc::clone(&shared_state);
         thread::spawn(move || {
             thread::sleep(duration);
             let mut state = thread_shared_state.lock().unwrap();
             state.completed = true;
             if let Some(waker) = state.waker.take() {
-                waker.wake(); // Notify the executor
+                waker.wake(); // Уведомляем исполнитель
             }
         });
 
@@ -59,37 +59,37 @@ impl Future for TimerFuture {
         if state.completed {
             Poll::Ready(())
         } else {
-            // Store the waker so the timer thread can wake us
-            // IMPORTANT: Always update the waker — the executor may
-            // have changed it between polls
+            // Сохраняем waker, чтобы поток таймера смог нас разбудить
+            // ВАЖНО: всегда обновляйте waker — исполнитель мог заменить его
+            // между опросами
             state.waker = Some(cx.waker().clone());
             Poll::Pending
         }
     }
 }
 
-// Usage:
+// Использование:
 // async fn example() {
-//     println!("Starting timer...");
+//     println!("Запускаем таймер...");
 //     TimerFuture::new(Duration::from_secs(2)).await;
-//     println!("Timer done!");
+//     println!("Таймер сработал!");
 // }
 //
-// ⚠️ This spawns an OS thread per timer — fine for learning, but in
-// production use `tokio::time::sleep` which is backed by a shared
-// timer wheel and requires zero extra threads.
+// ⚠️ Здесь на каждый таймер создаётся системный поток — для обучения это нормально,
+// но в продакшене используйте `tokio::time::sleep`: он работает на общем
+// колесе таймеров и не требует дополнительных потоков.
 ```
 
-### Join: Running Two Futures Concurrently
+### Join: одновременный запуск двух фьючей
 
-`Join` polls two futures and completes when *both* finish. This is how `tokio::join!` works internally:
+`Join` опрашивает два future и завершается, когда *оба* закончились. Так `tokio::join!` работает внутри:
 
 ```rust
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-/// Polls two futures concurrently, returns both results as a tuple
+/// Опрашивает два future одновременно и возвращает оба результата в кортеже
 pub struct Join<A, B>
 where
     A: Future,
@@ -102,13 +102,13 @@ where
 enum MaybeDone<F: Future> {
     Pending(F),
     Done(F::Output),
-    Taken, // Output has been taken
+    Taken, // Результат уже забран
 }
 
-// MaybeDone<F> stores F::Output, which the compiler can't prove
-// is Unpin even when F: Unpin. Since we only use Join with Unpin
-// futures and never pin-project into fields, implementing Unpin
-// by hand is safe and lets us call self.get_mut() in poll().
+// MaybeDone<F> хранит F::Output, и компилятор не может доказать,
+// что он Unpin, даже когда F: Unpin. Поскольку мы используем Join только с Unpin-
+// future и никогда не проецируем закрепление на поля, ручная реализация
+// Unpin безопасна и позволяет вызывать self.get_mut() в poll().
 impl<A: Future + Unpin, B: Future + Unpin> Unpin for Join<A, B> {}
 
 impl<A, B> Join<A, B>
@@ -134,24 +134,24 @@ where
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.get_mut();
 
-        // Poll A if not done
+        // Опрашиваем A, если он ещё не завершён
         if let MaybeDone::Pending(ref mut fut) = this.a {
             if let Poll::Ready(val) = Pin::new(fut).poll(cx) {
                 this.a = MaybeDone::Done(val);
             }
         }
 
-        // Poll B if not done
+        // Опрашиваем B, если он ещё не завершён
         if let MaybeDone::Pending(ref mut fut) = this.b {
             if let Poll::Ready(val) = Pin::new(fut).poll(cx) {
                 this.b = MaybeDone::Done(val);
             }
         }
 
-        // Both done?
+        // Оба готовы?
         match (&this.a, &this.b) {
             (MaybeDone::Done(_), MaybeDone::Done(_)) => {
-                // Take both outputs
+                // Забираем оба результата
                 let a_val = match std::mem::replace(&mut this.a, MaybeDone::Taken) {
                     MaybeDone::Done(v) => v,
                     _ => unreachable!(),
@@ -162,31 +162,31 @@ where
                 };
                 Poll::Ready((a_val, b_val))
             }
-            _ => Poll::Pending, // At least one is still pending
+            _ => Poll::Pending, // Хотя бы один ещё ожидает
         }
     }
 }
 
-// Usage (async blocks are !Unpin, so wrap them with Box::pin):
+// Использование (async-блоки являются !Unpin, поэтому оборачиваем их в Box::pin):
 // let (page1, page2) = Join::new(
 //     Box::pin(http_get("https://example.com/a")),
 //     Box::pin(http_get("https://example.com/b")),
 // ).await;
-// Both requests run concurrently!
+// Оба запроса выполняются одновременно!
 ```
 
-> **Key insight**: "Concurrent" here means *interleaved on the same thread*.
-> Join doesn't spawn threads — it polls both futures in the same `poll()` call.
-> This is cooperative concurrency, not parallelism.
+> **Ключевая мысль**: «одновременно» здесь означает *чередование на одном потоке*.
+> Join не создаёт потоков — он опрашивает оба future в одном и том же вызове `poll()`.
+> Это кооперативная конкурентность, а не параллелизм.
 
 ```mermaid
 graph LR
-    subgraph "Future Combinators"
+    subgraph "Комбинаторы фьючей"
         direction TB
-        TIMER["TimerFuture<br/>Single future, wake after delay"]
-        JOIN["Join&lt;A, B&gt;<br/>Wait for BOTH"]
-        SELECT["Select&lt;A, B&gt;<br/>Wait for FIRST"]
-        RETRY["RetryFuture<br/>Re-create on failure"]
+        TIMER["TimerFuture<br/>Один future, пробуждение через задержку"]
+        JOIN["Join&lt;A, B&gt;<br/>Ждём ОБА"]
+        SELECT["Select&lt;A, B&gt;<br/>Ждём ПЕРВЫЙ"]
+        RETRY["RetryFuture<br/>Пересоздаём при ошибке"]
     end
 
     TIMER --> JOIN
@@ -199,9 +199,9 @@ graph LR
     style RETRY fill:#fadbd8,stroke:#e74c3c,color:#000
 ```
 
-### Select: Racing Two Futures
+### Select: гонка двух фьючей
 
-`Select` completes when *either* future finishes first (the other is dropped):
+`Select` завершается, когда *любой* из future закончился первым (второй уничтожается):
 
 ```rust
 use std::future::Future;
@@ -213,7 +213,7 @@ pub enum Either<A, B> {
     Right(B),
 }
 
-/// Returns whichever future completes first; drops the other
+/// Возвращает тот future, который завершился первым; второй уничтожает
 pub struct Select<A, B> {
     a: A,
     b: B,
@@ -237,12 +237,12 @@ where
     type Output = Either<A::Output, B::Output>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        // Poll A first
+        // Сначала опрашиваем A
         if let Poll::Ready(val) = Pin::new(&mut self.a).poll(cx) {
             return Poll::Ready(Either::Left(val));
         }
 
-        // Then poll B
+        // Затем опрашиваем B
         if let Poll::Ready(val) = Pin::new(&mut self.b).poll(cx) {
             return Poll::Ready(Either::Right(val));
         }
@@ -251,25 +251,25 @@ where
     }
 }
 
-// Usage with timeout:
+// Использование с таймаутом:
 // match Select::new(http_get(url), TimerFuture::new(timeout)).await {
-//     Either::Left(response) => println!("Got response: {}", response),
-//     Either::Right(()) => println!("Request timed out!"),
+//     Either::Left(response) => println!("Получен ответ: {}", response),
+//     Either::Right(()) => println!("Запрос просрочен по таймауту!"),
 // }
 ```
 
-> **Fairness note**: Our `Select` always polls A first — if both are ready, A
-> always wins. Tokio's `select!` macro randomizes the poll order for fairness.
+> **Замечание о справедливости**: наш `Select` всегда опрашивает A первым — если готовы оба, всегда побеждает A.
+> Макрос `select!` в tokio рандомизирует порядок опроса, чтобы обеспечить справедливость.
 
 <details>
-<summary><strong>🏋️ Exercise: Build a RetryFuture</strong> (click to expand)</summary>
+<summary><strong>🏋️ Упражнение: реализуйте RetryFuture</strong> (нажмите, чтобы раскрыть)</summary>
 
-**Challenge**: Build a `RetryFuture<F, Fut>` that takes a closure `F: Fn() -> Fut` and retries up to N times if the inner future returns `Err`. It should return the first `Ok` result or the last `Err`.
+**Задача**: реализуйте `RetryFuture<F, Fut>`, который принимает замыкание `F: Fn() -> Fut` и повторяет попытку до N раз, если внутренний future возвращает `Err`. Он должен вернуть первый `Ok` или последний `Err`.
 
-*Hint*: You'll need states for "running attempt" and "all attempts exhausted."
+*Подсказка*: понадобятся состояния «выполняется попытка» и «все попытки исчерпаны».
 
 <details>
-<summary>🔑 Solution</summary>
+<summary>🔑 Решение</summary>
 
 ```rust
 use std::future::Future;
@@ -312,8 +312,8 @@ where
     type Output = Result<T, E>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        // Pin<Box<Fut>> is always Unpin, so the struct is Unpin when F and E are.
-        // This lets us safely use get_mut() without any unsafe code.
+        // Pin<Box<Fut>> всегда Unpin, поэтому структура Unpin, когда Unpin F и E.
+        // Это позволяет безопасно использовать get_mut() без unsafe-кода.
         loop {
             if let Some(ref mut fut) = self.current {
                 match fut.as_mut().poll(cx) {
@@ -323,7 +323,7 @@ where
                         if self.remaining > 0 {
                             self.remaining -= 1;
                             self.current = Some(Box::pin((self.factory)()));
-                            // Loop to poll the new future immediately
+                            // Возвращаемся в цикл, чтобы сразу опросить новый future
                         } else {
                             return Poll::Ready(Err(self.last_error.take().unwrap()));
                         }
@@ -337,25 +337,23 @@ where
     }
 }
 
-// Usage:
+// Использование:
 // let result = RetryFuture::new(3, || async {
 //     http_get("https://flaky-server.com/api").await
 // }).await;
 ```
 
-**Key takeaway**: The retry future is itself a state machine: it holds the current attempt and creates new inner futures on failure. Wrapping the inner future in `Pin<Box<Fut>>` removes the `Fut: Unpin` bound — since `Pin<Box<T>>` is always `Unpin`, the struct remains easy to work with while supporting any future type. This is how combinators compose — futures all the way down.
+**Ключевой вывод**: сам future для повторов — это конечный автомат: он хранит текущую попытку и создаёт новые внутренние future при ошибке. Оборачивание внутреннего future в `Pin<Box<Fut>>` снимает ограничение `Fut: Unpin` — поскольку `Pin<Box<T>>` всегда `Unpin`, со структурой легко работать, и при этом она поддерживает любой тип future. Так компонуются комбинаторы — фьючи внутри фьючей до самого низа.
 
 </details>
 </details>
 
-> **Key Takeaways — Building Futures by Hand**
-> - A future needs three things: state, a `poll()` implementation, and a waker registration
-> - `Join` polls both sub-futures; `Select` returns whichever finishes first
-> - Combinators are themselves futures wrapping other futures — it's turtles all the way down
-> - Building futures by hand gives deep insight, but in production use `tokio::join!`/`select!`
+> **Ключевые выводы — создаём фьючи вручную**
+> - Future нужны три вещи: состояние, реализация `poll()` и регистрация waker
+> - `Join` опрашивает оба вложенных future; `Select` возвращает тот, что завершится первым
+> - Комбинаторы — это сами фьючи, оборачивающие другие фьючи: и так до самого низа
+> - Построение фьючей вручную даёт глубокое понимание, но в продакшене используйте `tokio::join!`/`select!`
 
-> **See also:** [Ch 2 — The Future Trait](ch02-the-future-trait.md) for the trait definition, [Ch 8 — Tokio Deep Dive](ch08-tokio-deep-dive.md) for production-grade equivalents
+> **См. также:** [Гл. 2 — Трейт Future](ch02-the-future-trait.md) — определение трейта, [Гл. 8 — Глубокое погружение в Tokio](ch08-tokio-deep-dive.md) — продакшен-аналоги
 
 ***
-
-

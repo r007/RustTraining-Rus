@@ -1,40 +1,40 @@
-# Summary
+# Содержание
 
-[Introduction](ch00-introduction.md)
-
----
-
-# Part I: How Async Works
-
-- [1. Why Async is Different in Rust](ch01-why-async-is-different-in-rust.md)
-- [2. The Future Trait](ch02-the-future-trait.md)
-- [3. How Poll Works](ch03-how-poll-works.md)
-- [4. Pin and Unpin](ch04-pin-and-unpin.md)
-- [5. The State Machine Reveal](ch05-the-state-machine-reveal.md)
+[Введение](ch00-introduction.md)
 
 ---
 
-# Part II: The Ecosystem
+# Часть I: Как работает async
 
-- [6. Building Futures by Hand](ch06-building-futures-by-hand.md)
-- [7. Executors and Runtimes](ch07-executors-and-runtimes.md)
-- [8. Tokio Deep Dive](ch08-tokio-deep-dive.md)
-- [9. When Tokio Isn't the Right Fit](ch09-when-tokio-isnt-the-right-fit.md)
-- [10. Async Traits](ch10-async-traits.md)
-
----
-
-# Part III: Production Async
-
-- [11. Streams and AsyncIterator](ch11-streams-and-asynciterator.md)
-- [12. Common Pitfalls](ch12-common-pitfalls.md)
-- [13. Production Patterns](ch13-production-patterns.md)
-- [14. Async Is an Optimization, Not an Architecture](ch14-async-is-an-optimization-not-an-architecture.md)
-- [15. Exercises](ch15-exercises.md)
+- [1. Почему async в Rust устроен иначе](ch01-why-async-is-different-in-rust.md)
+- [2. Трейт Future](ch02-the-future-trait.md)
+- [3. Как работает poll](ch03-how-poll-works.md)
+- [4. Pin и Unpin](ch04-pin-and-unpin.md)
+- [5. Раскрываем конечный автомат](ch05-the-state-machine-reveal.md)
 
 ---
 
-# Appendices
+# Часть II: Экосистема
 
-- [Summary and Reference Card](ch16-summary-and-reference-card.md)
-- [Capstone Project: Async Chat Server](ch17-capstone-project.md)
+- [6. Создаём фьючи вручную](ch06-building-futures-by-hand.md)
+- [7. Исполнители и рантаймы](ch07-executors-and-runtimes.md)
+- [8. Глубокое погружение в Tokio](ch08-tokio-deep-dive.md)
+- [9. Когда Tokio не подходит](ch09-when-tokio-isnt-the-right-fit.md)
+- [10. Async-трейты](ch10-async-traits.md)
+
+---
+
+# Часть III: Async в продакшене
+
+- [11. Потоки и AsyncIterator](ch11-streams-and-asynciterator.md)
+- [12. Типичные ловушки](ch12-common-pitfalls.md)
+- [13. Продакшен-паттерны](ch13-production-patterns.md)
+- [14. Async — это оптимизация, а не архитектура](ch14-async-is-an-optimization-not-an-architecture.md)
+- [15. Упражнения](ch15-exercises.md)
+
+---
+
+# Приложения
+
+- [Итоги и справочная карточка](ch16-summary-and-reference-card.md)
+- [Итоговый проект: асинхронный чат-сервер](ch17-capstone-project.md)

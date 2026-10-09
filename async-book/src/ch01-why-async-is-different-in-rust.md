@@ -1,38 +1,38 @@
-# 1. Why Async is Different in Rust 🟢
+# 1. Почему async в Rust устроен иначе 🟢
 
-> **What you'll learn:**
-> - Why Rust has no built-in async runtime (and what that means for you)
-> - The three key properties: lazy execution, no runtime, zero-cost abstraction
-> - When async is the right tool (and when it's slower)
-> - How Rust's model compares to C#, Go, Python, and JavaScript
+> **Что вы узнаете:**
+> - Почему в Rust нет встроенного асинхронного рантайма (и что это значит для вас)
+> - Три ключевых свойства: ленивое выполнение, отсутствие рантайма, абстракции с нулевой стоимостью
+> - Когда async — правильный инструмент (а когда он медленнее)
+> - Как модель Rust соотносится с C#, Go, Python и JavaScript
 
-## The Fundamental Difference
+## Фундаментальное отличие
 
-Most languages with `async/await` hide the machinery. C# has the CLR thread pool. JavaScript has the event loop. Go has goroutines and a scheduler built into the runtime. Python has `asyncio`.
+Большинство языков с `async/await` скрывают внутренний механизм. В C# есть пул потоков CLR. В JavaScript есть цикл событий (event loop). В Go есть горутины и планировщик, встроенный в рантайм. В Python есть `asyncio`.
 
-**Rust has nothing.**
+**В Rust ничего этого нет.**
 
-There is no built-in runtime, no thread pool, no event loop. The `async` keyword is a zero-cost compilation strategy — it transforms your function into a state machine that implements the `Future` trait. Someone else (an *executor*) must drive that state machine forward.
+Нет встроенного рантайма, нет пула потоков, нет цикла событий. Ключевое слово `async` — это стратегия компиляции с нулевой стоимостью: она превращает вашу функцию в конечный автомат, реализующий трейт `Future`. Кто-то другой (*исполнитель*, executor) должен продвигать этот автомат вперёд.
 
-### Three Key Properties of Rust Async
+### Три ключевых свойства async в Rust
 
 ```mermaid
 graph LR
     subgraph "C# / JS / Go"
-        EAGER["Eager Execution<br/>Task starts immediately"]
-        BUILTIN["Built-in Runtime<br/>Thread pool included"]
-        GC["GC-Managed<br/>No lifetime concerns"]
+        EAGER["Жадное выполнение<br/>Задача стартует сразу"]
+        BUILTIN["Встроенный рантайм<br/>Пул потоков в комплекте"]
+        GC["Управляется GC<br/>Никаких забот о временах жизни"]
     end
 
-    subgraph "Rust (and Python*)"
-        LAZY["Lazy Execution<br/>Nothing happens until polled/awaited"]
-        BYOB["Bring Your Own Runtime<br/>You choose the executor"]
-        OWNED["Ownership Applies<br/>Lifetimes, Send, Sync matter"]
+    subgraph "Rust (и Python*)"
+        LAZY["Ленивое выполнение<br/>Ничего не происходит, пока не вызван poll/await"]
+        BYOB["Свой рантайм<br/>Исполнитель выбираете вы"]
+        OWNED["Действует владение<br/>Важны времена жизни, Send, Sync"]
     end
 
-    EAGER -. "opposite" .-> LAZY
-    BUILTIN -. "opposite" .-> BYOB
-    GC -. "opposite" .-> OWNED
+    EAGER -. "противоположность" .-> LAZY
+    BUILTIN -. "противоположность" .-> BYOB
+    GC -. "противоположность" .-> OWNED
 
     style LAZY fill:#e8f5e8,color:#000
     style BYOB fill:#e8f5e8,color:#000
@@ -42,78 +42,78 @@ graph LR
     style GC fill:#e3f2fd,color:#000
 ```
 
-> \* Python coroutines are lazy like Rust futures — they don't execute until awaited or scheduled. However, Python still uses GC and has no ownership/lifetime concerns.
+> \* Корутины Python, как и фьючи Rust, ленивые — они не выполняются, пока их не `await`-ят или не запланируют. Однако Python по-прежнему использует GC и не знает о владении и временах жизни.
 
-### No Built-In Runtime
+### Нет встроенного рантайма
 
 ```rust
-// This compiles but does NOTHING:
+// Это компилируется, но НИЧЕГО не делает:
 async fn fetch_data() -> String {
     "hello".to_string()
 }
 
 fn main() {
-    let future = fetch_data(); // Creates the Future, but doesn't execute it
-    // future is just a struct sitting on the stack
-    // No output, no side effects, nothing happens
-    drop(future); // Silently dropped — work was never started
+    let future = fetch_data(); // Создаёт Future, но не выполняет его
+    // future — это просто структура на стеке
+    // Никакого вывода, никаких побочных эффектов, ничего не происходит
+    drop(future); // Молча уничтожена — работа так и не начиналась
 }
 ```
 
-Compare with C# where `Task` starts eagerly:
+Сравните с C#, где `Task` стартует сразу:
 ```csharp
-// C# — this immediately starts executing:
+// C# — это немедленно начинает выполняться:
 async Task<string> FetchData() => "hello";
 
-var task = FetchData(); // Already running!
-var result = await task; // Just waits for completion
+var task = FetchData(); // Уже выполняется!
+var result = await task; // Только ждём завершения
 ```
 
-### Lazy Futures vs Eager Tasks
+### Ленивые фьючи против жадных задач
 
-This is the single most important mental shift:
+Это самая важная смена мышления:
 
 | | C# / JavaScript | Python | Go | Rust |
 |---|---|---|---|---|
-| **Creation** | `Task` starts executing immediately | Coroutine is **lazy** — returns an object, doesn't run until awaited or scheduled | Goroutine starts immediately | `Future` does nothing until polled |
-| **Dropping** | Detached task continues running | Unawaited coroutine is garbage-collected (with a warning) | Goroutine runs until return | Dropping a Future cancels it |
-| **Runtime** | Built into the language/VM | `asyncio` event loop (must be explicitly started) | Built into the binary (M:N scheduler) | You choose (tokio, smol, etc.) |
-| **Scheduling** | Automatic (thread pool) | Event loop + `await` or `create_task()` | Automatic (GMP scheduler) | Explicit (`spawn`, `block_on`) |
-| **Cancellation** | `CancellationToken` (cooperative) | `Task.cancel()` (cooperative, raises `CancelledError`) | `context.Context` (cooperative) | Drop the future (immediate) |
+| **Создание** | `Task` начинает выполняться сразу | Корутина **ленивая** — возвращает объект, не выполняется, пока её не `await`-ят или не запланируют | Горутина стартует сразу | `Future` ничего не делает, пока его не опросили (polled) |
+| **Уничтожение** | Отсоединённая задача продолжает работать | Невызванная корутина собирается GC (с предупреждением) | Горутина работает до возврата | Уничтожение Future отменяет его |
+| **Рантайм** | Встроен в язык / VM | Цикл событий `asyncio` (нужно запускать явно) | Встроен в бинарник (планировщик M:N) | Выбираете вы (tokio, smol и др.) |
+| **Планирование** | Автоматическое (пул потоков) | Цикл событий + `await` или `create_task()` | Автоматическое (планировщик GMP) | Явное (`spawn`, `block_on`) |
+| **Отмена** | `CancellationToken` (кооперативная) | `Task.cancel()` (кооперативная, выбрасывает `CancelledError`) | `context.Context` (кооперативная) | Уничтожить фьючу (мгновенно) |
 
 ```rust
-// To actually RUN a future, you need an executor:
+// Чтобы РЕАЛЬНО выполнить фьючу, нужен исполнитель:
 #[tokio::main]
 async fn main() {
-    let result = fetch_data().await; // NOW it executes
+    let result = fetch_data().await; // ТЕПЕРЬ оно выполняется
     println!("{result}");
 }
 ```
 
-### When to Use Async (and When Not To)
+### Когда использовать async (и когда не стоит)
 
 ```mermaid
 graph TD
-    START["What kind of work?"]
+    START["Какой характер работы?"]
 
-    IO["I/O-bound?<br/>(network, files, DB)"]
-    CPU["CPU-bound?<br/>(computation, parsing)"]
-    MANY["Many concurrent connections?<br/>(100+)"]
-    FEW["Few concurrent tasks?<br/>(<10)"]
+    IO["Ограничено вводом-выводом?<br/>(сеть, файлы, БД)"]
+    CPU["Ограничено процессором?<br/>(вычисления, парсинг)"]
+    MANY["Много одновременных соединений?<br/>(100+)"]
+    FEW["Мало одновременных задач?<br/>(<10)"]
 
-    USE_ASYNC["✅ Use async/await"]
-    USE_THREADS["✅ Use std::thread or rayon"]
-    USE_SPAWN_BLOCKING["✅ Use spawn_blocking()"]
-    MAYBE_SYNC["Consider synchronous code<br/>(simpler, less overhead)"]
+    USE_ASYNC["✅ Используйте async/await"]
+    USE_THREADS["✅ Используйте std::thread или rayon"]
+    USE_SPAWN_BLOCKING["✅ Используйте spawn_blocking()"]
+    MAYBE_SYNC["Рассмотрите синхронный код<br/>(проще, меньше накладных расходов)"]
 
-    START -->|Network, files, DB| IO
-    START -->|Computation| CPU
-    IO -->|Yes, many| MANY
-    IO -->|Just a few| FEW
+    START -->|Сеть, файлы, БД| IO
+    START -->|Вычисления| CPU
+    IO -->|Да, много| MANY
+    IO -->|Всего несколько| FEW
     MANY --> USE_ASYNC
     FEW --> MAYBE_SYNC
-    CPU -->|Parallelize| USE_THREADS
-    CPU -->|Inside async context| USE_SPAWN_BLOCKING
+    CPU -->|Распараллелить| USE_THREADS
+    CPU -->|Внутри async-контекста| USE_SPAWN_BLOCKING
 
     style USE_ASYNC fill:#c8e6c9,color:#000
     style USE_THREADS fill:#c8e6c9,color:#000
@@ -121,53 +121,51 @@ graph TD
     style MAYBE_SYNC fill:#fff3e0,color:#000
 ```
 
-**Rule of thumb**: Async is for I/O concurrency (doing many things at once while waiting), not CPU parallelism (making one thing faster). If you have 10,000 network connections, async shines. If you're crunching numbers, use `rayon` or OS threads.
+**Практическое правило**: async нужен для конкурентности ввода-вывода (делать много дел одновременно, пока ждём), а не для параллелизма вычислений (ускорение одной операции). Если у вас 10 000 сетевых соединений, async проявляет себя во всей красе. Если вы считаете числа, используйте `rayon` или потоки ОС.
 
-### When Async Can Be *Slower*
+### Когда async может быть *медленнее*
 
-Async isn't free. For low-concurrency workloads, synchronous code can outperform async:
+Async не бесплатен. При низкой конкурентности синхронный код может работать быстрее async:
 
-| Cost | Why |
-|------|-----|
-| **State machine overhead** | Each `.await` adds an enum variant; deeply nested futures produce large, complex state machines |
-| **Dynamic dispatch** | `Box<dyn Future>` adds indirection and kills inlining |
-| **Context switching** | Cooperative scheduling still has cost — the executor must manage a task queue, wakers, and I/O registrations |
-| **Compile time** | Async code generates more complex types, slowing down compilation |
-| **Debuggability** | Stack traces through state machines are harder to read (see Ch. 12) |
+| Издержка | Почему |
+|----------|--------|
+| **Накладные расходы конечного автомата** | Каждый `.await` добавляет вариант enum; глубоко вложенные фьючи порождают большие и сложные автоматы |
+| **Динамическая диспетчеризация** | `Box<dyn Future>` добавляет косвенность и мешает инлайнингу |
+| **Переключение контекста** | Кооперативное планирование тоже стоит ресурсов — исполнителю нужно управлять очередью задач, wakers и регистрациями I/O |
+| **Время компиляции** | Async-код порождает более сложные типы и замедляет компиляцию |
+| **Отладка** | Трассировки стека через конечные автоматы труднее читать (см. гл. 12) |
 
-**Benchmarking guidance**: If fewer than ~10 concurrent I/O operations, profile before committing to async. A simple `std::thread::spawn` per connection scales fine to hundreds of threads on modern Linux.
+**Рекомендация по бенчмаркам**: если одновременных операций ввода-вывода меньше ~10, сначала профилируйте, и только потом переходите на async. Простой `std::thread::spawn` на соединение хорошо масштабируется до сотен потоков на современном Linux.
 
-### Exercise: When Would You Use Async?
-
-<details>
-<summary>🏋️ Exercise (click to expand)</summary>
-
-For each scenario, decide whether async is appropriate and explain why:
-
-1. A web server handling 10,000 concurrent WebSocket connections
-2. A CLI tool that compresses a single large file
-3. A service that queries 5 different databases and merges results
-4. A game engine running a physics simulation at 60 FPS
+### Упражнение: когда использовать async?
 
 <details>
-<summary>🔑 Solution</summary>
+<summary>🏋️ Упражнение (нажмите, чтобы раскрыть)</summary>
 
-1. **Async** — I/O-bound with massive concurrency. Each connection spends most time waiting for data. Threads would require 10K stacks.
-2. **Sync/threads** — CPU-bound, single task. Async adds overhead with no benefit. Use `rayon` for parallel compression.
-3. **Async** — Five concurrent I/O waits. `tokio::join!` runs all five queries simultaneously.
-4. **Sync/threads** — CPU-bound, latency-sensitive. Async's cooperative scheduling could introduce frame jitter.
+Для каждого сценария решите, уместен ли async, и объясните почему:
+
+1. Веб-сервер, обрабатывающий 10 000 одновременных WebSocket-соединений
+2. CLI-утилита, которая сжимает один большой файл
+3. Сервис, который опрашивает 5 разных баз данных и объединяет результаты
+4. Игровой движок, который выполняет физическую симуляцию с 60 FPS
+
+<details>
+<summary>🔑 Решение</summary>
+
+1. **Async** — ограничено вводом-выводом, огромная конкурентность. Каждое соединение большую часть времени ждёт данных. Для потоков понадобилось бы 10 000 стеков.
+2. **Синхронно / потоки** — ограничено процессором, одна задача. Async добавляет накладные расходы без пользы. Для параллельного сжатия используйте `rayon`.
+3. **Async** — пять одновременных ожиданий I/O. `tokio::join!` выполняет все пять запросов одновременно.
+4. **Синхронно / потоки** — ограничено процессором, чувствительно к задержкам. Кооперативное планирование async может вызвать джиттер кадров.
 
 </details>
 </details>
 
-> **Key Takeaways — Why Async is Different**
-> - Rust futures are **lazy** — they do nothing until polled by an executor
-> - There is **no built-in runtime** — you choose (or build) your own
-> - Async is a **zero-cost compilation strategy** that produces state machines
-> - Async shines for **I/O-bound concurrency**; for CPU-bound work, use threads or rayon
+> **Ключевые выводы — почему async устроен иначе**
+> - Фьючи в Rust **ленивые** — они ничего не делают, пока исполнитель их не опросит
+> - Встроенного рантайма **нет** — вы выбираете (или создаёте) свой
+> - Async — это **стратегия компиляции с нулевой стоимостью**, которая порождает конечные автоматы
+> - Async проявляет себя в **конкурентности ввода-вывода**; для вычислений используйте потоки или rayon
 
-> **See also:** [Ch 2 — The Future Trait](ch02-the-future-trait.md) for the trait that makes this all work, [Ch 7 — Executors and Runtimes](ch07-executors-and-runtimes.md) for choosing your runtime
+> **См. также:** [Гл. 2 — Трейт Future](ch02-the-future-trait.md) — трейт, на котором всё это держится, [Гл. 7 — Исполнители и рантаймы](ch07-executors-and-runtimes.md) — как выбрать рантайм
 
 ***
-
-
