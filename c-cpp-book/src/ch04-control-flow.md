@@ -1,8 +1,8 @@
-# Rust if keyword
+# Ключевое слово if в Rust
 
-> **What you'll learn:** Rust's control flow constructs — `if`/`else` as expressions, `loop`/`while`/`for`, `match`, and how they differ from C/C++ counterparts. The key insight: most Rust control flow returns values.
+> **Что вы узнаете:** конструкции управления потоком выполнения в Rust — `if`/`else` как выражения, `loop`/`while`/`for`, `match` и то, чем они отличаются от аналогов в C/C++. Ключевая мысль: большинство конструкций управления потоком в Rust возвращают значения.
 
-- In Rust, ```if``` is actually an expression, i.e., it can be used to assign values, but it also behaves like a statement. [▶ Try it](https://play.rust-lang.org/)
+- В Rust ```if``` — это выражение, то есть его можно использовать для присваивания значений, но он также ведёт себя как оператор. [▶ Попробовать](https://play.rust-lang.org/)
 
 ```rust
 fn main() {
@@ -19,8 +19,8 @@ fn main() {
 }
 ```
 
-# Rust loops using while and for
-- The ```while``` keyword can be used to loop while an expression is true
+# Циклы while и for в Rust
+- Ключевое слово ```while``` можно использовать для цикла, пока выражение истинно
 ```rust
 fn main() {
     let mut x = 40;
@@ -29,55 +29,53 @@ fn main() {
     }
 }
 ```
-- The ```for``` keyword can be used to iterate over ranges
+- Ключевое слово ```for``` можно использовать для итерации по диапазонам
 ```rust
 fn main() {
-    // Will not print 43; use 40..=43 to include last element
+    // Не выведет 43; используйте 40..=43, чтобы включить последний элемент
     for x in 40..43 {
         println!("{}", x);
     } 
 }
 ```
 
-# Rust loops using loop
-- The ```loop``` keyword creates an infinite loop until a ```break``` is encountered
+# Циклы loop в Rust
+- Ключевое слово ```loop``` создаёт бесконечный цикл, пока не встретится ```break```
 ```rust
 fn main() {
     let mut x = 40;
-    // Change the below to 'here: loop to specify optional label for the loop
+    // Замените на 'here: loop, чтобы указать необязательную метку цикла
     loop {
         if x == 42 {
-            break; // Use break x; to return the value of x
+            break; // Используйте break x; чтобы вернуть значение x
         }
         x += 1;
     }
 }
 ```
-- The ```break``` statement can include an optional expression that can be used to assign the value of a ```loop``` expression
-- The ```continue``` keyword can be used to return to the top of the ```loop```
-- Loop labels can be used with ```break``` or ```continue``` and are useful when dealing with nested loops
+- Оператор ```break``` может включать необязательное выражение, которое используется для присваивания значения выражению ```loop```
+- Ключевое слово ```continue``` возвращает выполнение к началу ```loop```
+- Метки циклов можно использовать с ```break``` или ```continue```; они полезны при работе с вложенными циклами
 
-# Rust expression blocks
-- Rust expression blocks are simply a sequence of expressions enclosed in ```{}```. The evaluated value is simply the last expression in the block
+# Блоки-выражения в Rust
+- Блок-выражение в Rust — это просто последовательность выражений в ```{}```. Значением блока становится последнее выражение в нём
 ```rust
 fn main() {
     let x = {
         let y = 40;
-        y + 2 // Note: ; must be omitted
+        y + 2 // Примечание: ; здесь не ставится
     };
-    // Notice the Python style printing
+    // Обратите внимание на вывод в стиле Python
     println!("{x}");
 }
 ```
-- Rust style is to use this to omit the ```return``` keyword in functions
+- В стиле Rust принято опускать ключевое слово ```return``` в функциях, используя это правило
 ```rust
 fn is_secret_of_life(x: u32) -> bool {
-    // Same as if x == 42 {true} else {false}
-    x == 42 // Note: ; must be omitted 
+    // То же, что if x == 42 {true} else {false}
+    x == 42 // Примечание: ; здесь не ставится
 }
 fn main() {
     println!("{}", is_secret_of_life(42));
 }
 ```
-
-

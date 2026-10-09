@@ -1,9 +1,9 @@
-# Rust traits
+# Трейты в Rust
 
-> **What you'll learn:** Traits — Rust's answer to interfaces, abstract base classes, and operator overloading. You'll learn how to define traits, implement them for your types, and use dynamic dispatch (`dyn Trait`) vs static dispatch (generics). For C++ developers: traits replace virtual functions, CRTP, and concepts. For C developers: traits are the structured way Rust does polymorphism.
+> **Что вы узнаете:** трейты — ответ Rust на интерфейсы, абстрактные базовые классы и перегрузку операторов. Вы научитесь определять трейты, реализовывать их для своих типов и использовать динамическую диспетчеризацию (`dyn Trait`) или статическую (обобщения). Для программистов C++: трейты заменяют виртуальные функции, CRTP и концепты. Для программистов на C: трейты — структурированный способ полиморфизма в Rust.
 
-- Rust traits are similar to interfaces in other languages
-    - Traits define methods that must be defined by types that implement the trait.
+- Трейты в Rust похожи на интерфейсы в других языках
+    - Трейты определяют методы, которые должны быть реализованы типами, реализующими трейт.
 ```rust
 fn main() {
     trait Pet {
@@ -23,80 +23,80 @@ fn main() {
     }
     let c = Cat{};
     let d = Dog{};
-    c.speak();  // There is no "is a" relationship between Cat and Dog
-    d.speak(); // There is no "is a" relationship between Cat and Dog
+    c.speak();  // Между Cat и Dog нет отношения «является»
+    d.speak(); // Между Cat и Dog нет отношения «является»
 }
 ```
 
-## Traits vs C++ Concepts and Interfaces
+## Трейты в сравнении с концептами и интерфейсами C++
 
-### Traditional C++ Inheritance vs Rust Traits
+### Традиционное наследование в C++ и трейты Rust
 
 ```cpp
-// C++ - Inheritance-based polymorphism
+// C++ — полиморфизм на основе наследования
 class Animal {
 public:
-    virtual void speak() = 0;  // Pure virtual function
+    virtual void speak() = 0;  // Чисто виртуальная функция
     virtual ~Animal() = default;
 };
 
-class Cat : public Animal {  // "Cat IS-A Animal"
+class Cat : public Animal {  // «Cat ЯВЛЯЕТСЯ Animal»
 public:
     void speak() override {
         std::cout << "Meow" << std::endl;
     }
 };
 
-void make_sound(Animal* animal) {  // Runtime polymorphism
-    animal->speak();  // Virtual function call
+void make_sound(Animal* animal) {  // Полиморфизм времени выполнения
+    animal->speak();  // Вызов виртуальной функции
 }
 ```
 
 ```rust
-// Rust - Composition over inheritance with traits
+// Rust — композиция вместо наследования, через трейты
 trait Animal {
     fn speak(&self);
 }
 
-struct Cat;  // Cat is NOT an Animal, but IMPLEMENTS Animal behavior
+struct Cat;  // Cat НЕ является Animal, но РЕАЛИЗУЕТ поведение Animal
 
-impl Animal for Cat {  // "Cat CAN-DO Animal behavior"
+impl Animal for Cat {  // «Cat УМЕЕТ поведение Animal»
     fn speak(&self) {
         println!("Meow");
     }
 }
 
-fn make_sound<T: Animal>(animal: &T) {  // Static polymorphism
-    animal.speak();  // Direct function call (zero cost)
+fn make_sound<T: Animal>(animal: &T) {  // Статический полиморфизм
+    animal.speak();  // Прямой вызов функции (без накладных расходов)
 }
 ```
 
 ```mermaid
 graph TD
-    subgraph "C++ Object-Oriented Hierarchy"
-        CPP_ANIMAL["Animal<br/>(Abstract base class)"]
-        CPP_CAT["Cat : public Animal<br/>(IS-A relationship)"]
-        CPP_DOG["Dog : public Animal<br/>(IS-A relationship)"]
+    subgraph "Объектно-ориентированная иерархия C++"
+        CPP_ANIMAL["Animal<br/>(абстрактный базовый класс)"]
+        CPP_CAT["Cat : public Animal<br/>(отношение IS-A)"]
+        CPP_DOG["Dog : public Animal<br/>(отношение IS-A)"]
         
         CPP_ANIMAL --> CPP_CAT
         CPP_ANIMAL --> CPP_DOG
         
-        CPP_VTABLE["Virtual function table<br/>(Runtime dispatch)"]
-        CPP_HEAP["Often requires<br/>heap allocation"]
-        CPP_ISSUES["[ERROR] Deep inheritance trees<br/>[ERROR] Diamond problem<br/>[ERROR] Runtime overhead<br/>[ERROR] Tight coupling"]
+        CPP_VTABLE["Таблица виртуальных функций<br/>(диспетчеризация во время выполнения)"]
+        CPP_HEAP["Часто требует<br/>выделения в куче"]
+        CPP_ISSUES["[ОШИБКА] Глубокие деревья наследования<br/>[ОШИБКА] Проблема ромба<br/>[ОШИБКА] Накладные расходы во время выполнения<br/>[ОШИБКА] Жёсткая связанность"]
     end
     
-    subgraph "Rust Trait-Based Composition"
-        RUST_TRAIT["trait Animal<br/>(Behavior definition)"]
-        RUST_CAT["struct Cat<br/>(Data only)"]
-        RUST_DOG["struct Dog<br/>(Data only)"]
+    subgraph "Композиция на трейтах в Rust"
+        RUST_TRAIT["trait Animal<br/>(определение поведения)"]
+        RUST_CAT["struct Cat<br/>(только данные)"]
+        RUST_DOG["struct Dog<br/>(только данные)"]
         
-        RUST_CAT -.->|"impl Animal for Cat<br/>(CAN-DO behavior)"| RUST_TRAIT
-        RUST_DOG -.->|"impl Animal for Dog<br/>(CAN-DO behavior)"| RUST_TRAIT
+        RUST_CAT -.->|"impl Animal for Cat<br/>(УМЕЕТ поведение)"| RUST_TRAIT
+        RUST_DOG -.->|"impl Animal for Dog<br/>(УМЕЕТ поведение)"| RUST_TRAIT
         
-        RUST_STATIC["Static dispatch<br/>(Compile-time)"]
-        RUST_STACK["Stack allocation<br/>possible"]
-        RUST_BENEFITS["[OK] No inheritance hierarchy<br/>[OK] Multiple trait impls<br/>[OK] Zero runtime cost<br/>[OK] Loose coupling"]
+        RUST_STATIC["Статическая диспетчеризация<br/>(на этапе компиляции)"]
+        RUST_STACK["Возможно размещение<br/>на стеке"]
+        RUST_BENEFITS["[OK] Нет иерархии наследования<br/>[OK] Несколько реализаций трейтов<br/>[OK] Нет накладных расходов во время выполнения<br/>[OK] Слабая связанность"]
     end
     
     style CPP_ISSUES fill:#ff6b6b,color:#000
@@ -105,59 +105,59 @@ graph TD
     style RUST_STATIC fill:#91e5a3,color:#000
 ```
 
-### Trait Bounds and Generic Constraints
+### Ограничения трейтов и обобщённые ограничения
 
 ```rust
 use std::fmt::Display;
 use std::ops::Add;
 
-// C++ template equivalent (less constrained)
+// Аналог на C++ с шаблонами (меньше ограничений)
 // template<typename T>
 // T add_and_print(T a, T b) {
-//     // No guarantee T supports + or printing
-//     return a + b;  // Might fail at compile time
+//     // Нет гарантии, что T поддерживает + или вывод
+//     return a + b;  // Может не скомпилироваться
 // }
 
-// Rust - explicit trait bounds
+// Rust — явные ограничения трейтами
 fn add_and_print<T>(a: T, b: T) -> T 
 where 
     T: Display + Add<Output = T> + Copy,
 {
-    println!("Adding {} + {}", a, b);  // Display trait
-    a + b  // Add trait
+    println!("Adding {} + {}", a, b);  // Трейт Display
+    a + b  // Трейт Add
 }
 ```
 
 ```mermaid
 graph TD
-    subgraph "Generic Constraints Evolution"
-        UNCONSTRAINED["fn process<T>(data: T)<br/>[ERROR] T can be anything"]
-        SINGLE_BOUND["fn process<T: Display>(data: T)<br/>[OK] T must implement Display"]
-        MULTI_BOUND["fn process<T>(data: T)<br/>where T: Display + Clone + Debug<br/>[OK] Multiple requirements"]
+    subgraph "Эволюция обобщённых ограничений"
+        UNCONSTRAINED["fn process<T>(data: T)<br/>[ОШИБКА] T может быть чем угодно"]
+        SINGLE_BOUND["fn process<T: Display>(data: T)<br/>[OK] T должен реализовывать Display"]
+        MULTI_BOUND["fn process<T>(data: T)<br/>where T: Display + Clone + Debug<br/>[OK] Несколько требований"]
         
         UNCONSTRAINED --> SINGLE_BOUND
         SINGLE_BOUND --> MULTI_BOUND
     end
     
-    subgraph "Trait Bound Syntax"
+    subgraph "Синтаксис ограничений трейтов"
         INLINE["fn func<T: Trait>(param: T)"]
         WHERE_CLAUSE["fn func<T>(param: T)<br/>where T: Trait"]
         IMPL_PARAM["fn func(param: impl Trait)"]
         
-        COMPARISON["Inline: Simple cases<br/>Where: Complex bounds<br/>impl: Concise syntax"]
+        COMPARISON["Inline: простые случаи<br/>Where: сложные ограничения<br/>impl: краткий синтаксис"]
     end
     
-    subgraph "Compile-time Magic"
-        GENERIC_FUNC["Generic function<br/>with trait bounds"]
-        TYPE_CHECK["Compiler verifies<br/>trait implementations"]
-        MONOMORPH["Monomorphization<br/>(Create specialized versions)"]
-        OPTIMIZED["Fully optimized<br/>machine code"]
+    subgraph "Магия времени компиляции"
+        GENERIC_FUNC["Обобщённая функция<br/>с ограничениями трейтов"]
+        TYPE_CHECK["Компилятор проверяет<br/>реализации трейтов"]
+        MONOMORPH["Мономорфизация<br/>(создание специализированных версий)"]
+        OPTIMIZED["Полностью оптимизированный<br/>машинный код"]
         
         GENERIC_FUNC --> TYPE_CHECK
         TYPE_CHECK --> MONOMORPH
         MONOMORPH --> OPTIMIZED
         
-        EXAMPLE["add_and_print::<i32><br/>add_and_print::<f64><br/>(Separate functions generated)"]
+        EXAMPLE["add_and_print::<i32><br/>add_and_print::<f64><br/>(генерируются отдельные функции)"]
         MONOMORPH --> EXAMPLE
     end
     
@@ -167,14 +167,14 @@ graph TD
     style OPTIMIZED fill:#91e5a3,color:#000
 ```
 
-### C++ Operator Overloading → Rust `std::ops` Traits
+### Перегрузка операторов в C++ → трейты `std::ops` в Rust
 
-In C++, you overload operators by writing free functions or member functions with special names (`operator+`, `operator<<`, `operator[]`, etc.). In Rust, every operator maps to a trait in `std::ops` (or `std::fmt` for output). You **implement the trait** instead of writing a magic-named function.
+В C++ операторы перегружают, записывая свободные функции или методы с особыми именами (`operator+`, `operator<<`, `operator[]` и т. д.). В Rust каждый оператор соответствует трейту из `std::ops` (или `std::fmt` для вывода). Вы **реализуете трейт** вместо того, чтобы писать функцию с магическим именем.
 
-#### Side-by-side: `+` operator
+#### Рядом: оператор `+`
 
 ```cpp
-// C++: operator overloading as a member or free function
+// C++: перегрузка оператора как метода или свободной функции
 struct Vec2 {
     double x, y;
     Vec2 operator+(const Vec2& rhs) const {
@@ -183,7 +183,7 @@ struct Vec2 {
 };
 
 Vec2 a{1.0, 2.0}, b{3.0, 4.0};
-Vec2 c = a + b;  // calls a.operator+(b)
+Vec2 c = a + b;  // вызывает a.operator+(b)
 ```
 
 ```rust
@@ -193,7 +193,7 @@ use std::ops::Add;
 struct Vec2 { x: f64, y: f64 }
 
 impl Add for Vec2 {
-    type Output = Vec2;                     // Associated type — the result of +
+    type Output = Vec2;                     // Ассоциированный тип — результат +
     fn add(self, rhs: Vec2) -> Vec2 {
         Vec2 { x: self.x + rhs.x, y: self.y + rhs.y }
     }
@@ -201,77 +201,77 @@ impl Add for Vec2 {
 
 let a = Vec2 { x: 1.0, y: 2.0 };
 let b = Vec2 { x: 3.0, y: 4.0 };
-let c = a + b;  // calls <Vec2 as Add>::add(a, b)
+let c = a + b;  // вызывает <Vec2 as Add>::add(a, b)
 println!("{c:?}"); // Vec2 { x: 4.0, y: 6.0 }
 ```
 
-#### Key differences from C++
+#### Ключевые отличия от C++
 
-| Aspect | C++ | Rust |
+| Аспект | C++ | Rust |
 |--------|-----|------|
-| **Mechanism** | Magic function names (`operator+`) | Implement a trait (`impl Add for T`) |
-| **Discovery** | Grep for `operator+` or read the header | Look at trait impls — IDE support excellent |
-| **Return type** | Free choice | Fixed by the `Output` associated type |
-| **Receiver** | Usually takes `const T&` (borrows) | Takes `self` by value (moves!) by default |
-| **Symmetry** | Can write `impl operator+(int, Vec2)` | Must add `impl Add<Vec2> for i32` (foreign trait rules apply) |
-| **`<<` for printing** | `operator<<(ostream&, T)` — overload for *any* stream | `impl fmt::Display for T` — one canonical `to_string` representation |
+| **Механизм** | Магические имена функций (`operator+`) | Реализация трейта (`impl Add for T`) |
+| **Поиск** | Grep по `operator+` или чтение заголовка | Смотрите реализации трейтов — отличная поддержка в IDE |
+| **Тип результата** | Выбирается свободно | Фиксируется ассоциированным типом `Output` |
+| **Получатель** | Обычно принимает `const T&` (заимствование) | По умолчанию принимает `self` по значению (перемещение!) |
+| **Симметрия** | Можно написать `impl operator+(int, Vec2)` | Нужно добавить `impl Add<Vec2> for i32` (действуют правила для чужих трейтов) |
+| **`<<` для вывода** | `operator<<(ostream&, T)` — перегрузка для *любого* потока | `impl fmt::Display for T` — одно каноническое представление `to_string` |
 
-#### The `self` by value gotcha
+#### Ловушка `self` по значению
 
-In Rust, `Add::add(self, rhs)` takes `self` **by value**. For `Copy` types (like `Vec2` above, which derives `Copy`) this is fine — the compiler copies. But for non-`Copy` types, `+` **consumes** the operands:
+В Rust `Add::add(self, rhs)` принимает `self` **по значению**. Для типов `Copy` (как `Vec2` выше, у которого есть `derive(Copy)`) это нормально — компилятор копирует. Но для типов, не реализующих `Copy`, `+` **поглощает** операнды:
 
 ```rust
 let s1 = String::from("hello ");
 let s2 = String::from("world");
-let s3 = s1 + &s2;  // s1 is MOVED into s3!
-// println!("{s1}");  // ❌ Compile error: value used after move
-println!("{s2}");     // ✅ s2 was only borrowed (&s2)
+let s3 = s1 + &s2;  // s1 ПЕРЕМЕЩЁН в s3!
+// println!("{s1}");  // ❌ Ошибка компиляции: значение использовано после перемещения
+println!("{s2}");     // ✅ s2 была только заимствована (&s2)
 ```
 
-This is why `String + &str` works but `&str + &str` does not — `Add` is only implemented for `String + &str`, consuming the left-hand `String` to reuse its buffer. This has no C++ analogue: `std::string::operator+` always creates a new string.
+Именно поэтому `String + &str` работает, а `&str + &str` — нет: `Add` реализован только для `String + &str`, и он поглощает левую `String`, чтобы переиспользовать её буфер. В C++ этому нет аналога: `std::string::operator+` всегда создаёт новую строку.
 
-#### Full mapping: C++ operators → Rust traits
+#### Полное соответствие: операторы C++ → трейты Rust
 
-| C++ Operator | Rust Trait | Notes |
+| Оператор C++ | Трейт Rust | Примечания |
 |-------------|-----------|-------|
-| `operator+` | `std::ops::Add` | `Output` associated type |
+| `operator+` | `std::ops::Add` | Ассоциированный тип `Output` |
 | `operator-` | `std::ops::Sub` | |
-| `operator*` | `std::ops::Mul` | Not pointer deref — that's `Deref` |
+| `operator*` | `std::ops::Mul` | Не разыменование указателя — это `Deref` |
 | `operator/` | `std::ops::Div` | |
 | `operator%` | `std::ops::Rem` | |
-| `operator-` (unary) | `std::ops::Neg` | |
-| `operator!` / `operator~` | `std::ops::Not` | Rust uses `!` for both logical and bitwise NOT (no `~` operator) |
+| `operator-` (унарный) | `std::ops::Neg` | |
+| `operator!` / `operator~` | `std::ops::Not` | Rust использует `!` и для логического, и для побитового НЕ (оператора `~` нет) |
 | `operator&`, `\|`, `^` | `BitAnd`, `BitOr`, `BitXor` | |
-| `operator<<`, `>>` (shift) | `Shl`, `Shr` | NOT stream I/O! |
-| `operator+=` | `std::ops::AddAssign` | Takes `&mut self` (not `self`) |
-| `operator[]` | `std::ops::Index` / `IndexMut` | Returns `&Output` / `&mut Output` |
-| `operator()` | `Fn` / `FnMut` / `FnOnce` | Closures implement these; you cannot `impl Fn` directly |
-| `operator==` | `PartialEq` (+ `Eq`) | In `std::cmp`, not `std::ops` |
-| `operator<` | `PartialOrd` (+ `Ord`) | In `std::cmp` |
-| `operator<<` (stream) | `fmt::Display` | `println!("{}", x)` |
-| `operator<<` (debug) | `fmt::Debug` | `println!("{:?}", x)` |
-| `operator bool` | No direct equivalent | Use `impl From<T> for bool` or a named method like `.is_empty()` |
-| `operator T()` (implicit conversion) | No implicit conversions | Use `From`/`Into` traits (explicit) |
+| `operator<<`, `>>` (сдвиг) | `Shl`, `Shr` | НЕ потоковый ввод-вывод! |
+| `operator+=` | `std::ops::AddAssign` | Принимает `&mut self` (а не `self`) |
+| `operator[]` | `std::ops::Index` / `IndexMut` | Возвращает `&Output` / `&mut Output` |
+| `operator()` | `Fn` / `FnMut` / `FnOnce` | Замыкания реализуют их; напрямую `impl Fn` написать нельзя |
+| `operator==` | `PartialEq` (+ `Eq`) | В `std::cmp`, а не в `std::ops` |
+| `operator<` | `PartialOrd` (+ `Ord`) | В `std::cmp` |
+| `operator<<` (поток) | `fmt::Display` | `println!("{}", x)` |
+| `operator<<` (отладка) | `fmt::Debug` | `println!("{:?}", x)` |
+| `operator bool` | Прямого аналога нет | Используйте `impl From<T> for bool` или именованный метод вроде `.is_empty()` |
+| `operator T()` (неявное преобразование) | Неявных преобразований нет | Используйте трейты `From`/`Into` (явные) |
 
-#### Guardrails: what Rust prevents
+#### Ограничители: что запрещает Rust
 
-1. **No implicit conversions**: C++ `operator int()` can cause silent, surprising casts. Rust has no implicit conversion operators — use `From`/`Into` and call `.into()` explicitly.
-2. **No overloading `&&` / `||`**: C++ allows it (breaking short-circuit semantics!). Rust does not.
-3. **No overloading `=`**: Assignment is always a move or copy, never user-defined. Compound assignment (`+=`) IS overloadable via `AddAssign`, etc.
-4. **No overloading `,`**: C++ allows `operator,()` — one of the most infamous C++ footguns. Rust does not.
-5. **No overloading `&` (address-of)**: Another C++ footgun (`std::addressof` exists to work around it). Rust's `&` always means "borrow."
-6. **Coherence rules**: You can only implement `Add<Foreign>` for your own type, or `Add<YourType>` for a foreign type — never `Add<Foreign>` for `Foreign`. This prevents conflicting operator definitions across crates.
+1. **Нет неявных преобразований**: `operator int()` в C++ может вызывать тихие и неожиданные приведения. В Rust нет операторов неявного преобразования — используйте `From`/`Into` и вызывайте `.into()` явно.
+2. **Нельзя перегружать `&&` / `||`**: C++ это позволяет (и ломает семантику короткого замыкания!). Rust — нет.
+3. **Нельзя перегружать `=`**: присваивание всегда является перемещением или копированием, никогда не определяется пользователем. Составное присваивание (`+=`) перегружается через `AddAssign` и т. д.
+4. **Нельзя перегружать `,`**: C++ позволяет `operator,()` — один из самых печально известных подводных камней C++. Rust — нет.
+5. **Нельзя перегружать `&` (взятие адреса)**: ещё один подводный камень C++ (для обхода существует `std::addressof`). Оператор `&` в Rust всегда означает «заимствование».
+6. **Правила согласованности (coherence)**: можно реализовать `Add<Foreign>` только для собственного типа или `Add<YourType>` для чужого типа — но никогда `Add<Foreign>` для `Foreign`. Это предотвращает конфликтующие определения операторов между крейтами.
 
-> **Bottom line**: In C++, operator overloading is powerful but largely unregulated — you can overload almost anything, including comma and address-of, and implicit conversions can trigger silently. Rust gives you the same expressiveness for arithmetic and comparison operators via traits, but **blocks the historically dangerous overloads** and forces all conversions to be explicit.
+> **Главное**: в C++ перегрузка операторов мощна, но в основном не регламентирована — можно перегружать почти что угодно, включая запятую и взятие адреса, а неявные преобразования могут срабатывать незаметно. Rust даёт ту же выразительность для арифметических и операторов сравнения через трейты, но **блокирует исторически опасные перегрузки** и требует, чтобы все преобразования были явными.
 
 ----
-# Rust traits
-- Rust allows implementing a user defined trait on even built-in types like u32 in this example. However, either the trait or the type must belong to the crate
+# Трейты в Rust (реализация для встроенных типов)
+- Rust позволяет реализовать пользовательский трейт даже для встроенных типов, например u32, как в этом примере. Однако либо трейт, либо тип должен принадлежать крейту
 ```rust
 trait IsSecret {
   fn is_secret(&self);
 }
-// The IsSecret trait belongs to the crate, so we are OK
+// Трейт IsSecret принадлежит нашему крейту, поэтому всё в порядке
 impl IsSecret for u32 {
   fn is_secret(&self) {
       if *self == 42 {
@@ -287,24 +287,24 @@ fn main() {
 ```
 
 
-# Rust traits
-- Traits support interface inheritance and default implementations
+# Трейты в Rust (наследование интерфейсов)
+- Трейты поддерживают наследование интерфейсов и реализации по умолчанию
 ```rust
 trait Animal {
-  // Default implementation
+  // Реализация по умолчанию
   fn is_mammal(&self) -> bool {
     true
   }
 }
 trait Feline : Animal {
-  // Default implementation
+  // Реализация по умолчанию
   fn is_feline(&self) -> bool {
     true
   }
 }
 
 struct Cat;
-// Use default implementations. Note that all traits for the supertrait must be individually implemented
+// Используем реализации по умолчанию. Обратите внимание: все надтрейты нужно реализовать отдельно
 impl Feline for Cat {}
 impl Animal for Cat {}
 fn main() {
@@ -313,14 +313,14 @@ fn main() {
 }
 ```
 ----
-# Exercise: Logger trait implementation
+# Упражнение: реализация трейта Logger
 
-🟡 **Intermediate**
+🟡 **Средний уровень**
 
-- Implement a ```Log trait``` with a single method called log() that accepts a u64
-    - Implement two different loggers ```SimpleLogger``` and ```ComplexLogger``` that implement the ```Log trait```. One should output "Simple logger" with the ```u64``` and the other should output "Complex logger" with the ```u64``` 
+- Реализуйте трейт ```Log``` с единственным методом log(), который принимает u64
+    - Реализуйте два разных логгера ```SimpleLogger``` и ```ComplexLogger```, которые реализуют трейт ```Log```. Один должен выводить "Simple logger" вместе с ```u64```, а другой — "Complex logger" вместе с ```u64```
 
-<details><summary>Solution (click to expand)</summary>
+<details><summary>Решение (нажмите, чтобы развернуть)</summary>
 
 ```rust
 trait Log {
@@ -348,7 +348,7 @@ fn main() {
     simple.log(42);
     complex.log(42);
 }
-// Output:
+// Вывод:
 // Simple logger: 42
 // Complex logger: 42 (hex: 0x2a, binary: 101010)
 ```
@@ -356,7 +356,7 @@ fn main() {
 </details>
 
 ----
-# Rust trait associated types
+# Ассоциированные типы трейтов в Rust
 ```rust
 #[derive(Debug)]
 struct Small(u32);
@@ -379,8 +379,8 @@ fn main() {
 }
 ```
 
-# Rust trait impl
-- ```impl``` can be used with traits to accept any type that implements a trait
+# Реализация трейтов через impl в Rust
+- ```impl``` можно использовать вместе с трейтами, чтобы принимать любой тип, который реализует трейт
 ```rust
 trait Pet {
     fn speak(&self);
@@ -404,8 +404,8 @@ fn main() {
 }
 ```
 
-# Rust trait impl
-- ```impl``` can be also be used be used in a return value
+# Реализация трейтов через impl: возвращаемые значения
+- ```impl``` также можно использовать в возвращаемом значении
 ```rust
 trait Pet {}
 struct Dog;
@@ -426,8 +426,8 @@ fn main() {
 }
 ```
 ----
-# Rust dynamic traits
-- Dynamic traits can be used to invoke the trait functionality without knowing the underlying type. This is known as ```type erasure``` 
+# Динамические трейты в Rust
+- Динамические трейты позволяют вызывать функциональность трейта, не зная конкретного типа. Это называется ```стирание типа``` (type erasure)
 ```rust
 trait Pet {
     fn speak(&self);
@@ -452,15 +452,15 @@ fn main() {
 ```
 ----
 
-## Choosing Between `impl Trait`, `dyn Trait`, and Enums
+## Выбор между `impl Trait`, `dyn Trait` и перечислениями
 
-These three approaches all achieve polymorphism but with different trade-offs:
+Все три подхода дают полиморфизм, но с разными компромиссами:
 
-| Approach | Dispatch | Performance | Heterogeneous collections? | When to use |
+| Подход | Диспетчеризация | Производительность | Разнородные коллекции? | Когда использовать |
 |----------|----------|-------------|---------------------------|-------------|
-| `impl Trait` / generics | Static (monomorphized) | Zero-cost — inlined at compile time | No — each slot has one concrete type | Default choice. Function arguments, return types |
-| `dyn Trait` | Dynamic (vtable) | Small overhead per call (~1 pointer indirection) | Yes — `Vec<Box<dyn Trait>>` | When you need mixed types in a collection, or plugin-style extensibility |
-| `enum` | Match | Zero-cost — known variants at compile time | Yes — but only known variants | When the set of variants is **closed** and known at compile time |
+| `impl Trait` / обобщения | Статическая (мономорфизация) | Без накладных расходов — встраивается на этапе компиляции | Нет — каждый слот имеет один конкретный тип | Выбор по умолчанию. Аргументы функций, возвращаемые типы |
+| `dyn Trait` | Динамическая (vtable) | Небольшие накладные расходы на вызов (~одно косвенное обращение через указатель) | Да — `Vec<Box<dyn Trait>>` | Когда нужны смешанные типы в коллекции или расширяемость в стиле плагинов |
+| `enum` | Сопоставление с образцом | Без накладных расходов — варианты известны на этапе компиляции | Да — но только известные варианты | Когда набор вариантов **закрыт** и известен на этапе компиляции |
 
 ```rust
 trait Shape {
@@ -471,13 +471,13 @@ struct Rect { w: f64, h: f64 }
 impl Shape for Circle { fn area(&self) -> f64 { std::f64::consts::PI * self.radius * self.radius } }
 impl Shape for Rect   { fn area(&self) -> f64 { self.w * self.h } }
 
-// Static dispatch — compiler generates separate code for each type
+// Статическая диспетчеризация — компилятор генерирует отдельный код для каждого типа
 fn print_area(s: &impl Shape) { println!("{}", s.area()); }
 
-// Dynamic dispatch — one function, works with any Shape behind a pointer
+// Динамическая диспетчеризация — одна функция, работает с любым Shape за указателем
 fn print_area_dyn(s: &dyn Shape) { println!("{}", s.area()); }
 
-// Enum — closed set, no trait needed
+// Перечисление — закрытый набор, трейт не нужен
 enum ShapeEnum { Circle(f64), Rect(f64, f64) }
 impl ShapeEnum {
     fn area(&self) -> f64 {
@@ -489,7 +489,7 @@ impl ShapeEnum {
 }
 ```
 
-> **For C++ developers:** `impl Trait` is like C++ templates (monomorphized, zero-cost). `dyn Trait` is like C++ virtual functions (vtable dispatch). Rust enums with `match` are like `std::variant` with `std::visit` — but exhaustive matching is enforced by the compiler.
+> **Для программистов C++:** `impl Trait` похож на шаблоны C++ (мономорфизация, без накладных расходов). `dyn Trait` похож на виртуальные функции C++ (диспетчеризация через vtable). Перечисления Rust с `match` похожи на `std::variant` с `std::visit` — но исчерпывающее сопоставление обеспечивает компилятор.
 
-> **Rule of thumb**: Start with `impl Trait` (static dispatch). Reach for `dyn Trait` only when you need heterogeneous collections or can't know the concrete type at compile time. Use `enum` when you own all the variants.
+> **Эмпирическое правило**: начинайте с `impl Trait` (статическая диспетчеризация). Прибегайте к `dyn Trait`, только когда нужны разнородные коллекции или когда конкретный тип неизвестен на этапе компиляции. Используйте `enum`, когда вы владеете всеми вариантами.
 

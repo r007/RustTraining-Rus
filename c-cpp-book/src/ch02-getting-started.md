@@ -1,62 +1,62 @@
-# Enough talk already: Show me some code
+# Хватит разговоров: покажите код
 
-> **What you'll learn:** Your first Rust program — `fn main()`, `println!()`, and how Rust macros differ fundamentally from C/C++ preprocessor macros. By the end you'll be able to write, compile, and run simple Rust programs.
+> **Что вы узнаете:** вашу первую программу на Rust — `fn main()`, `println!()` и то, чем макросы Rust принципиально отличаются от препроцессорных макросов C/C++. К концу главы вы сможете написать, скомпилировать и запустить простые программы на Rust.
 
 ```rust
 fn main() {
     println!("Hello world from Rust");
 }
 ```
-- The above syntax should be similar to anyone familiar with C-style languages
-    - All functions in Rust begin with the ```fn``` keyword
-    - The default entry point for executables is ```main()```
-    - The ```println!``` looks like a function, but is actually a **macro**. Macros in Rust are very different from C/C++ preprocessor macros — they are hygienic, type-safe, and operate on the syntax tree rather than text substitution
-- Two great ways to quickly try out Rust snippets:
-    - **Online**: [Rust Playground](https://play.rust-lang.org/) — paste code, hit Run, share results. No install needed
-    - **Local REPL**: Install [`evcxr_repl`](https://github.com/evcxr/evcxr) for an interactive Rust REPL (like Python's REPL, but for Rust):
+- Этот синтаксис должен быть понятен всем, кто знаком с языками в стиле C
+    - Все функции в Rust начинаются с ключевого слова ```fn```
+    - Точка входа по умолчанию для исполняемых файлов — ```main()```
+    - ```println!``` выглядит как функция, но на самом деле это **макрос**. Макросы в Rust сильно отличаются от препроцессорных макросов C/C++: они гигиеничны, типобезопасны и работают с синтаксическим деревом, а не с текстовой подстановкой
+- Два удобных способа быстро опробовать фрагменты кода на Rust:
+    - **Онлайн**: [Rust Playground](https://play.rust-lang.org/) — вставьте код, нажмите Run и поделитесь результатом. Установка не нужна
+    - **Локальный REPL**: установите [`evcxr_repl`](https://github.com/evcxr/evcxr) для интерактивного REPL Rust (как REPL Python, только для Rust):
 ```bash
 cargo install --locked evcxr_repl
-evcxr   # Start the REPL, type Rust expressions interactively
+evcxr   # Запустить REPL и вводить выражения Rust интерактивно
 ```
 
-### Rust Local installation
-- Rust can be locally installed using the following methods
+### Локальная установка Rust
+- Rust можно установить локально одним из следующих способов
     - Windows: https://static.rust-lang.org/rustup/dist/x86_64-pc-windows-msvc/rustup-init.exe
     - Linux / WSL: ```curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh```
-- The Rust ecosystem is composed of the following components
-    - ```rustc``` is the standalone compiler, but it's seldom used directly
-    - The preferred tool, ```cargo``` is the Swiss Army knife and is used for dependency management, building, testing, formatting, linting, etc.
-    - The Rust toolchain comes in the ```stable```, ```beta``` and ```nightly``` (experimental) channels, but we'll stick with ```stable```. Use the ```rustup update``` command to upgrade the ```stable``` installation that's released every six weeks
-- We'll also install the ```rust-analyzer``` plug-in for VSCode
+- Экосистема Rust состоит из следующих компонентов
+    - ```rustc``` — самостоятельный компилятор, но им редко пользуются напрямую
+    - Основной инструмент — ```cargo```, швейцарский армейский нож для управления зависимостями, сборки, тестирования, форматирования, линтинга и т. д.
+    - Тулчейн Rust бывает в каналах ```stable```, ```beta``` и ```nightly``` (экспериментальный), но мы будем использовать ```stable```. Команда ```rustup update``` обновляет установку ```stable```, которая выходит каждые шесть недель
+- Мы также установим плагин ```rust-analyzer``` для VSCode
 
-# Rust packages (crates)
-- Rust binaries are created using packages (hereby called crates)
-    - A crate may either be standalone, or may have dependency on other crates. The crates for the dependencies can be local or remote. Third-party crates are typically downloaded from a centralized repository called ```crates.io```. 
-    - The ```cargo``` tool automatically handles the downloading of crates and their dependencies. This is conceptually equivalent to linking to C-libraries
-    - Crate dependencies are expressed in a file called ```Cargo.toml```. It also defines the target type for the crate: standalone executable, static library, dynamic library (uncommon)
-    - Reference: https://doc.rust-lang.org/cargo/reference/cargo-targets.html
+# Пакеты Rust (крейты)
+- Бинарные файлы Rust создаются из пакетов (далее — крейты)
+    - Крейт может быть самостоятельным или зависеть от других крейтов. Крейты-зависимости могут быть локальными или удалёнными. Сторонние крейты обычно скачиваются из централизованного репозитория под названием ```crates.io```.
+    - Инструмент ```cargo``` автоматически загружает крейты и их зависимости. Концептуально это эквивалентно подключению C-библиотек
+    - Зависимости крейта описываются в файле ```Cargo.toml```. Там же задаётся тип цели для крейта: самостоятельный исполняемый файл, статическая библиотека, динамическая библиотека (встречается редко)
+    - Справка: https://doc.rust-lang.org/cargo/reference/cargo-targets.html
 
-## Cargo vs Traditional C Build Systems
+## Cargo и традиционные системы сборки C
 
-### Dependency Management Comparison
+### Сравнение управления зависимостями
 
 ```mermaid
 graph TD
-    subgraph "Traditional C Build Process"
-        CC["C Source Files<br/>(.c, .h)"]
-        CM["Manual Makefile<br/>or CMake"]
-        CL["Linker"]
-        CB["Final Binary"]
+    subgraph "Традиционный процесс сборки на C"
+        CC["Исходные файлы C<br/>(.c, .h)"]
+        CM["Ручной Makefile<br/>или CMake"]
+        CL["Компоновщик"]
+        CB["Итоговый бинарный файл"]
         
         CC --> CM
         CM --> CL
         CL --> CB
         
-        CDep["Manual dependency<br/>management"]
+        CDep["Ручное управление<br/>зависимостями"]
         CLib1["libcurl-dev<br/>(apt install)"]
         CLib2["libjson-dev<br/>(apt install)"]
-        CInc["Manual include paths<br/>-I/usr/include/curl"]
-        CLink["Manual linking<br/>-lcurl -ljson"]
+        CInc["Ручные пути включения<br/>-I/usr/include/curl"]
+        CLink["Ручная компоновка<br/>-lcurl -ljson"]
         
         CDep --> CLib1
         CDep --> CLib2
@@ -65,28 +65,28 @@ graph TD
         CInc --> CM
         CLink --> CL
         
-        C_ISSUES["[ERROR] Version conflicts<br/>[ERROR] Platform differences<br/>[ERROR] Missing dependencies<br/>[ERROR] Linking order matters<br/>[ERROR] No automated updates"]
+        C_ISSUES["[ОШИБКА] Конфликты версий<br/>[ОШИБКА] Различия платформ<br/>[ОШИБКА] Отсутствующие зависимости<br/>[ОШИБКА] Важен порядок компоновки<br/>[ОШИБКА] Нет автоматических обновлений"]
     end
     
-    subgraph "Rust Cargo Build Process"
-        RS["Rust Source Files<br/>(.rs)"]
+    subgraph "Процесс сборки Rust с Cargo"
+        RS["Исходные файлы Rust<br/>(.rs)"]
         CT["Cargo.toml<br/>[dependencies]<br/>reqwest = '0.11'<br/>serde_json = '1.0'"]
-        CRG["Cargo Build System"]
-        RB["Final Binary"]
+        CRG["Система сборки Cargo"]
+        RB["Итоговый бинарный файл"]
         
         RS --> CRG
         CT --> CRG
         CRG --> RB
         
-        CRATES["crates.io<br/>(Package registry)"]
-        DEPS["Automatic dependency<br/>resolution"]
-        LOCK["Cargo.lock<br/>(Version pinning)"]
+        CRATES["crates.io<br/>(реестр пакетов)"]
+        DEPS["Автоматическое разрешение<br/>зависимостей"]
+        LOCK["Cargo.lock<br/>(фиксация версий)"]
         
         CRATES --> DEPS
         DEPS --> CRG
         CRG --> LOCK
         
-        R_BENEFITS["[OK] Semantic versioning<br/>[OK] Automatic downloads<br/>[OK] Cross-platform<br/>[OK] Transitive dependencies<br/>[OK] Reproducible builds"]
+        R_BENEFITS["[OK] Семантическое версионирование<br/>[OK] Автоматическая загрузка<br/>[OK] Кроссплатформенность<br/>[OK] Транзитивные зависимости<br/>[OK] Воспроизводимые сборки"]
     end
     
     style C_ISSUES fill:#ff6b6b,color:#000
@@ -99,34 +99,34 @@ graph TD
     style CRATES fill:#91e5a3,color:#000
 ```
 
-### Cargo Project Structure
+### Структура проекта Cargo
 
 ```text
 my_project/
-|-- Cargo.toml          # Project configuration (like package.json)
-|-- Cargo.lock          # Exact dependency versions (auto-generated)
+|-- Cargo.toml          # Конфигурация проекта (аналог package.json)
+|-- Cargo.lock          # Точные версии зависимостей (генерируется автоматически)
 |-- src/
-|   |-- main.rs         # Main entry point for binary
-|   |-- lib.rs          # Library root (if creating a library)
-|   `-- bin/            # Additional binary targets
-|-- tests/              # Integration tests
-|-- examples/           # Example code
-|-- benches/            # Benchmarks
-`-- target/             # Build artifacts (like C's build/ or obj/)
-    |-- debug/          # Debug builds (fast compile, slow runtime)
-    `-- release/        # Release builds (slow compile, fast runtime)
+|   |-- main.rs         # Главная точка входа для бинарного файла
+|   |-- lib.rs          # Корень библиотеки (если создаёте библиотеку)
+|   `-- bin/            # Дополнительные бинарные цели
+|-- tests/              # Интеграционные тесты
+|-- examples/           # Примеры кода
+|-- benches/            # Бенчмарки
+`-- target/             # Артефакты сборки (аналог build/ или obj/ в C)
+    |-- debug/          # Отладочные сборки (быстрая компиляция, медленное выполнение)
+    `-- release/        # Релизные сборки (медленная компиляция, быстрое выполнение)
 ```
 
-### Common Cargo Commands
+### Основные команды Cargo
 
 ```mermaid
 graph LR
-    subgraph "Project Lifecycle"
-        NEW["cargo new my_project<br/>[FOLDER] Create new project"]
-        CHECK["cargo check<br/>[SEARCH] Fast syntax check"]
-        BUILD["cargo build<br/>[BUILD] Compile project"]
-        RUN["cargo run<br/>[PLAY] Build and execute"]
-        TEST["cargo test<br/>[TEST] Run all tests"]
+    subgraph "Жизненный цикл проекта"
+        NEW["cargo new my_project<br/>[FOLDER] Создать проект"]
+        CHECK["cargo check<br/>[SEARCH] Быстрая проверка синтаксиса"]
+        BUILD["cargo build<br/>[BUILD] Скомпилировать проект"]
+        RUN["cargo run<br/>[PLAY] Собрать и выполнить"]
+        TEST["cargo test<br/>[TEST] Запустить все тесты"]
         
         NEW --> CHECK
         CHECK --> BUILD
@@ -134,17 +134,17 @@ graph LR
         BUILD --> TEST
     end
     
-    subgraph "Advanced Commands"
-        UPDATE["cargo update<br/>[CHART] Update dependencies"]
-        FORMAT["cargo fmt<br/>[SPARKLES] Format code"]
-        LINT["cargo clippy<br/>[WRENCH] Lint and suggestions"]
-        DOC["cargo doc<br/>[BOOKS] Generate documentation"]
-        PUBLISH["cargo publish<br/>[PACKAGE] Publish to crates.io"]
+    subgraph "Дополнительные команды"
+        UPDATE["cargo update<br/>[CHART] Обновить зависимости"]
+        FORMAT["cargo fmt<br/>[SPARKLES] Форматировать код"]
+        LINT["cargo clippy<br/>[WRENCH] Линтинг и подсказки"]
+        DOC["cargo doc<br/>[BOOKS] Сгенерировать документацию"]
+        PUBLISH["cargo publish<br/>[PACKAGE] Опубликовать на crates.io"]
     end
     
-    subgraph "Build Profiles"
-        DEBUG["cargo build<br/>(debug profile)<br/>Fast compile<br/>Slow runtime<br/>Debug symbols"]
-        RELEASE["cargo build --release<br/>(release profile)<br/>Slow compile<br/>Fast runtime<br/>Optimized"]
+    subgraph "Профили сборки"
+        DEBUG["cargo build<br/>(отладочный профиль)<br/>Быстрая компиляция<br/>Медленное выполнение<br/>Отладочные символы"]
+        RELEASE["cargo build --release<br/>(релизный профиль)<br/>Медленная компиляция<br/>Быстрое выполнение<br/>Оптимизирован"]
     end
     
     style NEW fill:#a3d5ff,color:#000
@@ -156,17 +156,15 @@ graph LR
     style RELEASE fill:#ef4444,color:#000
 ```
 
-# Example: cargo and crates
-- In this example, we have a standalone executable crate with no other dependencies
-- Use the following commands to create a new crate called ```helloworld``` 
+# Пример: cargo и крейты
+- В этом примере у нас есть самостоятельный исполняемый крейт без других зависимостей
+- Используйте следующие команды, чтобы создать новый крейт под названием ```helloworld```
 ```bash
 cargo new helloworld
 cd helloworld
 cat Cargo.toml
 ```
-- By default, ```cargo run``` will compile and run the ```debug``` (unoptimized) version of the crate. To execute the ```release``` version, use ```cargo run --release```
-- Note that actual binary file resides under the ```target``` folder under the ```debug``` or ```release``` folder 
-- We might have also noticed a file called ```Cargo.lock``` in the same folder as the source. It is automatically generated and should not be modified by hand
-    - We will revisit the specific purpose of ```Cargo.lock``` later
-
-
+- По умолчанию ```cargo run``` скомпилирует и запустит ```debug```-версию крейта (без оптимизаций). Чтобы запустить ```release```-версию, используйте ```cargo run --release```
+- Обратите внимание: сам бинарный файл находится в папке ```target```, внутри папки ```debug``` или ```release```
+- Возможно, вы также заметили файл ```Cargo.lock``` рядом с исходниками. Он генерируется автоматически и не должен редактироваться вручную
+    - Конкретное назначение ```Cargo.lock``` мы рассмотрим позже
