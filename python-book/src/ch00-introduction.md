@@ -126,7 +126,7 @@
 #### 16. Лучшие практики 🟡
 - [Идиоматичный Rust для разработчиков на Python](ch16-best-practices.md#идиоматичный-rust-для-разработчиков-на-python)
 - [Частые ошибки и их решения](ch16-best-practices.md#частые-ошибки-и-их-решения)
-- [Шпаргалка «Python → Rust»](ch16-best-practices.md#шпаргалка-python-rust)
+- [Шпаргалка «Python → Rust»](ch16-best-practices.md#шпаргалка-python--rust)
 - [Путь обучения и ресурсы](ch16-best-practices.md#путь-обучения-и-ресурсы)
 
 ---

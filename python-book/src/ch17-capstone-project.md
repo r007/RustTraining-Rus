@@ -1,32 +1,31 @@
-## Capstone Project: Build a CLI Task Manager
+## Итоговый проект: CLI-менеджер задач
 
-> **What you'll learn:** Tie together everything from the course by building a complete Rust CLI application
-> that a Python developer would typically write with `argparse` + `json` + `pathlib`.
+> **Что вы узнаете:** как объединить всё изученное в курсе, написав полноценное CLI-приложение на Rust. Обычно такое приложение пишут на Python с помощью `argparse` + `json` + `pathlib`.
 >
-> **Difficulty:** 🔴 Advanced
+> **Сложность:** 🔴 Продвинутый
 
-This capstone project exercises concepts from every major chapter:
-- **Ch. 3**: Types and variables (structs, enums)
-- **Ch. 5**: Collections (`Vec`, `HashMap`)
-- **Ch. 6**: Enums and pattern matching (task status, commands)
-- **Ch. 7**: Ownership and borrowing (passing references)
-- **Ch. 9**: Error handling (`Result`, `?`, custom errors)
-- **Ch. 10**: Traits (`Display`, `FromStr`)
-- **Ch. 11**: Type conversions (`From`, `TryFrom`)
-- **Ch. 12**: Iterators and closures (filtering, mapping)
-- **Ch. 8**: Modules (organized project structure)
+Этот итоговый проект использует концепции из каждой ключевой главы:
+- **Гл. 3**: типы и переменные (структуры, перечисления)
+- **Гл. 5**: коллекции (`Vec`, `HashMap`)
+- **Гл. 6**: перечисления и сопоставление с образцом (статус задачи, команды)
+- **Гл. 7**: владение и заимствование (передача ссылок)
+- **Гл. 9**: обработка ошибок (`Result`, `?`, собственные ошибки)
+- **Гл. 10**: трейты (`Display`, `FromStr`)
+- **Гл. 11**: преобразования типов (`From`, `TryFrom`)
+- **Гл. 12**: итераторы и замыкания (фильтрация, преобразование)
+- **Гл. 8**: модули (организация структуры проекта)
 
 ***
 
-## The Project: `rustdo`
+## Проект: `rustdo`
 
-A command-line task manager (like Python's `todo.txt` tools) that stores tasks in a JSON file.
+Менеджер задач для командной строки (вроде инструментов `todo.txt` в Python), который хранит задачи в JSON-файле.
 
-### Python Equivalent (what you'd write in Python)
+### Аналог на Python (что вы написали бы на Python)
 
 ```python
 #!/usr/bin/env python3
-"""A simple CLI task manager — the Python version."""
+"""Простой CLI-менеджер задач: версия на Python."""
 import json
 import sys
 from pathlib import Path
@@ -57,17 +56,17 @@ def load_tasks() -> list[Task]:
 def save_tasks(tasks: list[Task]):
     TASK_FILE.write_text(json.dumps([t.__dict__ for t in tasks], indent=2))
 
-# Commands: add, list, done, remove, stats
-# ... (you know how this goes in Python)
+# Команды: add, list, done, remove, stats
+# ... (вы и так знаете, как это делается на Python)
 ```
 
-### Your Rust Implementation
+### Ваша реализация на Rust
 
-Build this step-by-step. Each step maps to concepts from specific chapters.
+Собирайте проект по шагам. Каждый шаг соответствует концепциям из определённых глав.
 
 ***
 
-## Step 1: Define the Data Model (Ch. 3, 6, 10, 11)
+## Шаг 1: определите модель данных (гл. 3, 6, 10, 11)
 
 ```rust
 // src/task.rs
@@ -76,7 +75,7 @@ use std::str::FromStr;
 use serde::{Deserialize, Serialize};
 use chrono::Local;
 
-/// Task priority — maps to Python's Priority(Enum)
+/// Приоритет задачи: соответствует Priority(Enum) в Python
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Priority {
@@ -85,7 +84,7 @@ pub enum Priority {
     High,
 }
 
-// Display trait (Python's __str__)
+// Трейт Display (аналог __str__ в Python)
 impl fmt::Display for Priority {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -96,7 +95,7 @@ impl fmt::Display for Priority {
     }
 }
 
-// FromStr trait (parsing "high" → Priority::High)
+// Трейт FromStr (разбор "high" → Priority::High)
 impl FromStr for Priority {
     type Err = String;
 
@@ -105,12 +104,12 @@ impl FromStr for Priority {
             "low" | "l" => Ok(Priority::Low),
             "medium" | "med" | "m" => Ok(Priority::Medium),
             "high" | "h" => Ok(Priority::High),
-            other => Err(format!("unknown priority: '{other}' (use low/medium/high)")),
+            other => Err(format!("неизвестный приоритет: '{other}' (используйте low/medium/high)")),
         }
     }
 }
 
-/// A single task — maps to Python's Task class
+/// Одна задача: соответствует классу Task в Python
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Task {
     pub id: u32,
@@ -145,11 +144,11 @@ impl fmt::Display for Task {
 }
 ```
 
-> **Python comparison**: In Python you'd use `@dataclass` + `Enum`. In Rust, `struct` + `enum` + `derive` macros give you serialization, display, and parsing for free.
+> **Сравнение с Python**: в Python вы бы использовали `@dataclass` + `Enum`. В Rust `struct` + `enum` + макросы `derive` дают сериализацию, вывод и разбор бесплатно.
 
 ***
 
-## Step 2: Storage Layer (Ch. 9, 7)
+## Шаг 2: слой хранения (гл. 9, 7)
 
 ```rust
 // src/storage.rs
@@ -157,24 +156,24 @@ use std::fs;
 use std::path::PathBuf;
 use crate::task::Task;
 
-/// Get the path to the task file (~/.rustdo.json)
+/// Путь к файлу задач (~/.rustdo.json)
 fn task_file_path() -> PathBuf {
-    let home = dirs::home_dir().expect("Could not determine home directory");
+    let home = dirs::home_dir().expect("Не удалось определить домашний каталог");
     home.join(".rustdo.json")
 }
 
-/// Load tasks from disk — returns empty Vec if file doesn't exist
+/// Загрузить задачи с диска: возвращает пустой Vec, если файла нет
 pub fn load_tasks() -> Result<Vec<Task>, Box<dyn std::error::Error>> {
     let path = task_file_path();
     if !path.exists() {
         return Ok(Vec::new());
     }
-    let content = fs::read_to_string(&path)?;  // ? propagates io::Error
-    let tasks: Vec<Task> = serde_json::from_str(&content)?;  // ? propagates serde error
+    let content = fs::read_to_string(&path)?;  // ? передаёт io::Error дальше
+    let tasks: Vec<Task> = serde_json::from_str(&content)?;  // ? передаёт ошибку serde дальше
     Ok(tasks)
 }
 
-/// Save tasks to disk
+/// Сохранить задачи на диск
 pub fn save_tasks(tasks: &[Task]) -> Result<(), Box<dyn std::error::Error>> {
     let path = task_file_path();
     let json = serde_json::to_string_pretty(tasks)?;
@@ -183,17 +182,17 @@ pub fn save_tasks(tasks: &[Task]) -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-> **Python comparison**: Python uses `Path.read_text()` + `json.loads()`. Rust uses `fs::read_to_string()` + `serde_json::from_str()`. Note the `?` — every error is explicit and propagated.
+> **Сравнение с Python**: Python использует `Path.read_text()` + `json.loads()`. Rust использует `fs::read_to_string()` + `serde_json::from_str()`. Обратите внимание на `?`: каждая ошибка явная и передаётся дальше.
 
 ***
 
-## Step 3: Command Enum (Ch. 6)
+## Шаг 3: перечисление команд (гл. 6)
 
 ```rust
 // src/command.rs
 use crate::task::Priority;
 
-/// All possible commands — one enum variant per action
+/// Все возможные команды: один вариант перечисления на каждое действие
 pub enum Command {
     Add { title: String, priority: Priority },
     List { show_done: bool },
@@ -204,13 +203,13 @@ pub enum Command {
 }
 
 impl Command {
-    /// Parse command-line arguments into a Command
-    /// (In production, you'd use `clap` — this is educational)
+    /// Разбирает аргументы командной строки в Command
+    /// (в реальном проекте используйте `clap`, а здесь это учебный пример)
     pub fn parse(args: &[String]) -> Result<Self, String> {
         match args.first().map(|s| s.as_str()) {
             Some("add") => {
                 let title = args.get(1)
-                    .ok_or("usage: rustdo add <title> [priority]")?
+                    .ok_or("использование: rustdo add <title> [priority]")?
                     .clone();
                 let priority = args.get(2)
                     .map(|p| p.parse::<Priority>())
@@ -225,16 +224,16 @@ impl Command {
             }
             Some("done") => {
                 let id: u32 = args.get(1)
-                    .ok_or("usage: rustdo done <id>")?
+                    .ok_or("использование: rustdo done <id>")?
                     .parse()
-                    .map_err(|_| "id must be a number")?;
+                    .map_err(|_| "id должен быть числом")?;
                 Ok(Command::Done { id })
             }
             Some("remove") => {
                 let id: u32 = args.get(1)
-                    .ok_or("usage: rustdo remove <id>")?
+                    .ok_or("использование: rustdo remove <id>")?
                     .parse()
-                    .map_err(|_| "id must be a number")?;
+                    .map_err(|_| "id должен быть числом")?;
                 Ok(Command::Remove { id })
             }
             Some("stats") => Ok(Command::Stats),
@@ -244,11 +243,11 @@ impl Command {
 }
 ```
 
-> **Python comparison**: Python uses `argparse` or `click`. This hand-rolled parser shows how `match` on enum-like patterns replaces Python's if/elif chains. For real projects, use the `clap` crate.
+> **Сравнение с Python**: Python использует `argparse` или `click`. Этот самописный разбор показывает, как `match` по шаблонам, похожим на перечисления, заменяет цепочки if/elif в Python. Для реальных проектов используйте крейт `clap`.
 
 ***
 
-## Step 4: Business Logic (Ch. 5, 12, 7)
+## Шаг 4: бизнес-логика (гл. 5, 12, 7)
 
 ```rust
 // src/actions.rs
@@ -259,7 +258,7 @@ pub fn add_task(title: String, priority: Priority) -> Result<(), Box<dyn std::er
     let mut tasks = storage::load_tasks()?;
     let next_id = tasks.iter().map(|t| t.id).max().unwrap_or(0) + 1;
     let task = Task::new(next_id, title.clone(), priority);
-    println!("Added: {task}");
+    println!("Добавлено: {task}");
     tasks.push(task);
     storage::save_tasks(&tasks)?;
     Ok(())
@@ -268,28 +267,28 @@ pub fn add_task(title: String, priority: Priority) -> Result<(), Box<dyn std::er
 pub fn list_tasks(show_done: bool) -> Result<(), Box<dyn std::error::Error>> {
     let tasks = storage::load_tasks()?;
     let filtered: Vec<&Task> = tasks.iter()
-        .filter(|t| show_done || !t.done)   // Iterator + closure (Ch. 12)
+        .filter(|t| show_done || !t.done)   // Итератор + замыкание (гл. 12)
         .collect();
 
     if filtered.is_empty() {
-        println!("No tasks! 🎉");
+        println!("Задач нет! 🎉");
         return Ok(());
     }
 
     for task in &filtered {
-        println!("  {task}");   // Uses Display trait (Ch. 10)
+        println!("  {task}");   // Использует трейт Display (гл. 10)
     }
-    println!("\n{} task(s) shown", filtered.len());
+    println!("\nПоказано задач: {}", filtered.len());
     Ok(())
 }
 
 pub fn complete_task(id: u32) -> Result<(), Box<dyn std::error::Error>> {
     let mut tasks = storage::load_tasks()?;
     let task = tasks.iter_mut()
-        .find(|t| t.id == id)                // Iterator::find (Ch. 12)
-        .ok_or(format!("No task with id {id}"))?;
+        .find(|t| t.id == id)                // Iterator::find (гл. 12)
+        .ok_or(format!("Задачи с id {id} нет"))?;
     task.done = true;
-    println!("Completed: {task}");
+    println!("Выполнено: {task}");
     storage::save_tasks(&tasks)?;
     Ok(())
 }
@@ -297,11 +296,11 @@ pub fn complete_task(id: u32) -> Result<(), Box<dyn std::error::Error>> {
 pub fn remove_task(id: u32) -> Result<(), Box<dyn std::error::Error>> {
     let mut tasks = storage::load_tasks()?;
     let len_before = tasks.len();
-    tasks.retain(|t| t.id != id);            // Vec::retain (Ch. 5)
+    tasks.retain(|t| t.id != id);            // Vec::retain (гл. 5)
     if tasks.len() == len_before {
-        return Err(format!("No task with id {id}").into());
+        return Err(format!("Задачи с id {id} нет").into());
     }
-    println!("Removed task {id}");
+    println!("Удалена задача {id}");
     storage::save_tasks(&tasks)?;
     Ok(())
 }
@@ -312,27 +311,27 @@ pub fn show_stats() -> Result<(), Box<dyn std::error::Error>> {
     let done = tasks.iter().filter(|t| t.done).count();
     let pending = total - done;
 
-    // Group by priority using iterators (Ch. 12)
+    // Группировка по приоритету с помощью итераторов (гл. 12)
     let high = tasks.iter().filter(|t| !t.done && t.priority == Priority::High).count();
     let medium = tasks.iter().filter(|t| !t.done && t.priority == Priority::Medium).count();
     let low = tasks.iter().filter(|t| !t.done && t.priority == Priority::Low).count();
 
-    println!("📊 Task Statistics");
-    println!("   Total:   {total}");
-    println!("   Done:    {done} ✅");
-    println!("   Pending: {pending}");
-    println!("   🔴 High:   {high}");
-    println!("   🟡 Medium: {medium}");
-    println!("   🟢 Low:    {low}");
+    println!("📊 Статистика задач");
+    println!("   Всего:       {total}");
+    println!("   Выполнено:   {done} ✅");
+    println!("   В работе:    {pending}");
+    println!("   🔴 Высокий:  {high}");
+    println!("   🟡 Средний:  {medium}");
+    println!("   🟢 Низкий:   {low}");
     Ok(())
 }
 ```
 
-> **Key Rust patterns used**: `iter().map().max()`, `iter().filter().collect()`, `iter_mut().find()`, `retain()`, `iter().filter().count()`. These replace Python's list comprehensions, `next(x for x in ...)`, and `Counter`.
+> **Используемые паттерны Rust**: `iter().map().max()`, `iter().filter().collect()`, `iter_mut().find()`, `retain()`, `iter().filter().count()`. Они заменяют списочные включения Python, `next(x for x in ...)` и `Counter`.
 
 ***
 
-## Step 5: Wire It Together (Ch. 8)
+## Шаг 5: собираем всё вместе (гл. 8)
 
 ```rust
 // src/main.rs
@@ -348,7 +347,7 @@ fn main() {
     let command = match Command::parse(&args) {
         Ok(cmd) => cmd,
         Err(e) => {
-            eprintln!("Error: {e}");
+            eprintln!("Ошибка: {e}");
             std::process::exit(1);
         }
     };
@@ -366,28 +365,28 @@ fn main() {
     };
 
     if let Err(e) = result {
-        eprintln!("Error: {e}");
+        eprintln!("Ошибка: {e}");
         std::process::exit(1);
     }
 }
 
 fn print_help() {
-    println!("rustdo — a task manager for Pythonistas learning Rust\n");
-    println!("USAGE:");
-    println!("  rustdo add <title> [low|medium|high]   Add a task");
-    println!("  rustdo list [--all]                    List pending tasks");
-    println!("  rustdo done <id>                       Mark task complete");
-    println!("  rustdo remove <id>                     Remove a task");
-    println!("  rustdo stats                           Show statistics");
+    println!("rustdo — менеджер задач для питонистов, которые изучают Rust\n");
+    println!("ИСПОЛЬЗОВАНИЕ:");
+    println!("  rustdo add <title> [low|medium|high]   Добавить задачу");
+    println!("  rustdo list [--all]                    Показать невыполненные задачи");
+    println!("  rustdo done <id>                       Отметить задачу выполненной");
+    println!("  rustdo remove <id>                     Удалить задачу");
+    println!("  rustdo stats                           Показать статистику");
 }
 ```
 
 ```mermaid
 graph TD
-    CLI["main.rs<br/>(CLI entry)"] --> CMD["command.rs<br/>(parse args)"]
-    CMD --> ACT["actions.rs<br/>(business logic)"]
-    ACT --> STORE["storage.rs<br/>(JSON persistence)"]
-    ACT --> TASK["task.rs<br/>(data model)"]
+    CLI["main.rs<br/>(точка входа CLI)"] --> CMD["command.rs<br/>(разбор аргументов)"]
+    CMD --> ACT["actions.rs<br/>(бизнес-логика)"]
+    ACT --> STORE["storage.rs<br/>(хранение в JSON)"]
+    ACT --> TASK["task.rs<br/>(модель данных)"]
     STORE --> TASK
     style CLI fill:#d4edda
     style CMD fill:#fff3cd
@@ -398,7 +397,7 @@ graph TD
 
 ***
 
-## Step 6: Cargo.toml Dependencies
+## Шаг 6: зависимости в Cargo.toml
 
 ```toml
 [package]
@@ -413,14 +412,14 @@ chrono = "0.4"
 dirs = "5"
 ```
 
-> **Python equivalent**: This is your `pyproject.toml` `[project.dependencies]`. `cargo add serde serde_json chrono dirs` is like `pip install`.
+> **Аналог в Python**: это ваш `[project.dependencies]` из `pyproject.toml`. `cargo add serde serde_json chrono dirs` — аналог `pip install`.
 
 ***
 
-## Step 7: Tests (Ch. 14)
+## Шаг 7: тесты (гл. 14)
 
 ```rust
-// src/task.rs — add at the bottom
+// src/task.rs — добавьте в конец файла
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -439,7 +438,7 @@ mod tests {
         let display = format!("{task}");
         assert!(display.contains("Write Rust"));
         assert!(display.contains("🔴"));
-        assert!(display.contains("⬜")); // Not done yet
+        assert!(display.contains("⬜")); // Ещё не выполнена
     }
 
     #[test]
@@ -453,15 +452,15 @@ mod tests {
 }
 ```
 
-> **Python equivalent**: `pytest` tests. Run with `cargo test` instead of `pytest`. No test discovery magic needed — `#[test]` marks test functions explicitly.
+> **Аналог в Python**: тесты `pytest`. Запускайте их через `cargo test` вместо `pytest`. Никакой магии поиска тестов не нужно: `#[test]` явно помечает тестовые функции.
 
 ***
 
-## Stretch Goals
+## Дополнительные задания
 
-Once you have the basic version working, try these enhancements:
+Когда базовая версия заработает, попробуйте эти улучшения:
 
-1. **Add `clap` for argument parsing** — Replace the hand-rolled parser with `clap`'s derive macros:
+1. **Добавьте `clap` для разбора аргументов**: замените самописный разбор макросами derive из `clap`:
    ```rust
    #[derive(Parser)]
    enum Command {
@@ -473,31 +472,32 @@ Once you have the basic version working, try these enhancements:
    }
    ```
 
-2. **Add colored output** — Use the `colored` crate for terminal colors (like Python's `colorama`).
+2. **Добавьте цветной вывод**: используйте крейт `colored` для цветов в терминале (аналог `colorama` в Python).
 
-3. **Add due dates** — Add an `Option<NaiveDate>` field and filter overdue tasks.
+3. **Добавьте сроки выполнения**: добавьте поле `Option<NaiveDate>` и фильтруйте просроченные задачи.
 
-4. **Add tags/categories** — Use `Vec<String>` for tags and filter with `.iter().any()`.
+4. **Добавьте теги и категории**: используйте `Vec<String>` для тегов и фильтруйте через `.iter().any()`.
 
-5. **Make it a library + binary** — Split into `lib.rs` + `main.rs` so the logic is reusable (Ch. 8 module pattern).
+5. **Сделайте библиотеку и исполняемый файл**: разделите код на `lib.rs` и `main.rs`, чтобы логику можно было переиспользовать (паттерн модулей, гл. 8).
+
+***
+
+## Что вы попрактиковали
+
+| Глава | Концепция | Где использовалась |
+|-------|-----------|--------------------|
+| Гл. 3 | Типы и переменные | Поля структуры `Task`, `u32`, `String`, `bool` |
+| Гл. 5 | Коллекции | `Vec<Task>`, `retain()`, `push()` |
+| Гл. 6 | Перечисления и match | `Priority`, `Command`, исчерпывающее сопоставление |
+| Гл. 7 | Владение и заимствование | `&[Task]` и `Vec<Task>`, `&mut` для отметки о выполнении |
+| Гл. 8 | Модули | `mod task; mod storage; mod command; mod actions;` |
+| Гл. 9 | Обработка ошибок | `Result<T, E>`, оператор `?`, `.ok_or()` |
+| Гл. 10 | Трейты | `Display`, `FromStr`, `Serialize`, `Deserialize` |
+| Гл. 11 | From/Into | `FromStr` для Priority, `.into()` для преобразования ошибок |
+| Гл. 12 | Итераторы | `filter`, `map`, `find`, `count`, `collect` |
+| Гл. 14 | Тестирование | `#[test]`, `#[cfg(test)]`, макросы проверок |
+
+> 🎓 **Поздравляем!** Если вы создали этот проект, вы использовали каждую ключевую концепцию Rust, которая разобрана в этой книге. Вы больше не программист на Python, который учит Rust, а разработчик на Rust, который знает Python.
 
 ***
 
-## What You Practiced
-
-| Chapter | Concept | Where It Appeared |
-|---------|---------|-------------------|
-| Ch. 3 | Types and variables | `Task` struct fields, `u32`, `String`, `bool` |
-| Ch. 5 | Collections | `Vec<Task>`, `retain()`, `push()` |
-| Ch. 6 | Enums + match | `Priority`, `Command`, exhaustive matching |
-| Ch. 7 | Ownership + borrowing | `&[Task]` vs `Vec<Task>`, `&mut` for completion |
-| Ch. 8 | Modules | `mod task; mod storage; mod command; mod actions;` |
-| Ch. 9 | Error handling | `Result<T, E>`, `?` operator, `.ok_or()` |
-| Ch. 10 | Traits | `Display`, `FromStr`, `Serialize`, `Deserialize` |
-| Ch. 11 | From/Into | `FromStr` for Priority, `.into()` for error conversion |
-| Ch. 12 | Iterators | `filter`, `map`, `find`, `count`, `collect` |
-| Ch. 14 | Testing | `#[test]`, `#[cfg(test)]`, assertion macros |
-
-> 🎓 **Congratulations!** If you've built this project, you've used every major Rust concept covered in this book. You're no longer a Python developer learning Rust — you're a Rust developer who also knows Python.
-
-***

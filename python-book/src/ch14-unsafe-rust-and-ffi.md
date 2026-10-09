@@ -1,26 +1,23 @@
-## When and Why to Use Unsafe
+## Когда и зачем использовать unsafe
 
-> **What you'll learn:** What `unsafe` permits and why it exists, writing Python extensions with PyO3 (the killer feature for Python devs),
-> Rust's testing framework vs pytest, mocking with mockall, and benchmarking.
+> **Что вы узнаете:** что разрешает `unsafe` и почему он существует, написание расширений Python на PyO3 (главная возможность для разработчиков на Python), систему тестирования Rust в сравнении с pytest, моки с помощью mockall и бенчмаркинг.
 >
-> **Difficulty:** 🔴 Advanced
+> **Сложность:** 🔴 Продвинутый
 
-`unsafe` in Rust is an escape hatch — it tells the compiler "I'm doing something
-you can't verify, but I promise it's correct." Python has no equivalent because
-Python never gives you direct memory access.
+`unsafe` в Rust — это запасной люк: он сообщает компилятору «я делаю то, что ты не можешь проверить, но обещаю, что это корректно». У Python аналога нет, потому что Python никогда не даёт прямого доступа к памяти.
 
 ```mermaid
 flowchart TB
-    subgraph Safe ["Safe Rust (99% of code)"]
-        S1["Your application logic"]
+    subgraph Safe ["Безопасный Rust (99% кода)"]
+        S1["Логика вашего приложения"]
         S2["pub fn safe_api(&self) -> Result"]
     end
-    subgraph Unsafe ["unsafe block (minimal, audited)"]
-        U1["Raw pointer dereference"]
-        U2["FFI call to C/Python"]
+    subgraph Unsafe ["Блок unsafe (минимальный, проверенный)"]
+        U1["Разыменование сырого указателя"]
+        U2["Вызов FFI к C/Python"]
     end
-    subgraph External ["External (C / Python / OS)"]
-        E1["libc / PyO3 / system calls"]
+    subgraph External ["Внешние (C / Python / ОС)"]
+        E1["libc / PyO3 / системные вызовы"]
     end
     S1 --> S2
     S2 --> U1
@@ -32,61 +29,60 @@ flowchart TB
     style External fill:#f8d7da,stroke:#dc3545
 ```
 
-> **The pattern**: Safe API wraps a small `unsafe` block. Callers never see `unsafe`. Python's `ctypes` has no such boundary — every FFI call is implicitly unsafe.
+> **Схема**: безопасный API оборачивает небольшой блок `unsafe`. Вызывающий код никогда не видит `unsafe`. В `ctypes` Python такой границы нет: каждый вызов FFI неявно небезопасен.
 >
-> 📌 **See also**: [Ch. 13 — Concurrency](ch13-concurrency.md) covers `Send`/`Sync` traits which are `unsafe` auto-traits that the compiler checks for thread safety.
+> 📌 **См. также**: [Гл. 13 — Конкурентность](ch13-concurrency.md) описывает трейты `Send`/`Sync`, которые являются небезопасными автотрейтами, и компилятор проверяет их для потокобезопасности.
 
-### What unsafe Allows
+### Что разрешает unsafe
 ```rust
-// unsafe lets you do FIVE things that safe Rust forbids:
-// 1. Dereference raw pointers
-// 2. Call unsafe functions/methods
-// 3. Access mutable static variables
-// 4. Implement unsafe traits
-// 5. Access union fields
+// unsafe позволяет делать ПЯТЬ вещей, которые запрещены в безопасном Rust:
+// 1. Разыменовывать сырые указатели
+// 2. Вызывать небезопасные функции и методы
+// 3. Обращаться к изменяемым статическим переменным
+// 4. Реализовывать небезопасные трейты
+// 5. Обращаться к полям union
 
-// Example: calling a C function
+// Пример: вызов функции из C
 extern "C" {
     fn abs(input: i32) -> i32;
 }
 
 fn main() {
-    // SAFETY: abs() is a well-defined C standard library function.
-    let result = unsafe { abs(-42) };  // Safe Rust can't verify C code
+    // SAFETY: abs() — корректно определённая функция стандартной библиотеки C.
+    let result = unsafe { abs(-42) };  // Безопасный Rust не может проверить код на C
     println!("{result}");               // 42
 }
 ```
 
-### When to Use unsafe
+### Когда использовать unsafe
 ```rust
-// 1. FFI — calling C libraries (most common reason)
-// 2. Performance-critical inner loops (rare)
-// 3. Data structures the borrow checker can't express (rare)
+// 1. FFI — вызов библиотек на C (самая частая причина)
+// 2. Критичные к производительности внутренние циклы (редко)
+// 3. Структуры данных, которые заимствующий checker не может выразить (редко)
 
-// As a Python developer, you'll mostly encounter unsafe in:
-// - PyO3 internals (Python ↔ Rust bridge)
-// - C library bindings
-// - Low-level system calls
+// Как разработчик на Python, вы в основном встретите unsafe в:
+// - внутренностях PyO3 (мост Python ↔ Rust)
+// - привязках к библиотекам на C
+// - низкоуровневых системных вызовах
 
-// Rule of thumb: if you're writing application code (not library code),
-// you should almost never need unsafe. If you think you do, ask in the
-// Rust community first — there's usually a safe alternative.
+// Практическое правило: если вы пишете прикладной код (а не библиотечный),
+// unsafe почти никогда не нужен. Если кажется, что нужен, сначала спросите
+// сообщество Rust: обычно есть безопасная альтернатива.
 ```
 
 ***
 
-## PyO3: Rust Extensions for Python
+## PyO3: расширения Rust для Python
 
-PyO3 is the bridge between Python and Rust. It lets you write Rust functions and
-classes that are callable from Python — perfect for replacing slow Python hotspots.
+PyO3 — мост между Python и Rust. Он позволяет писать функции и классы на Rust, которые вызываются из Python, и это идеально для замены медленных участков кода на Python.
 
-### Creating a Python Extension in Rust
+### Создание расширения Python на Rust
 ```bash
-# Setup
-pip install maturin    # Build tool for Rust Python extensions
-maturin init           # Creates project structure
+# Установка
+pip install maturin    # Инструмент сборки расширений Rust для Python
+maturin init           # Создаёт структуру проекта
 
-# Project structure:
+# Структура проекта:
 # my_extension/
 # ├── Cargo.toml
 # ├── pyproject.toml
@@ -102,17 +98,17 @@ version = "0.1.0"
 edition = "2021"
 
 [lib]
-crate-type = ["cdylib"]    # Shared library for Python
+crate-type = ["cdylib"]    # Разделяемая библиотека для Python
 
 [dependencies]
 pyo3 = { version = "0.22", features = ["extension-module"] }
 ```
 
 ```rust
-// src/lib.rs — Rust functions callable from Python
+// src/lib.rs — функции Rust, которые можно вызывать из Python
 use pyo3::prelude::*;
 
-/// A fast Fibonacci function written in Rust.
+/// Быстрая функция Фибоначчи, написанная на Rust.
 #[pyfunction]
 fn fibonacci(n: u64) -> u64 {
     let (mut a, mut b) = (0u64, 1u64);
@@ -124,7 +120,7 @@ fn fibonacci(n: u64) -> u64 {
     a
 }
 
-/// Find all prime numbers up to n (Sieve of Eratosthenes).
+/// Найти все простые числа до n (решето Эратосфена).
 #[pyfunction]
 fn primes_up_to(n: usize) -> Vec<usize> {
     let mut is_prime = vec![true; n + 1];
@@ -140,7 +136,7 @@ fn primes_up_to(n: usize) -> Vec<usize> {
     (2..=n).filter(|&i| is_prime[i]).collect()
 }
 
-/// A Rust class usable from Python.
+/// Класс Rust, который можно использовать из Python.
 #[pyclass]
 struct Counter {
     value: i64,
@@ -166,7 +162,7 @@ impl Counter {
     }
 }
 
-/// The Python module definition.
+/// Определение модуля Python.
 #[pymodule]
 fn my_extension(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(fibonacci, m)?)?;
@@ -176,31 +172,31 @@ fn my_extension(m: &Bound<'_, PyModule>) -> PyResult<()> {
 }
 ```
 
-### Using from Python
+### Использование из Python
 ```bash
-# Build and install:
-maturin develop --release   # Builds and installs into current venv
+# Сборка и установка:
+maturin develop --release   # Собирает и устанавливает в текущее venv
 ```
 
 ```python
-# Python — use the Rust extension like any Python module
+# Python — используйте расширение Rust как любой модуль Python
 import my_extension
 
-# Call Rust function
+# Вызов функции на Rust
 result = my_extension.fibonacci(50)
-print(result)  # 12586269025 — computed in microseconds
+print(result)  # 12586269025 — вычислено за микросекунды
 
-# Use Rust class
+# Использование класса Rust
 counter = my_extension.Counter(0)
 counter.increment()
 counter.increment()
 print(counter.get_value())  # 2
 print(counter)              # Counter(value=2)
 
-# Performance comparison:
+# Сравнение производительности:
 import time
 
-# Python version
+# Версия на Python
 def py_primes(n):
     sieve = [True] * (n + 1)
     for i in range(2, int(n**0.5) + 1):
@@ -217,58 +213,58 @@ start = time.perf_counter()
 rs_result = my_extension.primes_up_to(10_000_000)
 rs_time = time.perf_counter() - start
 
-print(f"Python: {py_time:.3f}s")    # ~3.5s
-print(f"Rust:   {rs_time:.3f}s")    # ~0.05s — 70x faster!
-print(f"Same results: {py_result == rs_result}")  # True
+print(f"Python: {py_time:.3f}s")    # ~3,5 с
+print(f"Rust:   {rs_time:.3f}s")    # ~0,05 с — в 70 раз быстрее!
+print(f"Результаты совпадают: {py_result == rs_result}")  # True
 ```
 
-### PyO3 Quick Reference
+### Краткая справка по PyO3
 
-| Python Concept | PyO3 Attribute | Notes |
-|---------------|----------------|-------|
-| Function | `#[pyfunction]` | Exposed to Python |
-| Class | `#[pyclass]` | Python-visible class |
-| Method | `#[pymethods]` | Methods on a pyclass |
-| `__init__` | `#[new]` | Constructor |
-| `__repr__` | `fn __repr__()` | String representation |
-| `__str__` | `fn __str__()` | Display string |
-| `__len__` | `fn __len__()` | Length |
-| `__getitem__` | `fn __getitem__()` | Indexing |
-| Property | `#[getter]` / `#[setter]` | Attribute access |
-| Static method | `#[staticmethod]` | No self |
-| Class method | `#[classmethod]` | Takes cls |
+| Концепция Python | Атрибут PyO3 | Примечания |
+|------------------|--------------|------------|
+| Функция | `#[pyfunction]` | Доступна в Python |
+| Класс | `#[pyclass]` | Класс, видимый в Python |
+| Метод | `#[pymethods]` | Методы pyclass |
+| `__init__` | `#[new]` | Конструктор |
+| `__repr__` | `fn __repr__()` | Строковое представление |
+| `__str__` | `fn __str__()` | Строка для вывода |
+| `__len__` | `fn __len__()` | Длина |
+| `__getitem__` | `fn __getitem__()` | Индексация |
+| Property | `#[getter]` / `#[setter]` | Доступ к атрибутам |
+| Static method | `#[staticmethod]` | Без self |
+| Class method | `#[classmethod]` | Принимает cls |
 
-### FFI Safety Patterns
+### Шаблоны безопасности FFI
 
-When exposing Rust to Python (via PyO3 or raw C FFI), these rules prevent the most common bugs:
+Когда Rust экспортируется в Python (через PyO3 или сырой C FFI), эти правила предотвращают самые частые ошибки:
 
-1. **Never let a panic cross the FFI boundary** — a Rust panic unwinding into Python (or C) is **undefined behavior**. PyO3 handles this automatically for `#[pyfunction]`, but raw `extern "C"` functions need explicit protection:
+1. **Никогда не пропускайте панику через границу FFI.** Паника Rust, раскручивающаяся в Python (или C), — это **неопределённое поведение**. PyO3 делает это автоматически для `#[pyfunction]`, но сырым функциям `extern "C"` нужна явная защита:
     ```rust
     #[no_mangle]
     pub extern "C" fn raw_ffi_function() -> i32 {
         match std::panic::catch_unwind(|| {
-            // actual logic
+            // собственно логика
             42
         }) {
             Ok(result) => result,
-            Err(_) => -1,  // Return error code instead of panicking into C/Python
+            Err(_) => -1,  // Возвращаем код ошибки вместо паники в C/Python
         }
     }
     ```
 
-2. **`#[repr(C)]` for shared structs** — if Python/C reads struct fields directly, you **must** use `#[repr(C)]` to guarantee C-compatible layout. If you're passing opaque pointers (which PyO3 does for `#[pyclass]`), it's not needed.
+2. **`#[repr(C)]` для общих структур**: если Python/C читает поля структуры напрямую, **обязательно** используйте `#[repr(C)]`, чтобы гарантировать совместимую с C раскладку. Если передаются непрозрачные указатели (как делает PyO3 для `#[pyclass]`), это не нужно.
 
-3. **`extern "C"`** — required for raw FFI functions so the calling convention matches what C/Python expects. PyO3's `#[pyfunction]` handles this for you.
+3. **`extern "C"`**: обязательно для сырых FFI-функций, чтобы соглашение о вызовах совпадало с тем, что ожидают C/Python. `#[pyfunction]` в PyO3 делает это за вас.
 
-> **PyO3 advantage**: PyO3 wraps most of these safety concerns for you — panic catching, type conversion, GIL management. Prefer PyO3 over raw FFI unless you have a specific reason not to.
+> **Преимущество PyO3**: PyO3 берёт на себя большинство этих проблем безопасности: перехват паник, преобразование типов, управление GIL. Предпочитайте PyO3 сырому FFI, если нет особой причины не делать этого.
 
 ***
 
 
 <!-- ch14a: Testing -->
-## Unit Tests vs pytest
+## Модульные тесты и pytest
 
-### Python Testing with pytest
+### Тестирование на Python с pytest
 ```python
 # test_calculator.py
 import pytest
@@ -287,7 +283,7 @@ def test_divide_by_zero():
     with pytest.raises(ZeroDivisionError):
         divide(1, 0)
 
-# Parameterized tests
+# Параметризованные тесты
 @pytest.mark.parametrize("a,b,expected", [
     (1, 2, 3),
     (0, 0, 0),
@@ -297,7 +293,7 @@ def test_divide_by_zero():
 def test_add_parametrized(a, b, expected):
     assert add(a, b) == expected
 
-# Fixtures
+# Фикстуры
 @pytest.fixture
 def sample_data():
     return [1, 2, 3, 4, 5]
@@ -307,33 +303,33 @@ def test_sum(sample_data):
 ```
 
 ```bash
-# Running tests
-pytest                      # Run all tests
-pytest test_calculator.py   # Run one file
-pytest -k "test_add"        # Run matching tests
-pytest -v                   # Verbose output
-pytest --tb=short           # Short tracebacks
+# Запуск тестов
+pytest                      # Запустить все тесты
+pytest test_calculator.py   # Запустить один файл
+pytest -k "test_add"        # Запустить подходящие тесты
+pytest -v                   # Подробный вывод
+pytest --tb=short           # Короткие трассировки
 ```
 
-### Rust Built-in Testing
+### Встроенное тестирование в Rust
 ```rust
-// src/calculator.rs — tests live in the SAME file!
+// src/calculator.rs — тесты находятся в ТОМ ЖЕ файле!
 fn add(a: i32, b: i32) -> i32 {
     a + b
 }
 
 fn divide(a: f64, b: f64) -> Result<f64, String> {
     if b == 0.0 {
-        Err("Division by zero".to_string())
+        Err("Деление на ноль".to_string())
     } else {
         Ok(a / b)
     }
 }
 
-// Tests go in a #[cfg(test)] module — only compiled during `cargo test`
+// Тесты размещаются в модуле #[cfg(test)]: он компилируется только при `cargo test`
 #[cfg(test)]
 mod tests {
-    use super::*;  // Import everything from parent module
+    use super::*;  // Импортировать всё из родительского модуля
 
     #[test]
     fn test_add() {
@@ -355,49 +351,49 @@ mod tests {
         assert!(divide(1.0, 0.0).is_err());
     }
 
-    // Test that something panics (like pytest.raises)
+    // Проверка, что что-то паникует (как pytest.raises)
     #[test]
     #[should_panic(expected = "out of bounds")]
     fn test_out_of_bounds() {
         let v = vec![1, 2, 3];
-        let _ = v[99];  // Panics
+        let _ = v[99];  // Паника
     }
 }
 ```
 
 ```bash
-# Running tests
-cargo test                         # Run all tests
-cargo test test_add                # Run matching tests
-cargo test -- --nocapture          # Show println! output
-cargo test -p my_crate             # Test one crate in workspace
-cargo test -- --test-threads=1     # Sequential (for tests with side effects)
+# Запуск тестов
+cargo test                         # Запустить все тесты
+cargo test test_add                # Запустить подходящие тесты
+cargo test -- --nocapture          # Показать вывод println!
+cargo test -p my_crate             # Тестировать один крейт в рабочем пространстве
+cargo test -- --test-threads=1     # Последовательно (для тестов с побочными эффектами)
 ```
 
-### Testing Quick Reference
+### Краткая справка по тестированию
 
-| pytest | Rust | Notes |
-|--------|------|-------|
-| `assert x == y` | `assert_eq!(x, y)` | Equality |
-| `assert x != y` | `assert_ne!(x, y)` | Inequality |
-| `assert condition` | `assert!(condition)` | Boolean |
-| `assert condition, "msg"` | `assert!(condition, "msg")` | With message |
-| `pytest.raises(E)` | `#[should_panic]` | Expect panic |
-| `@pytest.fixture` | Setup in test or helper fn | No built-in fixtures |
-| `@pytest.mark.parametrize` | `rstest` crate | Parameterized tests |
-| `conftest.py` | `tests/common/mod.rs` | Shared test helpers |
-| `pytest.skip()` | `#[ignore]` | Skip a test |
-| `tmp_path` fixture | `tempfile` crate | Temporary directories |
+| pytest | Rust | Примечания |
+|--------|------|------------|
+| `assert x == y` | `assert_eq!(x, y)` | Равенство |
+| `assert x != y` | `assert_ne!(x, y)` | Неравенство |
+| `assert condition` | `assert!(condition)` | Логическое условие |
+| `assert condition, "msg"` | `assert!(condition, "msg")` | С сообщением |
+| `pytest.raises(E)` | `#[should_panic]` | Ожидается паника |
+| `@pytest.fixture` | Настройка в тесте или вспомогательной функции | Встроенных фикстур нет |
+| `@pytest.mark.parametrize` | Крейт `rstest` | Параметризованные тесты |
+| `conftest.py` | `tests/common/mod.rs` | Общие вспомогательные функции для тестов |
+| `pytest.skip()` | `#[ignore]` | Пропустить тест |
+| Фикстура `tmp_path` | Крейт `tempfile` | Временные каталоги |
 
 ***
 
-## Parameterized Tests with rstest
+## Параметризованные тесты с rstest
 ```rust
 // Cargo.toml: rstest = "0.23"
 
 use rstest::rstest;
 
-// Like @pytest.mark.parametrize
+// Как @pytest.mark.parametrize
 #[rstest]
 #[case(1, 2, 3)]
 #[case(0, 0, 0)]
@@ -407,7 +403,7 @@ fn test_add(#[case] a: i32, #[case] b: i32, #[case] expected: i32) {
     assert_eq!(add(a, b), expected);
 }
 
-// Like @pytest.fixture
+// Как @pytest.fixture
 use rstest::fixture;
 
 #[fixture]
@@ -423,9 +419,9 @@ fn test_sum(sample_data: Vec<i32>) {
 
 ***
 
-## Mocking with mockall
+## Моки с mockall
 ```python
-# Python — mocking with unittest.mock
+# Python — моки с помощью unittest.mock
 from unittest.mock import Mock, patch
 
 def test_fetch_user():
@@ -438,12 +434,12 @@ def test_fetch_user():
 ```
 
 ```rust
-// Rust — mocking with mockall crate
+// Rust — моки с помощью крейта mockall
 // Cargo.toml: mockall = "0.13"
 
 use mockall::{automock, predicate::*};
 
-#[automock]                          // Generates MockDatabase automatically
+#[automock]                          // Автоматически генерирует MockDatabase
 trait Database {
     fn get_user(&self, id: i64) -> Option<User>;
 }
@@ -467,15 +463,15 @@ fn test_fetch_user() {
 
 ---
 
-## Exercises
+## Упражнения
 
 <details>
-<summary><strong>🏋️ Exercise: Safe Wrapper Around Unsafe</strong> (click to expand)</summary>
+<summary><strong>🏋️ Упражнение: безопасная обёртка вокруг unsafe</strong> (нажмите, чтобы раскрыть)</summary>
 
-**Challenge**: Write a safe function `split_at_mid` that takes a `&mut [i32]` and returns two mutable slices `(&mut [i32], &mut [i32])` split at the midpoint. Internally, use `unsafe` with raw pointers (simulating what `split_at_mut` does). Then wrap it in a safe API.
+**Задание**: напишите безопасную функцию `split_at_mid`, которая принимает `&mut [i32]` и возвращает два изменяемых среза `(&mut [i32], &mut [i32])`, разделённых посередине. Внутри используйте `unsafe` с сырыми указателями (имитируя то, что делает `split_at_mut`). Затем оберните это в безопасный API.
 
 <details>
-<summary>🔑 Solution</summary>
+<summary>🔑 Решение</summary>
 
 ```rust
 fn split_at_mid(slice: &mut [i32]) -> (&mut [i32], &mut [i32]) {
@@ -483,10 +479,10 @@ fn split_at_mid(slice: &mut [i32]) -> (&mut [i32], &mut [i32]) {
     let ptr = slice.as_mut_ptr();
     let len = slice.len();
 
-    assert!(mid <= len); // Safety check before unsafe
+    assert!(mid <= len); // Проверка безопасности до unsafe
 
-    // SAFETY: mid <= len (asserted above), and ptr comes from a valid &mut slice,
-    // so both sub-slices are within bounds and non-overlapping.
+    // SAFETY: mid <= len (проверено выше), а ptr получен из корректного &mut среза,
+    // поэтому оба подсреза находятся в границах и не пересекаются.
     unsafe {
         (
             std::slice::from_raw_parts_mut(ptr, mid),
@@ -500,16 +496,15 @@ fn main() {
     let (left, right) = split_at_mid(&mut data);
     left[0] = 99;
     right[0] = 88;
-    println!("left: {left:?}, right: {right:?}");
-    // left: [99, 2, 3], right: [88, 5, 6]
+    println!("слева: {left:?}, справа: {right:?}");
+    // слева: [99, 2, 3], справа: [88, 5, 6]
 }
 ```
 
-**Key takeaway**: The `unsafe` block is small and guarded by the `assert!`. The public API is fully safe — callers never see `unsafe`. This is the Rust pattern: unsafe internals, safe interfaces. Python's `ctypes` gives you no such guarantees.
+**Ключевой вывод**: блок `unsafe` небольшой и защищён `assert!`. Публичный API полностью безопасен: вызывающий код никогда не видит `unsafe`. Это паттерн Rust: небезопасные внутренности, безопасные интерфейсы. `ctypes` в Python не даёт таких гарантий.
 
 </details>
 </details>
 
 ***
-
 

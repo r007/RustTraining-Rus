@@ -1,13 +1,12 @@
-## Common Python Patterns in Rust
+## Частые паттерны Python в Rust
 
-> **What you'll learn:** How to translate dict→struct, class→struct+impl, list comprehension→iterator chain,
-> decorator→trait, and context manager→Drop/RAII. Plus essential crates and an incremental adoption strategy.
+> **Что вы узнаете:** как переводить dict → struct, class → struct+impl, списочные включения → цепочки итераторов, декоратор → функции высшего порядка и контекстный менеджер → Drop/RAII. Плюс основные крейты и стратегия постепенного внедрения.
 >
-> **Difficulty:** 🟡 Intermediate
+> **Сложность:** 🟡 Средний
 
-### Dictionary → Struct
+### Словарь → структура
 ```python
-# Python — dict as data container (very common)
+# Python — dict как контейнер данных (очень распространённо)
 user = {
     "name": "Alice",
     "age": 30,
@@ -18,7 +17,7 @@ print(user["name"])
 ```
 
 ```rust
-// Rust — struct with named fields
+// Rust — структура с именованными полями
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 struct User {
     name: String,
@@ -36,9 +35,9 @@ let user = User {
 println!("{}", user.name);
 ```
 
-### Context Manager → RAII (Drop)
+### Контекстный менеджер → RAII (Drop)
 ```python
-# Python — context manager for resource cleanup
+# Python — контекстный менеджер для освобождения ресурсов
 class FileManager:
     def __init__(self, path):
         self.file = open(path, 'w')
@@ -51,11 +50,11 @@ class FileManager:
 
 with FileManager("output.txt") as f:
     f.write("hello")
-# File automatically closed when exiting `with`
+# Файл автоматически закрывается при выходе из блока `with`
 ```
 
 ```rust
-// Rust — RAII: Drop trait runs when value goes out of scope
+// Rust — RAII: трейт Drop выполняется, когда значение выходит из области видимости
 use std::fs::File;
 use std::io::Write;
 
@@ -63,14 +62,14 @@ fn write_file() -> std::io::Result<()> {
     let mut file = File::create("output.txt")?;
     file.write_all(b"hello")?;
     Ok(())
-    // File automatically closed when `file` goes out of scope
-    // No `with` needed — RAII handles it!
+    // Файл автоматически закрывается, когда `file` выходит из области видимости
+    // `with` не нужен: RAII делает всё сам!
 }
 ```
 
-### Decorator → Higher-Order Function or Macro
+### Декоратор → функция высшего порядка или макрос
 ```python
-# Python — decorator for timing
+# Python — декоратор для замера времени
 import functools, time
 
 def timed(func):
@@ -79,7 +78,7 @@ def timed(func):
         start = time.perf_counter()
         result = func(*args, **kwargs)
         elapsed = time.perf_counter() - start
-        print(f"{func.__name__} took {elapsed:.4f}s")
+        print(f"{func.__name__} выполнилась за {elapsed:.4f}s")
         return result
     return wrapper
 
@@ -89,7 +88,7 @@ def slow_function():
 ```
 
 ```rust
-// Rust — no decorators, use wrapper functions or macros
+// Rust — никаких декораторов: используйте функции-обёртки или макросы
 use std::time::Instant;
 
 fn timed<F, R>(name: &str, f: F) -> R
@@ -98,20 +97,20 @@ where
 {
     let start = Instant::now();
     let result = f();
-    println!("{} took {:.4?}", name, start.elapsed());
+    println!("{} выполнилась за {:.4?}", name, start.elapsed());
     result
 }
 
-// Usage:
+// Использование:
 let result = timed("slow_function", || {
     std::thread::sleep(std::time::Duration::from_secs(1));
     42
 });
 ```
 
-### Iterator Pipeline (Data Processing)
+### Конвейер итераторов (обработка данных)
 ```python
-# Python — chain of transformations
+# Python — цепочка преобразований
 import csv
 from collections import Counter
 
@@ -128,7 +127,7 @@ def analyze_sales(filename):
 ```
 
 ```rust
-// Rust — iterator chains with strong types
+// Rust — цепочки итераторов с сильной типизацией
 use std::collections::HashMap;
 
 #[derive(Debug, serde::Deserialize)]
@@ -155,9 +154,9 @@ fn analyze_sales(filename: &str) -> Vec<(String, usize)> {
 }
 ```
 
-### Global Config / Singleton
+### Глобальная конфигурация / синглтон
 ```python
-# Python — module-level singleton (common pattern)
+# Python — синглтон на уровне модуля (распространённый паттерн)
 # config.py
 import json
 
@@ -171,11 +170,11 @@ class Config:
                 cls._instance.data = json.load(f)
         return cls._instance
 
-config = Config()  # Module-level singleton
+config = Config()  # Синглтон на уровне модуля
 ```
 
 ```rust
-// Rust — OnceLock for lazy static initialization (Rust 1.70+)
+// Rust — OnceLock для ленивой статической инициализации (Rust 1.70+)
 use std::sync::OnceLock;
 use serde_json::Value;
 
@@ -184,80 +183,80 @@ static CONFIG: OnceLock<Value> = OnceLock::new();
 fn get_config() -> &'static Value {
     CONFIG.get_or_init(|| {
         let data = std::fs::read_to_string("config.json")
-            .expect("Failed to read config");
+            .expect("Не удалось прочитать конфигурацию");
         serde_json::from_str(&data)
-            .expect("Failed to parse config")
+            .expect("Не удалось разобрать конфигурацию")
     })
 }
 
-// Usage anywhere:
+// Использование в любом месте:
 let db_host = get_config()["database"]["host"].as_str().unwrap();
 ```
 
 ***
 
-## Essential Crates for Python Developers
+## Основные крейты для разработчиков на Python
 
-### Data Processing & Serialization
+### Обработка данных и сериализация
 
-| Task | Python | Rust Crate | Notes |
-|------|--------|-----------|-------|
-| JSON | `json` | `serde_json` | Type-safe serialization |
-| CSV | `csv`, `pandas` | `csv` | Streaming, low memory |
-| YAML | `pyyaml` | `serde_yaml` | Config files |
-| TOML | `tomllib` | `toml` | Config files |
-| Data validation | `pydantic` | `serde` + custom | Compile-time validation |
-| Date/time | `datetime` | `chrono` | Full timezone support |
-| Regex | `re` | `regex` | Very fast |
-| UUID | `uuid` | `uuid` | Same concept |
+| Задача | Python | Крейт Rust | Примечания |
+|--------|--------|------------|------------|
+| JSON | `json` | `serde_json` | Типобезопасная сериализация |
+| CSV | `csv`, `pandas` | `csv` | Потоковая обработка, мало памяти |
+| YAML | `pyyaml` | `serde_yaml` | Файлы конфигурации |
+| TOML | `tomllib` | `toml` | Файлы конфигурации |
+| Валидация данных | `pydantic` | `serde` + собственная логика | Проверка на этапе компиляции |
+| Дата и время | `datetime` | `chrono` | Полная поддержка часовых поясов |
+| Регулярные выражения | `re` | `regex` | Очень быстро |
+| UUID | `uuid` | `uuid` | Та же концепция |
 
-### Web & Network
+### Веб и сеть
 
-| Task | Python | Rust Crate | Notes |
-|------|--------|-----------|-------|
-| HTTP client | `requests` | `reqwest` | Async-first |
-| Web framework | `FastAPI`/`Flask` | `axum` / `actix-web` | Very fast |
-| WebSocket | `websockets` | `tokio-tungstenite` | Async |
-| gRPC | `grpcio` | `tonic` | Full support |
-| Database (SQL) | `sqlalchemy` | `sqlx` / `diesel` | Compile-time checked SQL |
-| Redis | `redis-py` | `redis` | Async support |
+| Задача | Python | Крейт Rust | Примечания |
+|--------|--------|------------|------------|
+| HTTP-клиент | `requests` | `reqwest` | Асинхронный в первую очередь |
+| Веб-фреймворк | `FastAPI`/`Flask` | `axum` / `actix-web` | Очень быстро |
+| WebSocket | `websockets` | `tokio-tungstenite` | Асинхронный |
+| gRPC | `grpcio` | `tonic` | Полная поддержка |
+| База данных (SQL) | `sqlalchemy` | `sqlx` / `diesel` | SQL с проверкой на этапе компиляции |
+| Redis | `redis-py` | `redis` | Поддержка async |
 
-### CLI & System
+### CLI и система
 
-| Task | Python | Rust Crate | Notes |
-|------|--------|-----------|-------|
-| CLI args | `argparse`/`click` | `clap` | Derive macros |
-| Colored output | `colorama` | `colored` | Terminal colors |
-| Progress bar | `tqdm` | `indicatif` | Same UX |
-| File watching | `watchdog` | `notify` | Cross-platform |
-| Logging | `logging` | `tracing` | Structured, async-ready |
-| Env vars | `os.environ` | `std::env` + `dotenvy` | .env support |
-| Subprocess | `subprocess` | `std::process::Command` | Built-in |
-| Temp files | `tempfile` | `tempfile` | Same name! |
+| Задача | Python | Крейт Rust | Примечания |
+|--------|--------|------------|------------|
+| Аргументы CLI | `argparse`/`click` | `clap` | Макросы derive |
+| Цветной вывод | `colorama` | `colored` | Цвета в терминале |
+| Индикатор прогресса | `tqdm` | `indicatif` | Похожий UX |
+| Отслеживание файлов | `watchdog` | `notify` | Кроссплатформенный |
+| Логирование | `logging` | `tracing` | Структурированный, готов к async |
+| Переменные окружения | `os.environ` | `std::env` + `dotenvy` | Поддержка .env |
+| Подпроцессы | `subprocess` | `std::process::Command` | Встроен |
+| Временные файлы | `tempfile` | `tempfile` | Одинаковое название! |
 
-### Testing
+### Тестирование
 
-| Task | Python | Rust Crate | Notes |
-|------|--------|-----------|-------|
-| Test framework | `pytest` | Built-in + `rstest` | `cargo test` |
-| Mocking | `unittest.mock` | `mockall` | Trait-based |
-| Property testing | `hypothesis` | `proptest` | Similar API |
-| Snapshot testing | `syrupy` | `insta` | Snapshot approval |
-| Benchmarking | `pytest-benchmark` | `criterion` | Statistical |
-| Code coverage | `coverage.py` | `cargo-tarpaulin` | LLVM-based |
+| Задача | Python | Крейт Rust | Примечания |
+|--------|--------|------------|------------|
+| Фреймворк тестов | `pytest` | Встроенный + `rstest` | `cargo test` |
+| Моки | `unittest.mock` | `mockall` | На основе трейтов |
+| Property-тестирование | `hypothesis` | `proptest` | Похожий API |
+| Снапшот-тестирование | `syrupy` | `insta` | Подтверждение снимков |
+| Бенчмарки | `pytest-benchmark` | `criterion` | Статистические |
+| Покрытие кода | `coverage.py` | `cargo-tarpaulin` | На основе LLVM |
 
 ***
 
-## Incremental Adoption Strategy
+## Стратегия постепенного внедрения
 
 ```mermaid
 flowchart TB
-    A["1️⃣ Profile Python<br/>(find hotspots)"] --> B["2️⃣ Write Rust Extension<br/>(PyO3 + maturin)"]
-    B --> C["3️⃣ Replace Python Call<br/>(same API)"]
-    C --> D["4️⃣ Expand Gradually<br/>(more functions)"]
-    D --> E{"Full rewrite<br/>worth it?"}
-    E -->|Yes| F["Pure Rust🦀"]
-    E -->|No| G["Hybrid🐍+🦀"]
+    A["1️⃣ Профилируйте Python<br/>(найдите узкие места)"] --> B["2️⃣ Напишите расширение на Rust<br/>(PyO3 + maturin)"]
+    B --> C["3️⃣ Замените вызов Python<br/>(тот же API)"]
+    C --> D["4️⃣ Расширяйте постепенно<br/>(больше функций)"]
+    D --> E{"Полная переписка<br/>оправдана?"}
+    E -->|Да| F["Чистый Rust🦀"]
+    E -->|Нет| G["Гибрид🐍+🦀"]
     style A fill:#ffeeba
     style B fill:#fff3cd
     style C fill:#d4edda
@@ -266,64 +265,64 @@ flowchart TB
     style G fill:#c3e6cb
 ```
 
-> 📌 **See also**: [Ch. 14 — Unsafe Rust and FFI](ch14-unsafe-rust-and-ffi.md) covers the low-level FFI details needed for PyO3 bindings.
+> 📌 **См. также**: [Гл. 14 — Unsafe Rust и FFI](ch14-unsafe-rust-and-ffi.md) описывает низкоуровневые детали FFI, необходимые для привязок PyO3.
 
-### Step 1: Identify Hotspots
+### Шаг 1: найдите узкие места
 
 ```python
-# Profile your Python code first
+# Сначала профилируйте код на Python
 import cProfile
-cProfile.run('main()')  # Find the CPU-intensive functions
+cProfile.run('main()')  # Находим функции, которые сильно грузят CPU
 
-# Or use py-spy for sampling profiler:
+# Или используйте py-spy как профилировщик сэмплирования:
 # py-spy top --pid <python-pid>
 # py-spy record -o profile.svg -- python main.py
 ```
 
-### Step 2: Write Rust Extension for Hotspot
+### Шаг 2: напишите расширение на Rust для узкого места
 
 ```bash
-# Create a Rust extension with maturin
+# Создаём расширение на Rust с помощью maturin
 cd my_python_project
 maturin init --bindings pyo3
 
-# Write the hot function in Rust (see PyO3 section above)
-# Build and install:
+# Пишем горячую функцию на Rust (см. раздел про PyO3 выше)
+# Собираем и устанавливаем:
 maturin develop --release
 ```
 
-### Step 3: Replace Python Call with Rust Call
+### Шаг 3: замените вызов Python вызовом Rust
 
 ```python
-# Before:
-result = python_hot_function(data)  # Slow
+# До:
+result = python_hot_function(data)  # Медленно
 
-# After:
+# После:
 import my_rust_extension
-result = my_rust_extension.hot_function(data)  # Fast!
+result = my_rust_extension.hot_function(data)  # Быстро!
 
-# Same API, same tests, 10-100x faster
+# Тот же API, те же тесты, в 10–100 раз быстрее
 ```
 
-### Step 4: Expand Gradually
+### Шаг 4: расширяйте постепенно
 
 ```rust
-Week 1-2: Replace one CPU-bound function with Rust
-Week 3-4: Replace data parsing/validation layer
-Month 2:  Replace core data pipeline
-Month 3+: Consider full Rust rewrite if benefits justify it
+Неделя 1–2: заменить одну функцию, ограниченную CPU, на Rust
+Неделя 3–4: заменить слой разбора и валидации данных
+Месяц 2:    заменить основной конвейер данных
+Месяц 3+:   рассмотреть полную переписку на Rust, если выгода оправдывает затраты
 
-Key principle: keep Python for orchestration, use Rust for computation.
+Ключевой принцип: оставьте Python для оркестрации, а Rust для вычислений.
 ```
 
 ---
 
-## 💼 Case Study: Accelerating a Data Pipeline with PyO3
+## 💼 Кейс: ускорение конвейера данных с PyO3
 
-A fintech startup has a Python data pipeline that processes 2GB of daily transaction CSV files. The critical bottleneck is a validation + transformation step:
+Финтех-стартап обрабатывает ежедневно файлы CSV с транзакциями общим объёмом 2 ГБ на Python. Критическое узкое место — шаг валидации и преобразования:
 
 ```python
-# Python — the slow part (~12 minutes for 2GB)
+# Python — медленная часть (~12 минут на 2 ГБ)
 import csv
 from decimal import Decimal
 from datetime import datetime
@@ -333,12 +332,12 @@ def validate_and_transform(filepath: str) -> list[dict]:
     with open(filepath) as f:
         reader = csv.DictReader(f)
         for row in reader:
-            # Parse and validate each field
+            # Разбираем и проверяем каждое поле
             amount = Decimal(row["amount"])
             if amount < 0:
-                raise ValueError(f"Negative amount: {amount}")
+                raise ValueError(f"Отрицательная сумма: {amount}")
             date = datetime.strptime(row["date"], "%Y-%m-%d")
-            category = categorize(row["merchant"])  # String matching, ~50 rules
+            category = categorize(row["merchant"])  # Поиск по строкам, ~50 правил
 
             results.append({
                 "amount_cents": int(amount * 100),
@@ -347,15 +346,15 @@ def validate_and_transform(filepath: str) -> list[dict]:
                 "merchant": row["merchant"].strip().lower(),
             })
     return results
-# ~12 minutes for 15M rows. Tried pandas — got to ~8 minutes but 6GB RAM.
+# ~12 минут на 15 млн строк. Пробовали pandas: вышло ~8 минут, но 6 ГБ ОЗУ.
 ```
 
-**Step 1**: Profile and identify the hotspot (CSV parsing + Decimal conversion + string matching = 95% of time).
+**Шаг 1**: профилируем и находим узкое место (разбор CSV + преобразование Decimal + поиск по строкам = 95% времени).
 
-**Step 2**: Write the Rust extension:
+**Шаг 2**: пишем расширение на Rust:
 
 ```rust
-// src/lib.rs — PyO3 extension
+// src/lib.rs — расширение PyO3
 use pyo3::prelude::*;
 use pyo3::types::PyList;
 use std::fs::File;
@@ -370,7 +369,7 @@ struct Transaction {
 }
 
 fn categorize(merchant: &str) -> &'static str {
-    // Aho-Corasick or simple rules — compiled once, blazing fast
+    // Aho-Corasick или простые правила: компилируются один раз и работают очень быстро
     if merchant.contains("amazon") { "shopping" }
     else if merchant.contains("uber") || merchant.contains("lyft") { "transport" }
     else if merchant.contains("starbucks") { "food" }
@@ -382,13 +381,13 @@ fn process_transactions(path: &str) -> PyResult<Vec<(i64, String, String, String
     let file = File::open(path).map_err(|e| pyo3::exceptions::PyIOError::new_err(e.to_string()))?;
     let mut reader = csv::Reader::from_reader(BufReader::new(file));
 
-    let mut results = Vec::with_capacity(15_000_000); // Pre-allocate
+    let mut results = Vec::with_capacity(15_000_000); // Предварительное выделение памяти
 
     for record in reader.records() {
         let record = record.map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
         let amount_str = &record[0];
-        let amount_cents = parse_amount_cents(amount_str)?;  // Your custom parser (no Decimal needed)
-        let date = &record[1];  // Already in ISO format, just validate
+        let amount_cents = parse_amount_cents(amount_str)?;  // Ваш собственный парсер (Decimal не нужен)
+        let date = &record[1];  // Уже в формате ISO, нужно только проверить
         let merchant = record[2].trim().to_lowercase();
         let category = categorize(&merchant).to_string();
 
@@ -404,62 +403,62 @@ fn fast_pipeline(m: &Bound<'_, PyModule>) -> PyResult<()> {
 }
 ```
 
-**Step 3**: Replace one line in Python:
+**Шаг 3**: заменяем одну строку в Python:
 
 ```python
-# Before:
-results = validate_and_transform("transactions.csv")  # 12 minutes
+# До:
+results = validate_and_transform("transactions.csv")  # 12 минут
 
-# After:
+# После:
 import fast_pipeline
-results = fast_pipeline.process_transactions("transactions.csv")  # 45 seconds
+results = fast_pipeline.process_transactions("transactions.csv")  # 45 секунд
 
-# Same Python orchestration, same tests, same deployment
-# Just one function replaced
+# Та же оркестрация на Python, те же тесты, то же развёртывание
+# Заменена только одна функция
 ```
 
-**Results**:
-| Metric | Python (csv + Decimal) | Rust (PyO3 + csv crate) |
-|--------|----------------------|------------------------|
-| Time (2GB / 15M rows) | 12 minutes | 45 seconds |
-| Peak memory | 6GB (pandas) / 2GB (csv) | 200MB |
-| Lines changed in Python | — | 1 (import + call) |
-| Rust code written | — | ~60 lines |
-| Tests passing | 47/47 | 47/47 (unchanged) |
+**Результаты**:
 
-> **Key lesson**: You don't need to rewrite your whole application. Find the 5% of code that takes 95% of the time, rewrite that in Rust with PyO3, and keep everything else in Python. The team went from "we need to add more servers" to "one server is enough."
+| Метрика | Python (csv + Decimal) | Rust (PyO3 + крейт csv) |
+|---------|------------------------|-------------------------|
+| Время (2 ГБ / 15 млн строк) | 12 минут | 45 секунд |
+| Пиковая память | 6 ГБ (pandas) / 2 ГБ (csv) | 200 МБ |
+| Строк изменено в Python | — | 1 (import + вызов) |
+| Написано кода на Rust | — | ~60 строк |
+| Пройденные тесты | 47/47 | 47/47 (без изменений) |
+
+> **Ключевой урок**: переписывать всё приложение не нужно. Найдите 5% кода, на который уходит 95% времени, перепишите его на Rust с PyO3, а всё остальное оставьте на Python. Команда перешла от «нам нужно добавить серверов» к «одного сервера достаточно».
 
 ---
 
-## Exercises
+## Упражнения
 
 <details>
-<summary><strong>🏋️ Exercise: Migration Decision Matrix</strong> (click to expand)</summary>
+<summary><strong>🏋️ Упражнение: матрица решений по миграции</strong> (нажмите, чтобы раскрыть)</summary>
 
-**Challenge**: You have a Python web application with these components. For each one, decide: **Keep in Python**, **Rewrite in Rust**, or **PyO3 bridge**. Justify each choice.
+**Задание**: у вас есть веб-приложение на Python с такими компонентами. Для каждого решите: **оставить на Python**, **переписать на Rust** или **мост PyO3**. Обоснуйте каждый выбор.
 
-1. Flask route handlers (request parsing, JSON responses)
-2. Image thumbnail generation (CPU-bound, processes 10k images/day)
-3. Database ORM queries (SQLAlchemy)
-4. CSV parser for 2GB financial files (runs nightly)
-5. Admin dashboard (Jinja2 templates)
+1. Обработчики маршрутов Flask (разбор запросов, ответы JSON)
+2. Генерация миниатюр изображений (ограничено CPU, 10 тыс. изображений в день)
+3. Запросы ORM к базе данных (SQLAlchemy)
+4. Разбор CSV для финансовых файлов по 2 ГБ (запускается ночью)
+5. Панель администратора (шаблоны Jinja2)
 
 <details>
-<summary>🔑 Solution</summary>
+<summary>🔑 Решение</summary>
 
-| Component | Decision | Rationale |
+| Компонент | Решение | Обоснование |
 |---|---|---|
-| Flask route handlers | 🐍 Keep Python | I/O-bound, framework-heavy, low benefit from Rust |
-| Image thumbnail generation | 🦀 PyO3 bridge | CPU-bound hot path, keep Python API, Rust internals |
-| Database ORM queries | 🐍 Keep Python | SQLAlchemy is mature, queries are I/O-bound |
-| CSV parser (2GB) | 🦀 PyO3 bridge or full Rust | CPU + memory bound, Rust's zero-copy parsing shines |
-| Admin dashboard | 🐍 Keep Python | UI/template code, no performance concern |
+| Обработчики маршрутов Flask | 🐍 Оставить на Python | Ограничено вводом-выводом, завязано на фреймворк, выигрыш от Rust мал |
+| Генерация миниатюр изображений | 🦀 Мост PyO3 | Горячий путь, ограниченный CPU: API остаётся на Python, внутренности на Rust |
+| Запросы ORM к базе данных | 🐍 Оставить на Python | SQLAlchemy зрелый, запросы ограничены вводом-выводом |
+| Разбор CSV (2 ГБ) | 🦀 Мост PyO3 или полный Rust | Ограничено CPU и памятью, здесь хорошо работает разбор без копирования |
+| Панель администратора | 🐍 Оставить на Python | Код UI и шаблонов, производительность не проблема |
 
-**Key takeaway**: The migration sweet spot is CPU-bound, performance-critical code that has a clean boundary. Don't rewrite glue code or I/O-bound handlers — the gains don't justify the cost.
+**Ключевой вывод**: золотая середина миграции — это код, ограниченный CPU и критичный к производительности, с чистой границей. Не переписывайте клеящий код и обработчики, ограниченные вводом-выводом: выигрыш не окупит затрат.
 
 </details>
 </details>
 
 ***
-
 
