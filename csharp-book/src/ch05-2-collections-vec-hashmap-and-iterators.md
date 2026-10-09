@@ -1,117 +1,117 @@
-## `Vec<T>` vs `List<T>`
+## `Vec<T>` против `List<T>`
 
-> **What you'll learn:** `Vec<T>` vs `List<T>`, `HashMap` vs `Dictionary`, safe access patterns
-> (why Rust returns `Option` instead of throwing), and the ownership implications of collections.
+> **Что вы узнаете:** `Vec<T>` против `List<T>`, `HashMap` против `Dictionary`, безопасные паттерны доступа
+> (почему Rust возвращает `Option` вместо генерации исключения), а также последствия владения для коллекций.
 >
-> **Difficulty:** 🟢 Beginner
+> **Сложность:** 🟢 Начальный
 
-`Vec<T>` is Rust's equivalent to C#'s `List<T>`, but with ownership semantics.
+`Vec<T>` — аналог `List<T>` из C# в Rust, но с семантикой владения.
 
-### C# `List<T>`
+### `List<T>` в C#
 ```csharp
-// C# List<T> - Reference type, heap allocated
+// List<T> в C# — ссылочный тип, размещается в куче
 var numbers = new List<int>();
 numbers.Add(1);
 numbers.Add(2);
 numbers.Add(3);
 
-// Pass to method - reference is copied
+// Передача в метод — ссылка копируется
 ProcessList(numbers);
-Console.WriteLine(numbers.Count);  // Still accessible
+Console.WriteLine(numbers.Count);  // По-прежнему доступен
 
 void ProcessList(List<int> list)
 {
-    list.Add(4);  // Modifies original list
+    list.Add(4);  // Изменяет исходный список
     Console.WriteLine($"Count in method: {list.Count}");
 }
 ```
 
-### Rust `Vec<T>`
+### `Vec<T>` в Rust
 ```rust
-// Rust Vec<T> - Owned type, heap allocated
+// Vec<T> в Rust — владеемый тип, размещается в куче
 let mut numbers = Vec::new();
 numbers.push(1);
 numbers.push(2);
 numbers.push(3);
 
-// Method that takes ownership
+// Метод, который забирает владение
 process_vec(numbers);
-// println!("{:?}", numbers);  // ❌ Error: numbers was moved
+// println!("{:?}", numbers);  // ❌ Ошибка: numbers было перемещено
 
-// Method that borrows
-let mut numbers = vec![1, 2, 3];  // vec! macro for convenience
+// Метод, который заимствует
+let mut numbers = vec![1, 2, 3];  // Макрос vec! для удобства
 process_vec_borrowed(&mut numbers);
-println!("{:?}", numbers);  // ✅ Still accessible
+println!("{:?}", numbers);  // ✅ По-прежнему доступен
 
-fn process_vec(mut vec: Vec<i32>) {  // Takes ownership
+fn process_vec(mut vec: Vec<i32>) {  // Забирает владение
     vec.push(4);
     println!("Count in method: {}", vec.len());
-    // vec is dropped here
+    // vec освобождается здесь
 }
 
-fn process_vec_borrowed(vec: &mut Vec<i32>) {  // Borrows mutably
+fn process_vec_borrowed(vec: &mut Vec<i32>) {  // Заимствует изменяемо
     vec.push(4);
     println!("Count in method: {}", vec.len());
 }
 ```
 
-### Creating and Initializing Vectors
+### Создание и инициализация векторов
 ```csharp
-// C# List initialization
+// Инициализация List в C#
 var numbers = new List<int> { 1, 2, 3, 4, 5 };
 var empty = new List<int>();
-var sized = new List<int>(10);  // Initial capacity
+var sized = new List<int>(10);  // Начальная ёмкость
 
-// From other collections
+// Из других коллекций
 var fromArray = new List<int>(new[] { 1, 2, 3 });
 ```
 
 ```rust
-// Rust Vec initialization
-let numbers = vec![1, 2, 3, 4, 5];  // vec! macro
-let empty: Vec<i32> = Vec::new();   // Type annotation needed for empty
-let sized = Vec::with_capacity(10); // Pre-allocate capacity
+// Инициализация Vec в Rust
+let numbers = vec![1, 2, 3, 4, 5];  // Макрос vec!
+let empty: Vec<i32> = Vec::new();   // Для пустого нужна аннотация типа
+let sized = Vec::with_capacity(10); // Предварительное выделение ёмкости
 
-// From iterator
+// Из итератора
 let from_range: Vec<i32> = (1..=5).collect();
 let from_array = vec![1, 2, 3];
 ```
 
-### Common Operations Comparison
+### Сравнение распространённых операций
 ```csharp
-// C# List operations
+// Операции с List в C#
 var list = new List<int> { 1, 2, 3 };
 
-list.Add(4);                    // Add element
-list.Insert(0, 0);              // Insert at index
-list.Remove(2);                 // Remove first occurrence
-list.RemoveAt(1);               // Remove at index
-list.Clear();                   // Remove all
+list.Add(4);                    // Добавить элемент
+list.Insert(0, 0);              // Вставить по индексу
+list.Remove(2);                 // Удалить первое вхождение
+list.RemoveAt(1);               // Удалить по индексу
+list.Clear();                   // Удалить все
 
-int first = list[0];            // Index access
-int count = list.Count;         // Get count
-bool contains = list.Contains(3); // Check if contains
+int first = list[0];            // Доступ по индексу
+int count = list.Count;         // Получить количество
+bool contains = list.Contains(3); // Проверка наличия
 ```
 
 ```rust
-// Rust Vec operations
+// Операции с Vec в Rust
 let mut vec = vec![1, 2, 3];
 
-vec.push(4);                    // Add element
-vec.insert(0, 0);               // Insert at index
-vec.retain(|&x| x != 2);        // Remove elements (functional style)
-vec.remove(1);                  // Remove at index
-vec.clear();                    // Remove all
+vec.push(4);                    // Добавить элемент
+vec.insert(0, 0);               // Вставить по индексу
+vec.retain(|&x| x != 2);        // Удалить элементы (в функциональном стиле)
+vec.remove(1);                  // Удалить по индексу
+vec.clear();                    // Удалить все
 
-let first = vec[0];             // Index access (panics if out of bounds)
-let safe_first = vec.get(0);    // Safe access, returns Option<&T>
-let count = vec.len();          // Get count
-let contains = vec.contains(&3); // Check if contains
+let first = vec[0];             // Доступ по индексу (паника, если выход за границы)
+let safe_first = vec.get(0);    // Безопасный доступ, возвращает Option<&T>
+let count = vec.len();          // Получить количество
+let contains = vec.contains(&3); // Проверка наличия
 ```
 
-### Safe Access Patterns
+### Паттерны безопасного доступа
 ```csharp
-// C# - Exception-based bounds checking
+// C# — проверка границ через исключения
 public int SafeAccess(List<int> list, int index)
 {
     try
@@ -120,27 +120,27 @@ public int SafeAccess(List<int> list, int index)
     }
     catch (ArgumentOutOfRangeException)
     {
-        return -1;  // Default value
+        return -1;  // Значение по умолчанию
     }
 }
 ```
 
 ```rust
-// Rust - Option-based safe access
+// Rust — безопасный доступ через Option
 fn safe_access(vec: &[i32], index: usize) -> Option<i32> {
-    vec.get(index).copied()  // Returns Option<i32>
+    vec.get(index).copied()  // Возвращает Option<i32>
 }
 
 fn main() {
     let vec = vec![1, 2, 3];
     
-    // Safe access patterns
+    // Паттерны безопасного доступа
     match vec.get(10) {
         Some(value) => println!("Value: {}", value),
-        None => println!("Index out of bounds"),
+        None => println!("Индекс вне границ"),
     }
     
-    // Or with unwrap_or
+    // Или через unwrap_or
     let value = vec.get(10).copied().unwrap_or(-1);
     println!("Value: {}", value);
 }
@@ -148,13 +148,13 @@ fn main() {
 
 ***
 
-## HashMap vs Dictionary
+## HashMap против Dictionary
 
-HashMap is Rust's equivalent to C#'s `Dictionary<K,V>`.
+HashMap — аналог `Dictionary<K,V>` из C# в Rust.
 
-### C# Dictionary
+### Dictionary в C#
 ```csharp
-// C# Dictionary<TKey, TValue>
+// Dictionary<TKey, TValue> в C#
 var scores = new Dictionary<string, int>
 {
     ["Alice"] = 100,
@@ -162,11 +162,11 @@ var scores = new Dictionary<string, int>
     ["Charlie"] = 92
 };
 
-// Add/Update
+// Добавление/обновление
 scores["Dave"] = 78;
-scores["Alice"] = 105;  // Update existing
+scores["Alice"] = 105;  // Обновление существующего
 
-// Safe access
+// Безопасный доступ
 if (scores.TryGetValue("Eve", out int score))
 {
     Console.WriteLine($"Eve's score: {score}");
@@ -176,192 +176,192 @@ else
     Console.WriteLine("Eve not found");
 }
 
-// Iteration
+// Итерация
 foreach (var kvp in scores)
 {
     Console.WriteLine($"{kvp.Key}: {kvp.Value}");
 }
 ```
 
-### Rust HashMap
+### HashMap в Rust
 ```rust
 use std::collections::HashMap;
 
-// Create and initialize HashMap
+// Создание и инициализация HashMap
 let mut scores = HashMap::new();
 scores.insert("Alice".to_string(), 100);
 scores.insert("Bob".to_string(), 85);
 scores.insert("Charlie".to_string(), 92);
 
-// Or use from iterator
+// Или из итератора
 let scores: HashMap<String, i32> = [
     ("Alice".to_string(), 100),
     ("Bob".to_string(), 85),
     ("Charlie".to_string(), 92),
 ].into_iter().collect();
 
-// Add/Update
-let mut scores = scores;  // Make mutable
+// Добавление/обновление
+let mut scores = scores;  // Делаем изменяемой
 scores.insert("Dave".to_string(), 78);
-scores.insert("Alice".to_string(), 105);  // Update existing
+scores.insert("Alice".to_string(), 105);  // Обновление существующего
 
-// Safe access
+// Безопасный доступ
 match scores.get("Eve") {
     Some(score) => println!("Eve's score: {}", score),
     None => println!("Eve not found"),
 }
 
-// Iteration
+// Итерация
 for (name, score) in &scores {
     println!("{}: {}", name, score);
 }
 ```
 
-### HashMap Operations
+### Операции с HashMap
 ```csharp
-// C# Dictionary operations
+// Операции с Dictionary в C#
 var dict = new Dictionary<string, int>();
 
-dict["key"] = 42;                    // Insert/update
-bool exists = dict.ContainsKey("key"); // Check existence
-bool removed = dict.Remove("key");    // Remove
-dict.Clear();                        // Clear all
+dict["key"] = 42;                    // Вставка/обновление
+bool exists = dict.ContainsKey("key"); // Проверка наличия
+bool removed = dict.Remove("key");    // Удаление
+dict.Clear();                        // Очистка
 
-// Get with default
+// Получение со значением по умолчанию
 int value = dict.GetValueOrDefault("missing", 0);
 ```
 
 ```rust
 use std::collections::HashMap;
 
-// Rust HashMap operations
+// Операции с HashMap в Rust
 let mut map = HashMap::new();
 
-map.insert("key".to_string(), 42);   // Insert/update
-let exists = map.contains_key("key"); // Check existence
-let removed = map.remove("key");      // Remove, returns Option<V>
-map.clear();                         // Clear all
+map.insert("key".to_string(), 42);   // Вставка/обновление
+let exists = map.contains_key("key"); // Проверка наличия
+let removed = map.remove("key");      // Удаление, возвращает Option<V>
+map.clear();                         // Очистка
 
-// Entry API for advanced operations
+// Entry API для продвинутых операций
 let mut map = HashMap::new();
-map.entry("key".to_string()).or_insert(42);  // Insert if not exists
-map.entry("key".to_string()).and_modify(|v| *v += 1); // Modify if exists
+map.entry("key".to_string()).or_insert(42);  // Вставить, если не существует
+map.entry("key".to_string()).and_modify(|v| *v += 1); // Изменить, если существует
 
-// Get with default
+// Получение со значением по умолчанию
 let value = map.get("missing").copied().unwrap_or(0);
 ```
 
-### Ownership with HashMap Keys and Values
+### Владение ключами и значениями HashMap
 ```rust
-// Understanding ownership with HashMap
+// Понимание владения в HashMap
 fn ownership_example() {
     let mut map = HashMap::new();
     
-    // String keys and values are moved into the map
+    // Строковые ключи и значения перемещаются в map
     let key = String::from("name");
     let value = String::from("Alice");
     
     map.insert(key, value);
-    // println!("{}", key);   // ❌ Error: key was moved
-    // println!("{}", value); // ❌ Error: value was moved
+    // println!("{}", key);   // ❌ Ошибка: key было перемещено
+    // println!("{}", value); // ❌ Ошибка: value было перемещено
     
-    // Access via references
+    // Доступ через ссылки
     if let Some(name) = map.get("name") {
-        println!("Name: {}", name);  // Borrowing the value
+        println!("Name: {}", name);  // Заимствуем значение
     }
 }
 
-// Using &str keys (no ownership transfer)
+// Использование ключей &str (без передачи владения)
 fn string_slice_keys() {
     let mut map = HashMap::new();
     
-    map.insert("name", "Alice");     // &str keys and values
+    map.insert("name", "Alice");     // Ключи и значения типа &str
     map.insert("age", "30");
     
-    // No ownership issues with string literals
+    // Со строковыми литералами проблем с владением нет
     println!("Name exists: {}", map.contains_key("name"));
 }
 ```
 
 ***
 
-## Working with Collections
+## Работа с коллекциями
 
-### Iteration Patterns
+### Паттерны итерации
 ```csharp
-// C# iteration patterns
+// Паттерны итерации в C#
 var numbers = new List<int> { 1, 2, 3, 4, 5 };
 
-// For loop with index
+// Цикл for с индексом
 for (int i = 0; i < numbers.Count; i++)
 {
     Console.WriteLine($"Index {i}: {numbers[i]}");
 }
 
-// Foreach loop
+// Цикл foreach
 foreach (int num in numbers)
 {
     Console.WriteLine(num);
 }
 
-// LINQ methods
+// Методы LINQ
 var doubled = numbers.Select(x => x * 2).ToList();
 var evens = numbers.Where(x => x % 2 == 0).ToList();
 ```
 
 ```rust
-// Rust iteration patterns
+// Паттерны итерации в Rust
 let numbers = vec![1, 2, 3, 4, 5];
 
-// For loop with index
+// Цикл for с индексом
 for (i, num) in numbers.iter().enumerate() {
     println!("Index {}: {}", i, num);
 }
 
-// For loop over values
-for num in &numbers {  // Borrow each element
+// Цикл for по значениям
+for num in &numbers {  // Заимствуем каждый элемент
     println!("{}", num);
 }
 
-// Iterator methods (like LINQ)
+// Методы итераторов (как LINQ)
 let doubled: Vec<i32> = numbers.iter().map(|x| x * 2).collect();
 let evens: Vec<i32> = numbers.iter().filter(|&x| x % 2 == 0).cloned().collect();
 
-// Or more efficiently, consuming iterator
+// Или эффективнее — потребляющий итератор
 let doubled: Vec<i32> = numbers.into_iter().map(|x| x * 2).collect();
 ```
 
-### Iterator vs IntoIterator vs Iter
+### Iterator против IntoIterator против Iter
 ```rust
-// Understanding different iteration methods
+// Понимание различных способов итерации
 fn iteration_methods() {
     let vec = vec![1, 2, 3, 4, 5];
     
-    // 1. iter() - borrows elements (&T)
+    // 1. iter() — заимствует элементы (&T)
     for item in vec.iter() {
-        println!("{}", item);  // item is &i32
+        println!("{}", item);  // item имеет тип &i32
     }
-    // vec is still usable here
+    // vec здесь по-прежнему доступен
     
-    // 2. into_iter() - takes ownership (T)
+    // 2. into_iter() — забирает владение (T)
     for item in vec.into_iter() {
-        println!("{}", item);  // item is i32
+        println!("{}", item);  // item имеет тип i32
     }
-    // vec is no longer usable here
+    // vec здесь больше недоступен
     
     let mut vec = vec![1, 2, 3, 4, 5];
     
-    // 3. iter_mut() - mutable borrows (&mut T)
+    // 3. iter_mut() — изменяемые заимствования (&mut T)
     for item in vec.iter_mut() {
-        *item *= 2;  // item is &mut i32
+        *item *= 2;  // item имеет тип &mut i32
     }
     println!("{:?}", vec);  // [2, 4, 6, 8, 10]
 }
 ```
 
-### Collecting Results
+### Сбор результатов
 ```csharp
-// C# - Processing collections with potential errors
+// C# — обработка коллекций с возможными ошибками
 public List<int> ParseNumbers(List<string> inputs)
 {
     var results = new List<int>();
@@ -371,37 +371,37 @@ public List<int> ParseNumbers(List<string> inputs)
         {
             results.Add(result);
         }
-        // Silently skip invalid inputs
+        // Молча пропускаем некорректные значения
     }
     return results;
 }
 ```
 
 ```rust
-// Rust - Explicit error handling with collect
+// Rust — явная обработка ошибок через collect
 fn parse_numbers(inputs: Vec<String>) -> Result<Vec<i32>, std::num::ParseIntError> {
     inputs.into_iter()
-        .map(|s| s.parse::<i32>())  // Returns Result<i32, ParseIntError>
-        .collect()                  // Collects into Result<Vec<i32>, ParseIntError>
+        .map(|s| s.parse::<i32>())  // Возвращает Result<i32, ParseIntError>
+        .collect()                  // Собирает в Result<Vec<i32>, ParseIntError>
 }
 
-// Alternative: Filter out errors
+// Альтернатива: отфильтровать ошибки
 fn parse_numbers_filter(inputs: Vec<String>) -> Vec<i32> {
     inputs.into_iter()
-        .filter_map(|s| s.parse::<i32>().ok())  // Keep only Ok values
+        .filter_map(|s| s.parse::<i32>().ok())  // Оставляем только значения Ok
         .collect()
 }
 
 fn main() {
     let inputs = vec!["1".to_string(), "2".to_string(), "invalid".to_string(), "4".to_string()];
     
-    // Version that fails on first error
+    // Вариант, который завершается при первой ошибке
     match parse_numbers(inputs.clone()) {
         Ok(numbers) => println!("All parsed: {:?}", numbers),
         Err(error) => println!("Parse error: {}", error),
     }
     
-    // Version that skips errors
+    // Вариант, который пропускает ошибки
     let numbers = parse_numbers_filter(inputs);
     println!("Successfully parsed: {:?}", numbers);  // [1, 2, 4]
 }
@@ -409,12 +409,12 @@ fn main() {
 
 ---
 
-## Exercises
+## Упражнения
 
 <details>
-<summary><strong>🏋️ Exercise: LINQ to Iterators</strong> (click to expand)</summary>
+<summary><strong>🏋️ Упражнение: из LINQ в итераторы</strong> (нажмите, чтобы раскрыть)</summary>
 
-Translate this C# LINQ query to idiomatic Rust iterators:
+Переведите этот LINQ-запрос на C# в идиоматичные итераторы Rust:
 
 ```csharp
 var result = students
@@ -425,22 +425,22 @@ var result = students
     .ToList();
 ```
 
-Use this struct:
+Используйте эту структуру:
 ```rust
 struct Student { name: String, grade: u32 }
 ```
 
-Return a `Vec<String>` of the top 3 students with grade ≥ 90, formatted as `"Name: Grade"`.
+Верните `Vec<String>` из трёх лучших студентов с оценкой ≥ 90, отформатированных как `"Name: Grade"`.
 
 <details>
-<summary>🔑 Solution</summary>
+<summary>🔑 Решение</summary>
 
 ```rust
 #[derive(Debug)]
 struct Student { name: String, grade: u32 }
 
 fn top_students(students: &mut [Student]) -> Vec<String> {
-    students.sort_by(|a, b| b.grade.cmp(&a.grade)); // sort descending
+    students.sort_by(|a, b| b.grade.cmp(&a.grade)); // сортировка по убыванию
     students.iter()
         .filter(|s| s.grade >= 90)
         .take(3)
@@ -462,7 +462,7 @@ fn main() {
 }
 ```
 
-**Key difference from C#**: Rust iterators are lazy (like LINQ), but `.sort_by()` is eager and in-place — there's no lazy `OrderBy`. You sort first, then chain lazy operations.
+**Ключевое отличие от C#**: итераторы Rust ленивы (как LINQ), но `.sort_by()` — энергичная операция, которая сортирует на месте; ленивого `OrderBy` здесь нет. Сначала сортируете, затем строите цепочку ленивых операций.
 
 </details>
 </details>

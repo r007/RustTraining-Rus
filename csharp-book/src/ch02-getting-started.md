@@ -1,45 +1,45 @@
-## Installation and Setup
+## Установка и настройка
 
-> **What you'll learn:** How to install Rust and set up your IDE, the Cargo build system vs MSBuild/NuGet,
-> your first Rust program compared to C#, and how to read command-line input.
+> **Что вы узнаете:** как установить Rust и настроить IDE, чем система сборки Cargo отличается от MSBuild/NuGet,
+> как выглядит первая программа на Rust по сравнению с C#, и как читать ввод из командной строки.
 >
-> **Difficulty:** 🟢 Beginner
+> **Сложность:** 🟢 Начальный
 
-### Installing Rust
+### Установка Rust
 ```bash
-# Install Rust (works on Windows, macOS, Linux)
+# Установка Rust (работает на Windows, macOS, Linux)
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
-# On Windows, you can also download from: https://rustup.rs/
+# В Windows можно также скачать с: https://rustup.rs/
 ```
 
-### Rust Tools vs C# Tools
-| C# Tool | Rust Equivalent | Purpose |
+### Инструменты Rust против инструментов C#
+| Инструмент C# | Аналог в Rust | Назначение |
 |---------|----------------|---------|
-| `dotnet new` | `cargo new` | Create new project |
-| `dotnet build` | `cargo build` | Compile project |
-| `dotnet run` | `cargo run` | Run project |
-| `dotnet test` | `cargo test` | Run tests |
-| NuGet | Crates.io | Package repository |
-| MSBuild | Cargo | Build system |
+| `dotnet new` | `cargo new` | Создание нового проекта |
+| `dotnet build` | `cargo build` | Компиляция проекта |
+| `dotnet run` | `cargo run` | Запуск проекта |
+| `dotnet test` | `cargo test` | Запуск тестов |
+| NuGet | Crates.io | Репозиторий пакетов |
+| MSBuild | Cargo | Система сборки |
 | Visual Studio | VS Code + rust-analyzer | IDE |
 
-### IDE Setup
-1. **VS Code** (Recommended for beginners)
-   - Install "rust-analyzer" extension
-   - Install "CodeLLDB" for debugging
+### Настройка IDE
+1. **VS Code** (рекомендуется для начинающих)
+   - Установите расширение «rust-analyzer»
+   - Установите «CodeLLDB» для отладки
 
 2. **Visual Studio** (Windows)
-   - Install Rust support extension
+   - Установите расширение с поддержкой Rust
 
-3. **JetBrains RustRover** (Full IDE)
-   - Similar to Rider for C#
+3. **JetBrains RustRover** (полноценная IDE)
+   - Похожа на Rider для C#
 
 ***
 
-## Your First Rust Program
+## Первая программа на Rust
 
-### C# Hello World
+### Hello World на C#
 ```csharp
 // Program.cs
 using System;
@@ -56,7 +56,7 @@ namespace HelloWorld
 }
 ```
 
-### Rust Hello World
+### Hello World на Rust
 ```rust
 // main.rs
 fn main() {
@@ -64,34 +64,34 @@ fn main() {
 }
 ```
 
-### Key Differences for C# Developers
-1. **No classes required** - Functions can exist at the top level
-2. **No namespaces** - Uses module system instead
-3. **`println!` is a macro** - Notice the `!` 
-4. **Semicolons matter** - Omitting the trailing semicolon turns a statement into a return expression
-5. **No explicit return type** - `main` returns `()` (unit type)
+### Ключевые отличия для разработчиков C#
+1. **Классы не требуются** — функции могут существовать на верхнем уровне
+2. **Пространств имён нет** — вместо них используется система модулей
+3. **`println!` — это макрос** — обратите внимание на `!`
+4. **Точка с запятой важна** — отсутствие завершающей точки с запятой превращает инструкцию в возвращаемое выражение
+5. **Явного типа возвращаемого значения нет** — `main` возвращает `()` (тип unit)
 
-### Creating Your First Project
+### Создание первого проекта
 ```bash
-# Create new project (like 'dotnet new console')
+# Создание нового проекта (аналог 'dotnet new console')
 cargo new hello_rust
 cd hello_rust
 
-# Project structure created:
+# Созданная структура проекта:
 # hello_rust/
-# ├── Cargo.toml      (like .csproj file)
+# ├── Cargo.toml      (аналог файла .csproj)
 # └── src/
-#     └── main.rs     (like Program.cs)
+#     └── main.rs     (аналог Program.cs)
 
-# Run the project (like 'dotnet run')
+# Запуск проекта (аналог 'dotnet run')
 cargo run
 ```
 
 ***
 
-## Cargo vs NuGet/MSBuild
+## Cargo против NuGet/MSBuild
 
-### Project Configuration
+### Конфигурация проекта
 
 **C# (.csproj)**
 ```xml
@@ -114,34 +114,34 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-serde_json = "1.0"    # Like Newtonsoft.Json
-log = "0.4"           # Like Serilog
+serde_json = "1.0"    # Аналог Newtonsoft.Json
+log = "0.4"           # Аналог Serilog
 ```
 
-### Common Cargo Commands
+### Основные команды Cargo
 ```bash
-# Create new project
+# Создание нового проекта
 cargo new my_project
-cargo new my_project --lib  # Create library project
+cargo new my_project --lib  # Создать библиотечный проект
 
-# Build and run
-cargo build          # Like 'dotnet build'
-cargo run            # Like 'dotnet run'
-cargo test           # Like 'dotnet test'
+# Сборка и запуск
+cargo build          # Аналог 'dotnet build'
+cargo run            # Аналог 'dotnet run'
+cargo test           # Аналог 'dotnet test'
 
-# Package management
-cargo add serde      # Add dependency (like 'dotnet add package')
-cargo update         # Update dependencies
+# Управление пакетами
+cargo add serde      # Добавить зависимость (аналог 'dotnet add package')
+cargo update         # Обновить зависимости
 
-# Release build
-cargo build --release  # Optimized build
-cargo run --release    # Run optimized version
+# Релизная сборка
+cargo build --release  # Оптимизированная сборка
+cargo run --release    # Запуск оптимизированной версии
 
-# Documentation
-cargo doc --open     # Generate and open docs
+# Документация
+cargo doc --open     # Сгенерировать и открыть документацию
 ```
 
-### Workspace vs Solution
+### Workspace против Solution
 
 **C# Solution (.sln)**
 ```text
@@ -167,26 +167,26 @@ members = [
 
 ***
 
-## Reading Input and CLI Arguments
+## Чтение ввода и аргументов командной строки
 
-Every C# developer knows `Console.ReadLine()`. Here's how to handle user input, environment variables, and command-line arguments in Rust.
+Каждый разработчик C# знает `Console.ReadLine()`. Вот как в Rust обрабатывать пользовательский ввод, переменные окружения и аргументы командной строки.
 
-### Console Input
+### Ввод с консоли
 ```csharp
-// C# — reading user input
-Console.Write("Enter your name: ");
-string? name = Console.ReadLine();  // Returns string? in .NET 6+
-Console.WriteLine($"Hello, {name}!");
+// C# — чтение пользовательского ввода
+Console.Write("Введите ваше имя: ");
+string? name = Console.ReadLine();  // Возвращает string? начиная с .NET 6+
+Console.WriteLine($"Привет, {name}!");
 
-// Parsing input
-Console.Write("Enter a number: ");
+// Разбор ввода
+Console.Write("Введите число: ");
 if (int.TryParse(Console.ReadLine(), out int number))
 {
-    Console.WriteLine($"You entered: {number}");
+    Console.WriteLine($"Вы ввели: {number}");
 }
 else
 {
-    Console.WriteLine("That's not a valid number.");
+    Console.WriteLine("Это не число.");
 }
 ```
 
@@ -194,40 +194,40 @@ else
 use std::io::{self, Write};
 
 fn main() {
-    // Reading a line of input
-    print!("Enter your name: ");
-    io::stdout().flush().unwrap(); // flush because print! doesn't auto-flush
+    // Чтение строки ввода
+    print!("Введите ваше имя: ");
+    io::stdout().flush().unwrap(); // flush нужен, потому что print! не сбрасывает буфер автоматически
 
     let mut name = String::new();
-    io::stdin().read_line(&mut name).expect("Failed to read line");
-    let name = name.trim(); // remove trailing newline
-    println!("Hello, {name}!");
+    io::stdin().read_line(&mut name).expect("Не удалось прочитать строку");
+    let name = name.trim(); // убираем завершающий перенос строки
+    println!("Привет, {name}!");
 
-    // Parsing input
-    print!("Enter a number: ");
+    // Разбор ввода
+    print!("Введите число: ");
     io::stdout().flush().unwrap();
 
     let mut input = String::new();
-    io::stdin().read_line(&mut input).expect("Failed to read");
+    io::stdin().read_line(&mut input).expect("Не удалось прочитать");
     match input.trim().parse::<i32>() {
-        Ok(number) => println!("You entered: {number}"),
-        Err(_)     => println!("That's not a valid number."),
+        Ok(number) => println!("Вы ввели: {number}"),
+        Err(_)     => println!("Это не число."),
     }
 }
 ```
 
-### Command-Line Arguments
+### Аргументы командной строки
 ```csharp
-// C# — reading CLI args
+// C# — чтение аргументов CLI
 static void Main(string[] args)
 {
     if (args.Length < 1)
     {
-        Console.WriteLine("Usage: program <filename>");
+        Console.WriteLine("Использование: program <filename>");
         return;
     }
     string filename = args[0];
-    Console.WriteLine($"Processing {filename}");
+    Console.WriteLine($"Обработка {filename}");
 }
 ```
 
@@ -236,19 +236,19 @@ use std::env;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    //  args[0] = program name (like C#'s Assembly name)
-    //  args[1..] = actual arguments
+    //  args[0] = имя программы (аналог имени сборки в C#)
+    //  args[1..] = собственно аргументы
 
     if args.len() < 2 {
-        eprintln!("Usage: {} <filename>", args[0]); // eprintln! → stderr
+        eprintln!("Использование: {} <filename>", args[0]); // eprintln! → stderr
         std::process::exit(1);
     }
     let filename = &args[1];
-    println!("Processing {filename}");
+    println!("Обработка {filename}");
 }
 ```
 
-### Environment Variables
+### Переменные окружения
 ```csharp
 // C#
 string dbUrl = Environment.GetEnvironmentVariable("DATABASE_URL") ?? "localhost";
@@ -258,12 +258,12 @@ string dbUrl = Environment.GetEnvironmentVariable("DATABASE_URL") ?? "localhost"
 use std::env;
 
 let db_url = env::var("DATABASE_URL").unwrap_or_else(|_| "localhost".to_string());
-// env::var returns Result<String, VarError> — no nulls!
+// env::var возвращает Result<String, VarError> — никаких null!
 ```
 
-### Production CLI Apps with `clap`
+### Промышленные CLI-приложения с `clap`
 
-For anything beyond trivial argument parsing, use the **`clap`** crate — it's the Rust equivalent of `System.CommandLine` or libraries like `CommandLineParser`.
+Для всего, что выходит за рамки тривиального разбора аргументов, используйте крейт **`clap`** — это аналог `System.CommandLine` или библиотек вроде `CommandLineParser` в Rust.
 
 ```toml
 # Cargo.toml
@@ -274,75 +274,75 @@ clap = { version = "4", features = ["derive"] }
 ```rust
 use clap::Parser;
 
-/// A simple file processor — this doc comment becomes the help text
+/// Простой обработчик файлов — этот doc-комментарий станет текстом справки
 #[derive(Parser, Debug)]
 #[command(name = "processor", version, about)]
 struct Args {
-    /// Input file to process
+    /// Входной файл для обработки
     #[arg(short, long)]
     input: String,
 
-    /// Output file (defaults to stdout)
+    /// Выходной файл (по умолчанию — stdout)
     #[arg(short, long)]
     output: Option<String>,
 
-    /// Enable verbose logging
+    /// Включить подробное логирование
     #[arg(short, long, default_value_t = false)]
     verbose: bool,
 
-    /// Number of worker threads
+    /// Количество рабочих потоков
     #[arg(short = 'j', long, default_value_t = 4)]
     threads: usize,
 }
 
 fn main() {
-    let args = Args::parse(); // auto-parses, validates, generates --help
+    let args = Args::parse(); // автоматически разбирает, проверяет и генерирует --help
 
     if args.verbose {
-        println!("Input:   {}", args.input);
-        println!("Output:  {:?}", args.output);
-        println!("Threads: {}", args.threads);
+        println!("Вход:    {}", args.input);
+        println!("Выход:   {:?}", args.output);
+        println!("Потоки:  {}", args.threads);
     }
 
-    // Use args.input, args.output, etc.
+    // Используйте args.input, args.output и т.д.
 }
 ```
 
 ```bash
-# Auto-generated help:
+# Автоматически сгенерированная справка:
 $ processor --help
-A simple file processor
+Простой обработчик файлов
 
 Usage: processor [OPTIONS] --input <INPUT>
 
 Options:
-  -i, --input <INPUT>      Input file to process
-  -o, --output <OUTPUT>    Output file (defaults to stdout)
-  -v, --verbose            Enable verbose logging
-  -j, --threads <THREADS>  Number of worker threads [default: 4]
+  -i, --input <INPUT>      Входной файл для обработки
+  -o, --output <OUTPUT>    Выходной файл (по умолчанию — stdout)
+  -v, --verbose            Включить подробное логирование
+  -j, --threads <THREADS>  Количество рабочих потоков [default: 4]
   -h, --help               Print help
   -V, --version            Print version
 ```
 
 ```csharp
-// C# equivalent with System.CommandLine (more boilerplate):
-var inputOption = new Option<string>("--input", "Input file") { IsRequired = true };
-var verboseOption = new Option<bool>("--verbose", "Enable verbose logging");
-var rootCommand = new RootCommand("A simple file processor");
+// Эквивалент на C# с System.CommandLine (больше шаблонного кода):
+var inputOption = new Option<string>("--input", "Входной файл") { IsRequired = true };
+var verboseOption = new Option<bool>("--verbose", "Включить подробное логирование");
+var rootCommand = new RootCommand("Простой обработчик файлов");
 rootCommand.AddOption(inputOption);
 rootCommand.AddOption(verboseOption);
 rootCommand.SetHandler((input, verbose) => { /* ... */ }, inputOption, verboseOption);
 await rootCommand.InvokeAsync(args);
-// clap's derive macro approach is more concise and type-safe
+// Подход с derive-макросом в clap короче и безопаснее по типам
 ```
 
-| C# | Rust | Notes |
+| C# | Rust | Примечания |
 |----|------|-------|
-| `Console.ReadLine()` | `io::stdin().read_line(&mut buf)` | Must provide buffer, returns `Result` |
-| `int.TryParse(s, out n)` | `s.parse::<i32>()` | Returns `Result<i32, ParseIntError>` |
-| `args[0]` | `env::args().nth(1)` | Rust args[0] = program name |
-| `Environment.GetEnvironmentVariable` | `env::var("KEY")` | Returns `Result`, not nullable |
-| `System.CommandLine` | `clap` | Derive-based, auto-generates help |
+| `Console.ReadLine()` | `io::stdin().read_line(&mut buf)` | Нужно передать буфер, возвращает `Result` |
+| `int.TryParse(s, out n)` | `s.parse::<i32>()` | Возвращает `Result<i32, ParseIntError>` |
+| `args[0]` | `env::args().nth(1)` | В Rust args[0] — имя программы |
+| `Environment.GetEnvironmentVariable` | `env::var("KEY")` | Возвращает `Result`, а не nullable-значение |
+| `System.CommandLine` | `clap` | Основан на derive, автоматически генерирует справку |
 
 ***
 

@@ -1,13 +1,14 @@
-## Algebraic Data Types vs C# Unions
+## Алгебраические типы данных против объединений C#
 
-> **What you'll learn:** Rust's algebraic data types (enums with data) vs C#'s limited discriminated unions,
-> `match` expressions with exhaustive checking, guard clauses, and nested pattern destructuring.
+> **Что вы узнаете:** алгебраические типы данных Rust (перечисления с данными) в сравнении с ограниченными
+> дискриминируемыми объединениями C#, выражения `match` с проверкой исчерпываемости, защитные условия (guards)
+> и деструктуризацию вложенных паттернов.
 >
-> **Difficulty:** 🟡 Intermediate
+> **Сложность:** 🟡 Средний
 
-### C# Discriminated Unions (Limited)
+### Дискриминируемые объединения в C# (ограниченные)
 ```csharp
-// C# - Limited union support with inheritance
+// C# — ограниченная поддержка объединений через наследование
 public abstract class Result
 {
     public abstract T Match<T>(Func<Success, T> onSuccess, Func<Error, T> onError);
@@ -31,7 +32,7 @@ public class Error : Result
         => onError(this);
 }
 
-// C# 9+ Records with pattern matching (better)
+// Records с сопоставлением с образцом в C# 9+ (лучше)
 public abstract record Shape;
 public record Circle(double Radius) : Shape;
 public record Rectangle(double Width, double Height) : Shape;
@@ -40,13 +41,13 @@ public static double Area(Shape shape) => shape switch
 {
     Circle(var radius) => Math.PI * radius * radius,
     Rectangle(var width, var height) => width * height,
-    _ => throw new ArgumentException("Unknown shape")  // [ERROR] Runtime error possible
+    _ => throw new ArgumentException("Unknown shape")  // [ERROR] Возможна ошибка времени выполнения
 };
 ```
 
-### Rust Algebraic Data Types (Enums)
+### Алгебраические типы данных Rust (перечисления)
 ```rust
-// Rust - True algebraic data types with exhaustive pattern matching
+// Rust — настоящие алгебраические типы данных с исчерпывающим сопоставлением с образцом
 #[derive(Debug, Clone)]
 pub enum Result<T, E> {
     Ok(T),
@@ -66,19 +67,19 @@ impl Shape {
             Shape::Circle { radius } => std::f64::consts::PI * radius * radius,
             Shape::Rectangle { width, height } => width * height,
             Shape::Triangle { base, height } => 0.5 * base * height,
-            // [OK] Compiler error if any variant is missing!
+            // [OK] Ошибка компиляции, если какой-либо вариант пропущен!
         }
     }
 }
 
-// Advanced: Enums can hold different types
+// Продвинутый пример: перечисления могут хранить значения разных типов
 #[derive(Debug)]
 pub enum Value {
     Integer(i64),
     Float(f64),
     Text(String),
     Boolean(bool),
-    List(Vec<Value>),  // Recursive types!
+    List(Vec<Value>),  // Рекурсивные типы!
 }
 
 impl Value {
@@ -96,13 +97,13 @@ impl Value {
 
 ```mermaid
 graph TD
-    subgraph "C# Discriminated Unions (Workarounds)"
+    subgraph "Дискриминируемые объединения C# (обходные пути)"
         CS_ABSTRACT["abstract class Result"]
         CS_SUCCESS["class Success : Result"]
         CS_ERROR["class Error : Result"]
-        CS_MATCH["Manual Match method<br/>or switch expressions"]
-        CS_RUNTIME["[ERROR] Runtime exceptions<br/>for missing cases"]
-        CS_HEAP["[ERROR] Heap allocation<br/>for class inheritance"]
+        CS_MATCH["Ручной метод Match<br/>или switch-выражения"]
+        CS_RUNTIME["[ERROR] Исключения во время выполнения<br/>для пропущенных случаев"]
+        CS_HEAP["[ERROR] Выделение в куче<br/>для наследования классов"]
         
         CS_ABSTRACT --> CS_SUCCESS
         CS_ABSTRACT --> CS_ERROR
@@ -112,13 +113,13 @@ graph TD
         CS_ABSTRACT --> CS_HEAP
     end
     
-    subgraph "Rust Algebraic Data Types"
+    subgraph "Алгебраические типы данных Rust"
         RUST_ENUM["enum Shape { ... }"]
         RUST_VARIANTS["Circle { radius }<br/>Rectangle { width, height }<br/>Triangle { base, height }"]
         RUST_MATCH["match shape { ... }"]
-        RUST_EXHAUSTIVE["[OK] Exhaustive checking<br/>Compile-time guarantee"]
-        RUST_STACK["[OK] Stack allocation<br/>Efficient memory use"]
-        RUST_ZERO["[OK] Zero-cost abstraction"]
+        RUST_EXHAUSTIVE["[OK] Проверка исчерпываемости<br/>Гарантия на этапе компиляции"]
+        RUST_STACK["[OK] Размещение на стеке<br/>Эффективное использование памяти"]
+        RUST_ZERO["[OK] Абстракция с нулевой стоимостью"]
         
         RUST_ENUM --> RUST_VARIANTS
         RUST_VARIANTS --> RUST_MATCH
@@ -136,13 +137,13 @@ graph TD
 
 ***
 
-## Enums and Pattern Matching
+## Перечисления и сопоставление с образцом
 
-Rust enums are much more powerful than C# enums - they can hold data and are the foundation of type-safe programming.
+Перечисления Rust намного мощнее перечислений C# — они могут хранить данные и составляют основу типобезопасного программирования.
 
-### C# Enum Limitations
+### Ограничения перечислений C#
 ```csharp
-// C# enum - just named constants
+// Перечисление C# — всего лишь именованные константы
 public enum Status
 {
     Pending,
@@ -150,7 +151,7 @@ public enum Status
     Rejected
 }
 
-// C# enum with backing values
+// Перечисление C# с базовыми значениями
 public enum HttpStatusCode
 {
     OK = 200,
@@ -158,7 +159,7 @@ public enum HttpStatusCode
     InternalServerError = 500
 }
 
-// Need separate classes for complex data
+// Для сложных данных нужны отдельные классы
 public abstract class Result
 {
     public abstract bool IsSuccess { get; }
@@ -187,9 +188,9 @@ public class Error : Result
 }
 ```
 
-### Rust Enum Power
+### Мощь перечислений Rust
 ```rust
-// Simple enum (like C# enum)
+// Простое перечисление (как enum в C#)
 #[derive(Debug, PartialEq)]
 enum Status {
     Pending,
@@ -197,23 +198,23 @@ enum Status {
     Rejected,
 }
 
-// Enum with data (this is where Rust shines!)
+// Перечисление с данными (здесь Rust раскрывается!)
 #[derive(Debug)]
 enum Result<T, E> {
-    Ok(T),      // Success variant holding value of type T
-    Err(E),     // Error variant holding error of type E
+    Ok(T),      // Вариант успеха, хранящий значение типа T
+    Err(E),     // Вариант ошибки, хранящий ошибку типа E
 }
 
-// Complex enum with different data types
+// Сложное перечисление с данными разных типов
 #[derive(Debug)]
 enum Message {
-    Quit,                       // No data
-    Move { x: i32, y: i32 },   // Struct-like variant
-    Write(String),             // Tuple-like variant
-    ChangeColor(i32, i32, i32), // Multiple values
+    Quit,                       // Без данных
+    Move { x: i32, y: i32 },   // Вариант в виде структуры
+    Write(String),             // Вариант в виде кортежа
+    ChangeColor(i32, i32, i32), // Несколько значений
 }
 
-// Real-world example: HTTP Response
+// Пример из практики: HTTP-ответ
 #[derive(Debug)]
 enum HttpResponse {
     Ok { body: String, headers: Vec<String> },
@@ -223,9 +224,9 @@ enum HttpResponse {
 }
 ```
 
-### Pattern Matching with Match
+### Сопоставление с образцом через match
 ```csharp
-// C# switch statement (limited)
+// Оператор switch в C# (ограниченный)
 public string HandleStatus(Status status)
 {
     switch (status)
@@ -237,34 +238,34 @@ public string HandleStatus(Status status)
         case Status.Rejected:
             return "Request rejected";
         default:
-            return "Unknown status"; // Always need default
+            return "Unknown status"; // Всегда нужен default
     }
 }
 
-// C# pattern matching (C# 8+)
+// Сопоставление с образцом в C# (C# 8+)
 public string HandleResult(Result result)
 {
     return result switch
     {
         Success success => $"Success: {success.Value}",
         Error error => $"Error: {error.Message}",
-        _ => "Unknown result" // Still need catch-all
+        _ => "Unknown result" // Всё равно нужен перехватывающий случай
     };
 }
 ```
 
 ```rust
-// Rust match - exhaustive and powerful
+// match в Rust — исчерпывающий и мощный
 fn handle_status(status: Status) -> String {
     match status {
         Status::Pending => "Waiting for approval".to_string(),
         Status::Approved => "Request approved".to_string(),
         Status::Rejected => "Request rejected".to_string(),
-        // No default needed - compiler ensures exhaustiveness
+        // Default не нужен — компилятор гарантирует исчерпываемость
     }
 }
 
-// Pattern matching with data extraction
+// Сопоставление с образцом с извлечением данных
 fn handle_result<T, E>(result: Result<T, E>) -> String 
 where 
     T: std::fmt::Debug,
@@ -273,11 +274,11 @@ where
     match result {
         Result::Ok(value) => format!("Success: {:?}", value),
         Result::Err(error) => format!("Error: {:?}", error),
-        // Exhaustive - no default needed
+        // Исчерпывающе — default не нужен
     }
 }
 
-// Complex pattern matching
+// Сложное сопоставление с образцом
 fn handle_message(msg: Message) -> String {
     match msg {
         Message::Quit => "Goodbye!".to_string(),
@@ -287,7 +288,7 @@ fn handle_message(msg: Message) -> String {
     }
 }
 
-// HTTP response handling
+// Обработка HTTP-ответа
 fn handle_http_response(response: HttpResponse) -> String {
     match response {
         HttpResponse::Ok { body, headers } => {
@@ -306,9 +307,9 @@ fn handle_http_response(response: HttpResponse) -> String {
 }
 ```
 
-### Guards and Advanced Patterns
+### Защитные условия и продвинутые паттерны
 ```rust
-// Pattern matching with guards
+// Сопоставление с образцом с защитными условиями (guards)
 fn describe_number(x: i32) -> String {
     match x {
         n if n < 0 => "negative".to_string(),
@@ -319,7 +320,7 @@ fn describe_number(x: i32) -> String {
     }
 }
 
-// Matching ranges
+// Сопоставление с диапазонами
 fn describe_age(age: u32) -> String {
     match age {
         0..=12 => "child".to_string(),
@@ -329,35 +330,35 @@ fn describe_age(age: u32) -> String {
     }
 }
 
-// Destructuring structs and tuples
+// Деструктуризация структур и кортежей
 ```
 
 <details>
-<summary><strong>🏋️ Exercise: Command Parser</strong> (click to expand)</summary>
+<summary><strong>🏋️ Упражнение: парсер команд</strong> (нажмите, чтобы раскрыть)</summary>
 
-**Challenge**: Model a CLI command system using Rust enums. Parse string input into a `Command` enum and execute each variant. Handle unknown commands with proper error handling.
+**Задача**: смоделируйте систему CLI-команд с помощью перечислений Rust. Разберите строку ввода в перечисление `Command` и выполните каждый вариант. Обработайте неизвестные команды с правильной обработкой ошибок.
 
 ```rust
-// Starter code — fill in the blanks
+// Стартовый код — заполните пропуски
 #[derive(Debug)]
 enum Command {
-    // TODO: Add variants for Quit, Echo(String), Move { x: i32, y: i32 }, Count(u32)
+    // TODO: Добавьте варианты Quit, Echo(String), Move { x: i32, y: i32 }, Count(u32)
 }
 
 fn parse_command(input: &str) -> Result<Command, String> {
     let parts: Vec<&str> = input.splitn(2, ' ').collect();
-    // TODO: match on parts[0] and parse arguments
+    // TODO: сопоставьте parts[0] и разберите аргументы
     todo!()
 }
 
 fn execute(cmd: &Command) -> String {
-    // TODO: match on each variant and return a description
+    // TODO: сопоставьте каждый вариант и верните описание
     todo!()
 }
 ```
 
 <details>
-<summary>🔑 Solution</summary>
+<summary>🔑 Решение</summary>
 
 ```rust
 #[derive(Debug)]
@@ -402,10 +403,10 @@ fn execute(cmd: &Command) -> String {
 }
 ```
 
-**Key takeaways**:
-- Each enum variant can hold different data — no need for class hierarchies
-- `match` forces you to handle every variant, preventing forgotten cases
-- `?` operator chains error propagation cleanly — no nested try-catch
+**Ключевые выводы**:
+- Каждый вариант перечисления может хранить разные данные — иерархии классов не нужны
+- `match` заставляет обработать каждый вариант, что предотвращает забытые случаи
+- Оператор `?` аккуратно связывает распространение ошибок — никаких вложенных try-catch
 
 </details>
 </details>

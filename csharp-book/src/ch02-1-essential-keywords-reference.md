@@ -1,97 +1,97 @@
-## Essential Rust Keywords for C# Developers
+## Ключевые слова Rust для разработчиков C#
 
-> **What you'll learn:** A quick-reference mapping of Rust keywords to their C# equivalents —
-> visibility modifiers, ownership keywords, control flow, type definitions, and pattern matching syntax.
+> **Что вы узнаете:** краткое соответствие ключевых слов Rust их аналогам в C# —
+> модификаторы видимости, ключевые слова владения, управление потоком, определения типов и синтаксис сопоставления с образцом.
 >
-> **Difficulty:** 🟢 Beginner
+> **Сложность:** 🟢 Начальный
 
-Understanding Rust's keywords and their purposes helps C# developers navigate the language more effectively.
+Понимание ключевых слов Rust и их назначения помогает разработчикам C# эффективнее осваивать язык.
 
-### Visibility and Access Control Keywords
+### Ключевые слова видимости и контроля доступа
 
-#### C# Access Modifiers
+#### Модификаторы доступа C#
 ```csharp
 public class Example
 {
-    public int PublicField;           // Accessible everywhere
-    private int privateField;        // Only within this class
-    protected int protectedField;    // This class and subclasses
-    internal int internalField;      // Within this assembly
-    protected internal int protectedInternalField; // Combination
+    public int PublicField;           // Доступно везде
+    private int privateField;        // Только внутри этого класса
+    protected int protectedField;    // Этот класс и его наследники
+    internal int internalField;      // Внутри этой сборки
+    protected internal int protectedInternalField; // Комбинация
 }
 ```
 
-#### Rust Visibility Keywords
+#### Ключевые слова видимости Rust
 ```rust
-// pub - Makes items public (like C# public)
+// pub - делает элементы публичными (как public в C#)
 pub struct PublicStruct {
-    pub public_field: i32,           // Public field
-    private_field: i32,              // Private by default (no keyword)
+    pub public_field: i32,           // Публичное поле
+    private_field: i32,              // По умолчанию приватное (без ключевого слова)
 }
 
 pub mod my_module {
-    pub(crate) fn crate_public() {}     // Public within current crate (like internal)
-    pub(super) fn parent_public() {}    // Public to parent module
-    pub(self) fn self_public() {}       // Public within current module (same as private)
+    pub(crate) fn crate_public() {}     // Публично внутри текущего крейта (как internal)
+    pub(super) fn parent_public() {}    // Публично для родительского модуля
+    pub(self) fn self_public() {}       // Публично внутри текущего модуля (то же, что и приватное)
     
-    pub use super::PublicStruct;        // Re-export (like using alias)
+    pub use super::PublicStruct;        // Реэкспорт (как псевдоним через using)
 }
 
-// No direct equivalent to C# protected - use composition instead
+// Прямого аналога protected в C# нет — используйте композицию
 ```
 
-### Memory and Ownership Keywords
+### Ключевые слова памяти и владения
 
-#### C# Memory Keywords
+#### Ключевые слова памяти C#
 ```csharp
-// ref - Pass by reference
+// ref - передача по ссылке
 public void Method(ref int value) { value = 10; }
 
-// out - Output parameter
+// out - выходной параметр
 public bool TryParse(string input, out int result) { /* */ }
 
-// in - Readonly reference (C# 7.2+)
-public void ReadOnly(in LargeStruct data) { /* Cannot modify data */ }
+// in - ссылка только для чтения (C# 7.2+)
+public void ReadOnly(in LargeStruct data) { /* Нельзя изменить data */ }
 ```
 
-#### Rust Ownership Keywords
+#### Ключевые слова владения Rust
 ```rust
-// & - Immutable reference (like C# in parameter)
+// & - неизменяемая ссылка (как in-параметр в C#)
 fn read_only(data: &Vec<i32>) {
-    println!("Length: {}", data.len()); // Can read, cannot modify
+    println!("Длина: {}", data.len()); // Можно читать, нельзя изменять
 }
 
-// &mut - Mutable reference (like C# ref parameter)
+// &mut - изменяемая ссылка (как ref-параметр в C#)
 fn modify(data: &mut Vec<i32>) {
-    data.push(42); // Can modify
+    data.push(42); // Можно изменять
 }
 
-// move - Force move capture in closures
+// move - принудительный захват перемещением в замыканиях
 let data = vec![1, 2, 3];
 let closure = move || {
-    println!("{:?}", data); // data is moved into closure
+    println!("{:?}", data); // data перемещается в замыкание
 };
-// data is no longer accessible here
+// data здесь больше недоступен
 
-// Box - Heap allocation (like C# new for reference types)
-let boxed_data = Box::new(42); // Allocate on heap
+// Box - выделение в куче (как new для ссылочных типов в C#)
+let boxed_data = Box::new(42); // Выделяем в куче
 ```
 
-### Control Flow Keywords
+### Ключевые слова управления потоком
 
-#### C# Control Flow
+#### Управление потоком C#
 ```csharp
-// return - Exit function with value
+// return - выход из функции со значением
 public int GetValue() { return 42; }
 
-// yield return - Iterator pattern
+// yield return - паттерн итератора
 public IEnumerable<int> GetNumbers()
 {
     yield return 1;
     yield return 2;
 }
 
-// break/continue - Loop control
+// break/continue - управление циклом
 foreach (var item in items)
 {
     if (item == null) continue;
@@ -99,89 +99,89 @@ foreach (var item in items)
 }
 ```
 
-#### Rust Control Flow Keywords
+#### Ключевые слова управления потоком Rust
 ```rust
-// return - Explicit return (usually not needed)
+// return - явный возврат (обычно не нужен)
 fn get_value() -> i32 {
-    return 42; // Explicit return
-    // OR just: 42 (implicit return)
+    return 42; // Явный возврат
+    // ИЛИ просто: 42 (неявный возврат)
 }
 
-// break/continue - Loop control with optional values
+// break/continue - управление циклом с необязательными значениями
 fn find_value() -> Option<i32> {
     loop {
         let value = get_next();
         if value < 0 { continue; }
-        if value > 100 { break None; }      // Break with value
-        if value == 42 { break Some(value); } // Break with success
+        if value > 100 { break None; }      // Выход с значением
+        if value == 42 { break Some(value); } // Выход с успешным результатом
     }
 }
 
-// loop - Infinite loop (like while(true))
+// loop - бесконечный цикл (как while(true))
 loop {
     if condition { break; }
 }
 
-// while - Conditional loop
+// while - условный цикл
 while condition {
-    // code
+    // код
 }
 
-// for - Iterator loop
+// for - цикл по итератору
 for item in collection {
-    // code
+    // код
 }
 ```
 
-### Type Definition Keywords
+### Ключевые слова определения типов
 
-#### C# Type Keywords
+#### Ключевые слова типов C#
 ```csharp
-// class - Reference type
+// class - ссылочный тип
 public class MyClass { }
 
-// struct - Value type
+// struct - значимый тип
 public struct MyStruct { }
 
-// interface - Contract definition
+// interface - определение контракта
 public interface IMyInterface { }
 
-// enum - Enumeration
+// enum - перечисление
 public enum MyEnum { Value1, Value2 }
 
-// delegate - Function pointer
+// delegate - указатель на функцию
 public delegate void MyDelegate(int value);
 ```
 
-#### Rust Type Keywords
+#### Ключевые слова типов Rust
 ```rust
-// struct - Data structure (like C# class/struct combined)
+// struct - структура данных (объединяет class и struct из C#)
 struct MyStruct {
     field: i32,
 }
 
-// enum - Algebraic data type (much more powerful than C# enum)
+// enum - алгебраический тип данных (гораздо мощнее enum из C#)
 enum MyEnum {
     Variant1,
-    Variant2(i32),              // Can hold data
-    Variant3 { x: i32, y: i32 }, // Struct-like variant
+    Variant2(i32),              // Может хранить данные
+    Variant3 { x: i32, y: i32 }, // Вариант в виде структуры
 }
 
-// trait - Interface definition (like C# interface but more powerful)
+// trait - определение интерфейса (как interface в C#, но мощнее)
 trait MyTrait {
     fn method(&self);
     
-    // Default implementation (like C# 8+ default interface methods)
+    // Реализация по умолчанию (как default-методы интерфейсов в C# 8+)
     fn default_method(&self) {
-        println!("Default implementation");
+        println!("Реализация по умолчанию");
     }
 }
 
-// type - Type alias (like C# using alias)
+// type - псевдоним типа (как псевдоним using в C#)
 type UserId = u32;
 type Result<T> = std::result::Result<T, MyError>;
 
-// impl - Implementation block (no C# equivalent - methods defined separately)
+// impl - блок реализации (аналога в C# нет — методы определяются отдельно)
 impl MyStruct {
     fn new() -> MyStruct {
         MyStruct { field: 0 }
@@ -190,220 +190,219 @@ impl MyStruct {
 
 impl MyTrait for MyStruct {
     fn method(&self) {
-        println!("Implementation");
+        println!("Реализация");
     }
 }
 ```
 
-### Function Definition Keywords
+### Ключевые слова определения функций
 
-#### C# Function Keywords
+#### Ключевые слова функций C#
 ```csharp
-// static - Class method
+// static - метод класса
 public static void StaticMethod() { }
 
-// virtual - Can be overridden
+// virtual - может быть переопределён
 public virtual void VirtualMethod() { }
 
-// override - Override base method
+// override - переопределение базового метода
 public override void VirtualMethod() { }
 
-// abstract - Must be implemented
+// abstract - обязан быть реализован
 public abstract void AbstractMethod();
 
-// async - Asynchronous method
+// async - асинхронный метод
 public async Task<int> AsyncMethod() { return await SomeTask(); }
 ```
 
-#### Rust Function Keywords
+#### Ключевые слова функций Rust
 ```rust
-// fn - Function definition (like C# method but standalone)
+// fn - определение функции (как метод в C#, но существует самостоятельно)
 fn regular_function() {
-    println!("Hello");
+    println!("Привет");
 }
 
-// const fn - Compile-time function (like C# const but for functions)
+// const fn - функция времени компиляции (как const в C#, но для функций)
 const fn compile_time_function() -> i32 {
-    42 // Can be evaluated at compile time
+    42 // Может быть вычислена на этапе компиляции
 }
 
-// async fn - Asynchronous function (like C# async)
+// async fn - асинхронная функция (как async в C#)
 async fn async_function() -> i32 {
     some_async_operation().await
 }
 
-// unsafe fn - Function that may violate memory safety
+// unsafe fn - функция, которая может нарушить безопасность памяти
 unsafe fn unsafe_function() {
-    // Can perform unsafe operations
+    // Может выполнять небезопасные операции
 }
 
-// extern fn - Foreign function interface
+// extern fn - интерфейс внешних функций (FFI)
 extern "C" fn c_compatible_function() {
-    // Can be called from C
+    // Может вызываться из C
 }
 ```
 
-### Variable Declaration Keywords
+### Ключевые слова объявления переменных
 
-#### C# Variable Keywords
+#### Ключевые слова переменных C#
 ```csharp
-// var - Type inference
-var name = "John"; // Inferred as string
+// var - вывод типа
+var name = "John"; // Выводится как string
 
-// const - Compile-time constant
+// const - константа времени компиляции
 const int MaxSize = 100;
 
-// readonly - Runtime constant (fields only, not local variables)
+// readonly - константа времени выполнения (только для полей, не для локальных переменных)
 // readonly DateTime createdAt = DateTime.Now;
 
-// static - Class-level variable
+// static - переменная уровня класса
 static int instanceCount = 0;
 ```
 
-#### Rust Variable Keywords
+#### Ключевые слова переменных Rust
 ```rust
-// let - Variable binding (like C# var)
-let name = "John"; // Immutable by default
+// let - привязка переменной (как var в C#)
+let name = "John"; // По умолчанию неизменяемая
 
-// let mut - Mutable variable binding
-let mut count = 0; // Can be changed
+// let mut - изменяемая привязка переменной
+let mut count = 0; // Может быть изменена
 count += 1;
 
-// const - Compile-time constant (like C# const)
+// const - константа времени компиляции (как const в C#)
 const MAX_SIZE: usize = 100;
 
-// static - Global variable (like C# static)
+// static - глобальная переменная (как static в C#)
 static INSTANCE_COUNT: std::sync::atomic::AtomicUsize = 
     std::sync::atomic::AtomicUsize::new(0);
 ```
 
-### Pattern Matching Keywords
+### Ключевые слова сопоставления с образцом
 
-#### C# Pattern Matching (C# 8+)
+#### Сопоставление с образцом C# (C# 8+)
 ```csharp
-// switch expression
+// switch-выражение
 string result = value switch
 {
-    1 => "One",
-    2 => "Two",
-    _ => "Other"
+    1 => "Один",
+    2 => "Два",
+    _ => "Другое"
 };
 
-// is pattern
+// паттерн is
 if (obj is string str)
 {
     Console.WriteLine(str.Length);
 }
 ```
 
-#### Rust Pattern Matching Keywords
+#### Ключевые слова сопоставления с образцом Rust
 ```rust
-// match - Pattern matching (like C# switch but much more powerful)
+// match - сопоставление с образцом (как switch в C#, но гораздо мощнее)
 let result = match value {
-    1 => "One",
-    2 => "Two",
-    3..=10 => "Between 3 and 10", // Range patterns
-    _ => "Other", // Wildcard (like C# _)
+    1 => "Один",
+    2 => "Два",
+    3..=10 => "От 3 до 10", // Диапазонные паттерны
+    _ => "Другое", // Подстановочный паттерн (как _ в C#)
 };
 
-// if let - Conditional pattern matching
+// if let - условное сопоставление с образцом
 if let Some(value) = optional {
-    println!("Got value: {}", value);
+    println!("Получено значение: {}", value);
 }
 
-// while let - Loop with pattern matching
+// while let - цикл с сопоставлением с образцом
 while let Some(item) = iterator.next() {
-    println!("Item: {}", item);
+    println!("Элемент: {}", item);
 }
 
-// let with patterns - Destructuring
-let (x, y) = point; // Destructure tuple
+// let с паттернами - деструктуризация
+let (x, y) = point; // Деструктуризация кортежа
 let Some(value) = optional else {
-    return; // Early return if pattern doesn't match
+    return; // Ранний выход, если паттерн не совпал
 };
 ```
 
-### Memory Safety Keywords
+### Ключевые слова безопасности памяти
 
-#### C# Memory Keywords
+#### Ключевые слова памяти C#
 ```csharp
-// unsafe - Disable safety checks
+// unsafe - отключение проверок безопасности
 unsafe
 {
     int* ptr = &variable;
     *ptr = 42;
 }
 
-// fixed - Pin managed memory
+// fixed - закрепление управляемой памяти
 unsafe
 {
     fixed (byte* ptr = array)
     {
-        // Use ptr
+        // Использовать ptr
     }
 }
 ```
 
-#### Rust Safety Keywords
+#### Ключевые слова безопасности Rust
 ```rust
-// unsafe - Disable borrow checker (use sparingly!)
+// unsafe - отключение проверок заимствований (используйте осторожно!)
 unsafe {
     let ptr = &variable as *const i32;
-    let value = *ptr; // Dereference raw pointer
+    let value = *ptr; // Разыменование сырого указателя
 }
 
-// Raw pointer types (no C# equivalent - usually not needed)
-let ptr: *const i32 = &42;  // Immutable raw pointer
-let ptr: *mut i32 = &mut 42; // Mutable raw pointer
+// Типы сырых указателей (аналога в C# нет — обычно не нужны)
+let ptr: *const i32 = &42;  // Неизменяемый сырой указатель
+let ptr: *mut i32 = &mut 42; // Изменяемый сырой указатель
 ```
 
-### Common Rust Keywords Not in C#
+### Распространённые ключевые слова Rust, которых нет в C#
 
 ```rust
-// where - Generic constraints (more flexible than C# where)
+// where - ограничения обобщений (гибче, чем where в C#)
 fn generic_function<T>() 
 where 
     T: Clone + Send + Sync,
 {
-    // T must implement Clone, Send, and Sync traits
+    // T должен реализовывать трейты Clone, Send и Sync
 }
 
-// dyn - Dynamic trait objects (like C# object but type-safe)
+// dyn - динамические трейт-объекты (как object в C#, но с проверкой типов)
 let drawable: Box<dyn Draw> = Box::new(Circle::new());
 
-// Self - Refer to the implementing type (like C# this but for types)
+// Self - ссылка на реализующий тип (как this в C#, но для типов)
 impl MyStruct {
     fn new() -> Self { // Self = MyStruct
         Self { field: 0 }
     }
 }
 
-// self - Method receiver
+// self - получатель метода
 impl MyStruct {
-    fn method(&self) { }        // Immutable borrow
-    fn method_mut(&mut self) { } // Mutable borrow  
-    fn consume(self) { }        // Take ownership
+    fn method(&self) { }        // Неизменяемое заимствование
+    fn method_mut(&mut self) { } // Изменяемое заимствование
+    fn consume(self) { }        // Принять владение
 }
 
-// crate - Refer to current crate root
-use crate::models::User; // Absolute path from crate root
+// crate - ссылка на корень текущего крейта
+use crate::models::User; // Абсолютный путь от корня крейта
 
-// super - Refer to parent module
-use super::utils; // Import from parent module
+// super - ссылка на родительский модуль
+use super::utils; // Импорт из родительского модуля
 ```
 
-### Keywords Summary for C# Developers
+### Сводка ключевых слов для разработчиков C#
 
-| Purpose | C# | Rust | Key Difference |
+| Назначение | C# | Rust | Ключевое отличие |
 |---------|----|----|----------------|
-| Visibility | `public`, `private`, `internal` | `pub`, default private | More granular with `pub(crate)` |
-| Variables | `var`, `readonly`, `const` | `let`, `let mut`, `const` | Immutable by default |
-| Functions | `method()` | `fn` | Standalone functions |
-| Types | `class`, `struct`, `interface` | `struct`, `enum`, `trait` | Enums are algebraic types |
-| Generics | `<T> where T : IFoo` | `<T> where T: Foo` | More flexible constraints |
-| References | `ref`, `out`, `in` | `&`, `&mut` | Compile-time borrow checking |
-| Patterns | `switch`, `is` | `match`, `if let` | Exhaustive matching required |
+| Видимость | `public`, `private`, `internal` | `pub`, по умолчанию приватное | Более тонкая настройка через `pub(crate)` |
+| Переменные | `var`, `readonly`, `const` | `let`, `let mut`, `const` | Неизменяемость по умолчанию |
+| Функции | `method()` | `fn` | Функции могут существовать самостоятельно |
+| Типы | `class`, `struct`, `interface` | `struct`, `enum`, `trait` | Перечисления — алгебраические типы |
+| Обобщения | `<T> where T : IFoo` | `<T> where T: Foo` | Более гибкие ограничения |
+| Ссылки | `ref`, `out`, `in` | `&`, `&mut` | Проверка заимствований на этапе компиляции |
+| Паттерны | `switch`, `is` | `match`, `if let` | Требуется исчерпывающее сопоставление |
 
 ***
-
 
