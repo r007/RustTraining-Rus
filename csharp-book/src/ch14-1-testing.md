@@ -1,11 +1,11 @@
-## Testing in Rust vs C#
+## Тестирование в Rust и C#
 
-> **What you'll learn:** Built-in `#[test]` vs xUnit, parameterized tests with `rstest` (like `[Theory]`),
-> property testing with `proptest`, mocking with `mockall`, and async test patterns.
+> **Что вы узнаете:** встроенный `#[test]` против xUnit, параметризованные тесты с `rstest` (аналог `[Theory]`),
+> property-тестирование с `proptest`, моки с `mockall` и паттерны асинхронных тестов.
 >
-> **Difficulty:** 🟡 Intermediate
+> **Сложность:** 🟡 Средний
 
-### Unit Tests
+### Модульные тесты
 ```csharp
 // C# — xUnit
 using Xunit;
@@ -31,12 +31,12 @@ public class CalculatorTests
 ```
 
 ```rust
-// Rust — built-in testing, no external framework needed
+// Rust — встроенное тестирование, внешний фреймворк не нужен
 pub fn add(a: i32, b: i32) -> i32 { a + b }
 
-#[cfg(test)]  // Only compiled during `cargo test`
+#[cfg(test)]  // Компилируется только при `cargo test`
 mod tests {
-    use super::*;  // Import from parent module
+    use super::*;  // Импорт из родительского модуля
 
     #[test]
     fn add_returns_sum() {
@@ -51,14 +51,14 @@ mod tests {
     #[test]
     #[should_panic(expected = "overflow")]
     fn add_overflow_panics() {
-        let _ = add(i32::MAX, 1); // panics in debug mode
+        let _ = add(i32::MAX, 1); // паникует в debug-режиме
     }
 }
 ```
 
-### Parameterized Tests (like `[Theory]`)
+### Параметризованные тесты (аналог `[Theory]`)
 ```rust
-// Use the `rstest` crate for parameterized tests
+// Для параметризованных тестов используйте крейт `rstest`
 use rstest::rstest;
 
 #[rstest]
@@ -69,41 +69,41 @@ fn test_add(#[case] a: i32, #[case] b: i32, #[case] expected: i32) {
     assert_eq!(add(a, b), expected);
 }
 
-// Fixtures — like test setup methods
+// Фикстуры — аналог методов настройки тестов
 #[rstest]
 fn test_with_fixture(#[values(1, 2, 3)] x: i32) {
     assert!(x > 0);
 }
 ```
 
-### Assertions Comparison
+### Сравнение утверждений
 
-| C# (xUnit) | Rust | Notes |
+| C# (xUnit) | Rust | Примечания |
 |-------------|------|-------|
-| `Assert.Equal(expected, actual)` | `assert_eq!(expected, actual)` | Prints diff on failure |
+| `Assert.Equal(expected, actual)` | `assert_eq!(expected, actual)` | При провале выводит diff |
 | `Assert.NotEqual(a, b)` | `assert_ne!(a, b)` | |
 | `Assert.True(condition)` | `assert!(condition)` | |
 | `Assert.Contains("sub", str)` | `assert!(str.contains("sub"))` | |
-| `Assert.Throws<T>(() => ...)` | `#[should_panic]` | Or use `std::panic::catch_unwind` |
-| `Assert.Null(obj)` | `assert!(option.is_none())` | No nulls — use `Option` |
+| `Assert.Throws<T>(() => ...)` | `#[should_panic]` | Или используйте `std::panic::catch_unwind` |
+| `Assert.Null(obj)` | `assert!(option.is_none())` | Нет null — используйте `Option` |
 
-### Test Organization
+### Организация тестов
 
 ```text
 my_crate/
 ├── src/
-│   ├── lib.rs          # Unit tests in #[cfg(test)] mod tests { }
-│   └── parser.rs       # Each module can have its own test module
-├── tests/              # Integration tests (each file is a separate crate)
-│   ├── parser_test.rs  # Tests the public API as an external consumer
+│   ├── lib.rs          # Модульные тесты в #[cfg(test)] mod tests { }
+│   └── parser.rs       # У каждого модуля может быть свой тестовый модуль
+├── tests/              # Интеграционные тесты (каждый файл — отдельный крейт)
+│   ├── parser_test.rs  # Тестирует публичный API как внешний потребитель
 │   └── api_test.rs
-└── benches/            # Benchmarks (with criterion crate)
+└── benches/            # Бенчмарки (с крейтом criterion)
     └── my_benchmark.rs
 ```
 
 ```rust
-// tests/parser_test.rs — integration test
-// Can only access PUBLIC API (like testing from outside the assembly)
+// tests/parser_test.rs — интеграционный тест
+// Имеет доступ только к ПУБЛИЧНОМУ API (как тестирование извне сборки)
 use my_crate::parser;
 
 #[test]
@@ -113,9 +113,9 @@ fn test_parse_valid_input() {
 }
 ```
 
-### Async Tests
+### Асинхронные тесты
 ```csharp
-// C# — async test with xUnit
+// C# — асинхронный тест в xUnit
 [Fact]
 public async Task GetUser_ReturnsUser()
 {
@@ -126,7 +126,7 @@ public async Task GetUser_ReturnsUser()
 ```
 
 ```rust
-// Rust — async test with tokio
+// Rust — асинхронный тест с tokio
 #[tokio::test]
 async fn get_user_returns_user() {
     let service = UserService::new();
@@ -135,11 +135,11 @@ async fn get_user_returns_user() {
 }
 ```
 
-### Mocking with mockall
+### Моки с mockall
 ```rust
 use mockall::automock;
 
-#[automock]                         // Generates MockUserRepo struct
+#[automock]                         // Генерирует структуру MockUserRepo
 trait UserRepo {
     fn find_by_id(&self, id: u32) -> Option<User>;
 }
@@ -163,7 +163,7 @@ mod tests {
 ```
 
 ```csharp
-// C# — Moq equivalent
+// C# — эквивалент с Moq
 var mock = new Mock<IUserRepo>();
 mock.Setup(r => r.FindById(1)).Returns(new User { Name = "Alice" });
 var service = new UserService(mock.Object);
@@ -171,9 +171,9 @@ Assert.Equal("Alice", service.GetUser(1).Name);
 ```
 
 <details>
-<summary><strong>🏋️ Exercise: Write Comprehensive Tests</strong> (click to expand)</summary>
+<summary><strong>🏋️ Упражнение: напишите полноценные тесты</strong> (нажмите, чтобы раскрыть)</summary>
 
-**Challenge**: Given this function, write tests covering: happy path, empty input, numeric strings, and Unicode.
+**Задача**: для этой функции напишите тесты, которые покрывают: основной сценарий, пустой ввод, числовые строки и Unicode.
 
 ```rust
 pub fn title_case(input: &str) -> String {
@@ -191,7 +191,7 @@ pub fn title_case(input: &str) -> String {
 ```
 
 <details>
-<summary>🔑 Solution</summary>
+<summary>🔑 Решение</summary>
 
 ```rust
 #[cfg(test)]
@@ -225,7 +225,7 @@ mod tests {
 
     #[test]
     fn extra_whitespace() {
-        // split_whitespace handles multiple spaces
+        // split_whitespace обрабатывает несколько пробелов
         assert_eq!(title_case("  hello   world  "), "Hello World");
     }
 
@@ -241,20 +241,20 @@ mod tests {
 }
 ```
 
-**Key takeaway**: Rust's built-in test framework handles most unit testing needs. Use `rstest` for parameterized tests and `mockall` for mocking — no need for a large test framework like xUnit.
+**Ключевая мысль**: встроенный тестовый фреймворк Rust покрывает большинство потребностей в модульном тестировании. Используйте `rstest` для параметризованных тестов и `mockall` для моков — большой тестовый фреймворк вроде xUnit не нужен.
 
 </details>
 </details>
 
 
 <!-- ch14a.1: Property Testing with proptest -->
-## Property Testing: Proving Correctness at Scale
+## Property-тестирование: доказательство корректности в масштабе
 
-C# developers familiar with **FsCheck** will recognize property-based testing: instead of writing individual test cases, you describe *properties* that must hold for **all possible inputs**, and the framework generates thousands of random inputs to try to break them.
+Разработчикам C#, знакомым с **FsCheck**, property-тестирование будет понятно сразу: вместо написания отдельных тест-кейсов вы описываете *свойства*, которые должны выполняться для **всех возможных входных данных**, а фреймворк генерирует тысячи случайных входов, чтобы их опровергнуть.
 
-### Why Property Testing Matters
+### Зачем нужно property-тестирование
 ```csharp
-// C# — Hand-written unit tests check specific cases
+// C# — написанные вручную модульные тесты проверяют конкретные случаи
 [Fact]
 public void Reverse_Twice_Returns_Original()
 {
@@ -263,12 +263,12 @@ public void Reverse_Twice_Returns_Original()
     list.Reverse();
     Assert.Equal(new[] { 1, 2, 3 }, list);
 }
-// But what about empty lists? Single elements? 10,000 elements? Negative numbers?
-// You'd need dozens of hand-written cases.
+// Но что насчёт пустых списков? Одиночных элементов? 10 000 элементов? Отрицательных чисел?
+// Понадобились бы десятки тестов, написанных вручную.
 ```
 
 ```rust
-// Rust — proptest generates thousands of inputs automatically
+// Rust — proptest автоматически генерирует тысячи входов
 use proptest::prelude::*;
 
 fn reverse<T: Clone>(v: &[T]) -> Vec<T> {
@@ -281,26 +281,26 @@ proptest! {
         let reversed_twice = reverse(&reverse(v));
         prop_assert_eq!(v, &reversed_twice);
     }
-    // proptest runs this with hundreds of random Vec<i32> values:
-    // [], [0], [i32::MIN, i32::MAX], [42; 999], random sequences...
-    // If it fails, it SHRINKS to the smallest failing input!
+    // proptest запускает это на сотнях случайных значений Vec<i32>:
+    // [], [0], [i32::MIN, i32::MAX], [42; 999], случайные последовательности...
+    // Если тест падает, он СЖИМАЕТСЯ до наименьшего падающего входа!
 }
 ```
 
-### Getting Started with proptest
+### Начало работы с proptest
 ```toml
 # Cargo.toml
 [dev-dependencies]
 proptest = "1.4"
 ```
 
-### Common Patterns for C# Developers
+### Распространённые паттерны для разработчиков C#
 
 ```rust
 use proptest::prelude::*;
 
-// 1. Roundtrip property: serialize → deserialize = identity
-// (Like testing JsonSerializer.Serialize → Deserialize)
+// 1. Свойство «туда и обратно»: сериализация → десериализация = тождество
+// (Как тестирование JsonSerializer.Serialize → Deserialize)
 proptest! {
     #[test]
     fn json_roundtrip(name in "[a-zA-Z]{1,50}", age in 0u32..150) {
@@ -311,20 +311,20 @@ proptest! {
     }
 }
 
-// 2. Invariant property: output always satisfies a condition
+// 2. Свойство-инвариант: результат всегда удовлетворяет условию
 proptest! {
     #[test]
     fn sort_output_is_sorted(ref v in prop::collection::vec(any::<i32>(), 0..500)) {
         let mut sorted = v.clone();
         sorted.sort();
-        // Every adjacent pair must be in order
+        // Каждая соседняя пара должна быть в порядке
         for window in sorted.windows(2) {
             prop_assert!(window[0] <= window[1]);
         }
     }
 }
 
-// 3. Oracle property: compare two implementations
+// 3. Свойство-оракул: сравниваем две реализации
 proptest! {
     #[test]
     fn fast_path_matches_slow_path(input in "[0-9a-f]{1,100}") {
@@ -334,7 +334,7 @@ proptest! {
     }
 }
 
-// 4. Custom strategies: generate domain-specific test data
+// 4. Пользовательские стратегии: генерируем данные, специфичные для предметной области
 fn valid_email() -> impl Strategy<Value = String> {
     ("[a-z]{1,20}", "[a-z]{1,10}", prop::sample::select(vec!["com", "org", "io"]))
         .prop_map(|(user, domain, tld)| format!("{}@{}.{}", user, domain, tld))
@@ -349,52 +349,52 @@ proptest! {
 }
 ```
 
-### proptest vs FsCheck Comparison
+### Сравнение proptest и FsCheck
 
-| Feature | C# FsCheck | Rust proptest |
+| Возможность | C# FsCheck | Rust proptest |
 |---------|-----------|---------------|
-| Random input generation | `Arb.Generate<T>()` | `any::<T>()` |
-| Custom generators | `Arb.Register<T>()` | `impl Strategy<Value = T>` |
-| Shrinking on failure | Automatic | Automatic |
-| String patterns | Manual | `"[regex]"` strategy |
-| Collection generation | `Gen.ListOf` | `prop::collection::vec(strategy, range)` |
-| Composing generators | `Gen.Select` | `.prop_map()`, `.prop_flat_map()` |
-| Config (# of cases) | `Config.MaxTest` | `#![proptest_config(ProptestConfig::with_cases(10000))]` inside `proptest!` block |
+| Генерация случайных входов | `Arb.Generate<T>()` | `any::<T>()` |
+| Пользовательские генераторы | `Arb.Register<T>()` | `impl Strategy<Value = T>` |
+| Сжатие при падении (shrinking) | Автоматическое | Автоматическое |
+| Строковые шаблоны | Вручную | Стратегия `"[regex]"` |
+| Генерация коллекций | `Gen.ListOf` | `prop::collection::vec(strategy, range)` |
+| Композиция генераторов | `Gen.Select` | `.prop_map()`, `.prop_flat_map()` |
+| Конфигурация (число случаев) | `Config.MaxTest` | `#![proptest_config(ProptestConfig::with_cases(10000))]` внутри блока `proptest!` |
 
-### When to Use Property Testing vs Unit Testing
+### Когда использовать property-тестирование, а когда модульное
 
-| Use **unit tests** when | Use **proptest** when |
+| Используйте **модульные тесты**, когда | Используйте **proptest**, когда |
 |------------------------|----------------------|
-| Testing specific edge cases | Verifying invariants across all inputs |
-| Testing error messages/codes | Roundtrip properties (parse ↔ format) |
-| Integration/mock tests | Comparing two implementations |
-| Behavior depends on exact values | "For all X, property P holds" |
+| Проверяются конкретные пограничные случаи | Проверяются инварианты на всех входах |
+| Проверяются сообщения об ошибках/коды | Свойства «туда и обратно» (разбор ↔ форматирование) |
+| Интеграционные и тесты с моками | Сравнение двух реализаций |
+| Поведение зависит от точных значений | «Для всех X выполняется свойство P» |
 
 ---
 
-## Integration Tests: the `tests/` Directory
+## Интеграционные тесты: каталог `tests/`
 
-Unit tests live inside `src/` with `#[cfg(test)]`. Integration tests live in a separate `tests/` directory and test your crate's **public API** — just like how C# integration tests reference the project as an external assembly.
+Модульные тесты живут внутри `src/` с `#[cfg(test)]`. Интеграционные тесты находятся в отдельном каталоге `tests/` и проверяют **публичный API** крейта — так же, как интеграционные тесты в C# ссылаются на проект как на внешнюю сборку.
 
 ```
 my_crate/
 ├── src/
-│   ├── lib.rs          // public API
-│   └── internal.rs     // private implementation
+│   ├── lib.rs          // публичный API
+│   └── internal.rs     // приватная реализация
 ├── tests/
-│   ├── smoke.rs        // each file is a separate test binary
+│   ├── smoke.rs        // каждый файл — отдельный тестовый бинарник
 │   ├── api_tests.rs
 │   └── common/
-│       └── mod.rs      // shared test helpers
+│       └── mod.rs      // общие вспомогательные функции для тестов
 └── Cargo.toml
 ```
 
-### Writing Integration Tests
+### Написание интеграционных тестов
 
-Each file in `tests/` is compiled as a separate crate that depends on your library:
+Каждый файл в `tests/` компилируется как отдельный крейт, который зависит от вашей библиотеки:
 
 ```rust
-// tests/smoke.rs — can only access pub items from my_crate
+// tests/smoke.rs — имеет доступ только к pub-элементам my_crate
 use my_crate::{process_order, Order, OrderResult};
 
 #[test]
@@ -405,9 +405,9 @@ fn process_valid_order_returns_confirmation() {
 }
 ```
 
-### Shared Test Helpers
+### Общие вспомогательные функции для тестов
 
-Put shared setup code in `tests/common/mod.rs` (not `tests/common.rs`, which would be treated as its own test file):
+Общий код настройки кладите в `tests/common/mod.rs` (а не `tests/common.rs`, который будет считаться отдельным тестовым файлом):
 
 ```rust
 // tests/common/mod.rs
@@ -435,16 +435,16 @@ fn app_starts_with_test_config() {
 }
 ```
 
-### Running Specific Test Types
+### Запуск отдельных типов тестов
 
 ```bash
-cargo test                  # run all tests (unit + integration)
-cargo test --lib            # unit tests only (like dotnet test --filter Category=Unit)
-cargo test --test smoke     # run only tests/smoke.rs
-cargo test --test api_tests # run only tests/api_tests.rs
+cargo test                  # запустить все тесты (модульные + интеграционные)
+cargo test --lib            # только модульные тесты (как dotnet test --filter Category=Unit)
+cargo test --test smoke     # запустить только tests/smoke.rs
+cargo test --test api_tests # запустить только tests/api_tests.rs
 ```
 
-**Key difference from C#:** Integration test files can only access your crate's `pub` API. Private functions are invisible — this forces you to test through the public interface, which is generally better test design.
+**Ключевое отличие от C#:** файлы интеграционных тестов видят только `pub`-API вашего крейта. Приватные функции невидимы — это заставляет тестировать через публичный интерфейс, что обычно даёт лучший дизайн тестов.
 
 ***
 

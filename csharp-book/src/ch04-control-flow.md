@@ -1,29 +1,29 @@
-## Functions vs Methods
+## Функции и методы
 
-> **What you'll learn:** Functions and methods in Rust vs C#, the critical distinction between
-> expressions and statements, `if`/`match`/`loop`/`while`/`for` syntax, and how Rust's
-> expression-oriented design eliminates the need for ternary operators.
+> **Что вы узнаете:** функции и методы в Rust по сравнению с C#, важнейшее различие между
+> выражениями и инструкциями, синтаксис `if`/`match`/`loop`/`while`/`for`, а также то, как
+> ориентированный на выражения дизайн Rust делает ненужными тернарные операторы.
 >
-> **Difficulty:** 🟢 Beginner
+> **Сложность:** 🟢 Начальный
 
-### C# Function Declaration
+### Объявление функций в C#
 ```csharp
-// C# - Methods in classes
+// C# — методы внутри классов
 public class Calculator
 {
-    // Instance method
+    // Метод экземпляра
     public int Add(int a, int b)
     {
         return a + b;
     }
     
-    // Static method
+    // Статический метод
     public static int Multiply(int a, int b)
     {
         return a * b;
     }
     
-    // Method with ref parameter
+    // Метод с параметром ref
     public void Increment(ref int value)
     {
         value++;
@@ -31,18 +31,18 @@ public class Calculator
 }
 ```
 
-### Rust Function Declaration
+### Объявление функций в Rust
 ```rust
-// Rust - Standalone functions
+// Rust — самостоятельные функции
 fn add(a: i32, b: i32) -> i32 {
-    a + b  // No 'return' needed for final expression
+    a + b  // Ключевое слово 'return' не нужно для последнего выражения
 }
 
 fn multiply(a: i32, b: i32) -> i32 {
-    return a * b;  // Explicit return is also fine
+    return a * b;  // Явный return тоже допустим
 }
 
-// Function with mutable reference
+// Функция с изменяемой ссылкой
 fn increment(value: &mut i32) {
     *value += 1;
 }
@@ -53,24 +53,24 @@ fn main() {
     
     let mut x = 10;
     increment(&mut x);
-    println!("After increment: {}", x);
+    println!("После increment: {}", x);
 }
 ```
 
-### Expression vs Statement (Important!)
+### Выражение против инструкции (важно!)
 
 ```mermaid
 graph LR
-    subgraph "C# — Statements"
+    subgraph "C# — инструкции"
         CS1["if (cond)"] --> CS2["return 42;"]
         CS1 --> CS3["return 0;"]
-        CS2 --> CS4["Value exits via return"]
+        CS2 --> CS4["Значение выходит через return"]
         CS3 --> CS4
     end
-    subgraph "Rust — Expressions"
-        RS1["if cond"] --> RS2["42  (no semicolon)"]
-        RS1 --> RS3["0  (no semicolon)"]
-        RS2 --> RS4["Block IS the value"]
+    subgraph "Rust — выражения"
+        RS1["if cond"] --> RS2["42  (без точки с запятой)"]
+        RS1 --> RS3["0  (без точки с запятой)"]
+        RS2 --> RS4["Блок И ЕСТЬ значение"]
         RS3 --> RS4
     end
 
@@ -79,123 +79,123 @@ graph LR
 ```
 
 ```csharp
-// C# - Statements vs expressions
+// C# — инструкции и выражения
 public int GetValue()
 {
     if (condition)
     {
-        return 42;  // Statement
+        return 42;  // Инструкция
     }
-    return 0;       // Statement
+    return 0;       // Инструкция
 }
 ```
 
 ```rust
-// Rust - Everything can be an expression
+// Rust — почти всё может быть выражением
 fn get_value(condition: bool) -> i32 {
     if condition {
-        42  // Expression (no semicolon)
+        42  // Выражение (без точки с запятой)
     } else {
-        0   // Expression (no semicolon)
+        0   // Выражение (без точки с запятой)
     }
-    // The if-else block itself is an expression that returns a value
+    // Сам блок if-else — это выражение, которое возвращает значение
 }
 
-// Or even simpler
+// Или ещё проще
 fn get_value_ternary(condition: bool) -> i32 {
     if condition { 42 } else { 0 }
 }
 ```
 
-### Function Parameters and Return Types
+### Параметры функций и типы возвращаемых значений
 ```rust
-// No parameters, no return value (returns unit type ())
+// Без параметров и без возвращаемого значения (возвращает тип unit ())
 fn say_hello() {
-    println!("Hello!");
+    println!("Привет!");
 }
 
-// Multiple parameters
+// Несколько параметров
 fn greet(name: &str, age: u32) {
-    println!("{} is {} years old", name, age);
+    println!("{} — {} лет", name, age);
 }
 
-// Multiple return values using tuple
+// Несколько возвращаемых значений через кортеж
 fn divide_and_remainder(dividend: i32, divisor: i32) -> (i32, i32) {
     (dividend / divisor, dividend % divisor)
 }
 
 fn main() {
     let (quotient, remainder) = divide_and_remainder(10, 3);
-    println!("10 ÷ 3 = {} remainder {}", quotient, remainder);
+    println!("10 ÷ 3 = {} остаток {}", quotient, remainder);
 }
 ```
 
 ***
 
-## Control Flow Basics
+## Основы управления потоком
 
-### Conditional Statements
+### Условные инструкции
 ```csharp
-// C# if statements
+// Инструкции if в C#
 int x = 5;
 if (x > 10)
 {
-    Console.WriteLine("Big number");
+    Console.WriteLine("Большое число");
 }
 else if (x > 5)
 {
-    Console.WriteLine("Medium number");
+    Console.WriteLine("Среднее число");
 }
 else
 {
-    Console.WriteLine("Small number");
+    Console.WriteLine("Маленькое число");
 }
 
-// C# ternary operator
-string message = x > 10 ? "Big" : "Small";
+// Тернарный оператор C#
+string message = x > 10 ? "Большое" : "Маленькое";
 ```
 
 ```rust
-// Rust if expressions
+// Выражения if в Rust
 let x = 5;
 if x > 10 {
-    println!("Big number");
+    println!("Большое число");
 } else if x > 5 {
-    println!("Medium number");
+    println!("Среднее число");
 } else {
-    println!("Small number");
+    println!("Маленькое число");
 }
 
-// Rust if as expression (like ternary)
-let message = if x > 10 { "Big" } else { "Small" };
+// if как выражение (аналог тернарного оператора)
+let message = if x > 10 { "Большое" } else { "Маленькое" };
 
-// Multiple conditions
+// Несколько условий
 let message = if x > 10 {
-    "Big"
+    "Большое"
 } else if x > 5 {
-    "Medium"
+    "Среднее"
 } else {
-    "Small"
+    "Маленькое"
 };
 ```
 
-### Loops
+### Циклы
 ```csharp
-// C# loops
-// For loop
+// Циклы в C#
+// Цикл for
 for (int i = 0; i < 5; i++)
 {
     Console.WriteLine(i);
 }
 
-// Foreach loop
+// Цикл foreach
 var numbers = new[] { 1, 2, 3, 4, 5 };
 foreach (var num in numbers)
 {
     Console.WriteLine(num);
 }
 
-// While loop
+// Цикл while
 int count = 0;
 while (count < 3)
 {
@@ -205,32 +205,32 @@ while (count < 3)
 ```
 
 ```rust
-// Rust loops
-// Range-based for loop
-for i in 0..5 {  // 0 to 4 (exclusive end)
+// Циклы в Rust
+// Цикл по диапазону
+for i in 0..5 {  // От 0 до 4 (правая граница не включается)
     println!("{}", i);
 }
 
-// Iterate over collection
+// Перебор коллекции
 let numbers = vec![1, 2, 3, 4, 5];
-for num in numbers {  // Takes ownership
+for num in numbers {  // Забирает владение
     println!("{}", num);
 }
 
-// Iterate over references (more common)
+// Перебор ссылок (встречается чаще)
 let numbers = vec![1, 2, 3, 4, 5];
-for num in &numbers {  // Borrows elements
+for num in &numbers {  // Заимствует элементы
     println!("{}", num);
 }
 
-// While loop
+// Цикл while
 let mut count = 0;
 while count < 3 {
     println!("{}", count);
     count += 1;
 }
 
-// Infinite loop with break
+// Бесконечный цикл с break
 let mut counter = 0;
 loop {
     if counter >= 3 {
@@ -241,9 +241,9 @@ loop {
 }
 ```
 
-### Loop Control
+### Управление циклом
 ```csharp
-// C# loop control
+// Управление циклом в C#
 for (int i = 0; i < 10; i++)
 {
     if (i == 3) continue;
@@ -253,18 +253,18 @@ for (int i = 0; i < 10; i++)
 ```
 
 ```rust
-// Rust loop control
+// Управление циклом в Rust
 for i in 0..10 {
     if i == 3 { continue; }
     if i == 7 { break; }
     println!("{}", i);
 }
 
-// Loop labels (for nested loops)
+// Метки циклов (для вложенных циклов)
 'outer: for i in 0..3 {
     'inner: for j in 0..3 {
         if i == 1 && j == 1 {
-            break 'outer;  // Break out of outer loop
+            break 'outer;  // Выход из внешнего цикла
         }
         println!("i: {}, j: {}", i, j);
     }
@@ -275,12 +275,12 @@ for i in 0..10 {
 
 
 <details>
-<summary><strong>🏋️ Exercise: Temperature Converter</strong> (click to expand)</summary>
+<summary><strong>🏋️ Упражнение: конвертер температур</strong> (нажмите, чтобы раскрыть)</summary>
 
-**Challenge**: Convert this C# program to idiomatic Rust. Use expressions, pattern matching, and proper error handling.
+**Задача**: переведите эту программу на C# на идиоматичный Rust. Используйте выражения, сопоставление с образцом и правильную обработку ошибок.
 
 ```csharp
-// C# — convert this to Rust
+// C# — переведите это на Rust
 public static double Convert(double value, string from, string to)
 {
     double celsius = from switch
@@ -301,7 +301,7 @@ public static double Convert(double value, string from, string to)
 ```
 
 <details>
-<summary>🔑 Solution</summary>
+<summary>🔑 Решение</summary>
 
 ```rust
 #[derive(Debug, Clone, Copy)]
@@ -312,7 +312,7 @@ fn parse_unit(s: &str) -> Result<TempUnit, String> {
         "C" => Ok(TempUnit::Celsius),
         "F" => Ok(TempUnit::Fahrenheit),
         "K" => Ok(TempUnit::Kelvin),
-        _   => Err(format!("Unknown unit: {s}")),
+        _   => Err(format!("Неизвестная единица: {s}")),
     }
 }
 
@@ -337,10 +337,10 @@ fn main() -> Result<(), String> {
 }
 ```
 
-**Key takeaways**:
-- Enums replace magic strings — exhaustive matching catches missing units at compile time
-- `Result<T, E>` replaces exceptions — the caller sees possible failures in the signature
-- `match` is an expression that returns a value — no `return` statements needed
+**Ключевые выводы**:
+- Перечисления заменяют «магические» строки — исчерпывающее сопоставление ловит пропущенные единицы на этапе компиляции
+- `Result<T, E>` заменяет исключения — вызывающий код видит возможные ошибки в сигнатуре
+- `match` — это выражение, которое возвращает значение, — инструкции `return` не нужны
 
 </details>
 </details>

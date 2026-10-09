@@ -1,12 +1,12 @@
-## Inheritance vs Composition
+## Наследование против композиции
 
-> **What you'll learn:** Why Rust has no class inheritance, how traits + structs replace deep
-> class hierarchies, and practical patterns for achieving polymorphism through composition.
+> **Что вы узнаете:** почему в Rust нет наследования классов, как трейты и структуры заменяют глубокие иерархии классов,
+> и практические паттерны для достижения полиморфизма через композицию.
 >
-> **Difficulty:** 🟡 Intermediate
+> **Сложность:** 🟡 Средний
 
 ```csharp
-// C# - Class-based inheritance
+// C# — наследование на основе классов
 public abstract class Animal
 {
     public string Name { get; protected set; }
@@ -33,7 +33,7 @@ public class Dog : Animal
     }
 }
 
-// Interface-based contracts
+// Контракты на основе интерфейсов
 public interface IFlyable
 {
     void Fly();
@@ -55,14 +55,14 @@ public class Bird : Animal, IFlyable
 }
 ```
 
-### Rust Composition Model
+### Модель композиции в Rust
 ```rust
-// Rust - Composition over inheritance with traits
+// Rust — композиция вместо наследования, через трейты
 pub trait Animal {
     fn name(&self) -> &str;
     fn make_sound(&self);
     
-    // Default implementation (like C# virtual methods)
+    // Реализация по умолчанию (как виртуальные методы в C#)
     fn sleep(&self) {
         println!("{} is sleeping", self.name());
     }
@@ -72,7 +72,7 @@ pub trait Flyable {
     fn fly(&self);
 }
 
-// Separate data from behavior
+// Отделяем данные от поведения
 #[derive(Debug)]
 pub struct Dog {
     name: String,
@@ -84,7 +84,7 @@ pub struct Bird {
     wingspan: f64,
 }
 
-// Implement behaviors for types
+// Реализуем поведение для типов
 impl Animal for Dog {
     fn name(&self) -> &str {
         &self.name
@@ -121,7 +121,7 @@ impl Flyable for Bird {
     }
 }
 
-// Multiple trait bounds (like multiple interfaces)
+// Несколько трейт-границ (как несколько интерфейсов)
 fn make_flying_animal_sound<T>(animal: &T) 
 where 
     T: Animal + Flyable,
@@ -133,12 +133,12 @@ where
 
 ```mermaid
 graph TD
-    subgraph "C# Inheritance Hierarchy"
-        CS_ANIMAL["Animal (abstract class)"]
+    subgraph "Иерархия наследования C#"
+        CS_ANIMAL["Animal (абстрактный класс)"]
         CS_DOG["Dog : Animal"]
         CS_BIRD["Bird : Animal, IFlyable"]
-        CS_VTABLE["Virtual method dispatch<br/>Runtime cost"]
-        CS_COUPLING["[ERROR] Tight coupling<br/>[ERROR] Diamond problem<br/>[ERROR] Deep hierarchies"]
+        CS_VTABLE["Диспетчеризация виртуальных методов<br/>Затраты во время выполнения"]
+        CS_COUPLING["[ERROR] Жёсткая связанность<br/>[ERROR] Ромбовидная проблема<br/>[ERROR] Глубокие иерархии"]
         
         CS_ANIMAL --> CS_DOG
         CS_ANIMAL --> CS_BIRD
@@ -147,7 +147,7 @@ graph TD
         CS_ANIMAL --> CS_COUPLING
     end
     
-    subgraph "Rust Composition Model"
+    subgraph "Модель композиции Rust"
         RUST_ANIMAL["trait Animal"]
         RUST_FLYABLE["trait Flyable"]
         RUST_DOG["struct Dog"]
@@ -155,8 +155,8 @@ graph TD
         RUST_IMPL1["impl Animal for Dog"]
         RUST_IMPL2["impl Animal for Bird"]
         RUST_IMPL3["impl Flyable for Bird"]
-        RUST_STATIC["Static dispatch<br/>Zero cost"]
-        RUST_FLEXIBLE["[OK] Flexible composition<br/>[OK] No hierarchy limits<br/>[OK] Mix and match traits"]
+        RUST_STATIC["Статическая диспетчеризация<br/>Нулевая стоимость"]
+        RUST_FLEXIBLE["[OK] Гибкая композиция<br/>[OK] Нет ограничений иерархии<br/>[OK] Свободное комбинирование трейтов"]
         
         RUST_DOG --> RUST_IMPL1
         RUST_BIRD --> RUST_IMPL2
@@ -179,12 +179,12 @@ graph TD
 
 ---
 
-## Exercises
+## Упражнения
 
 <details>
-<summary><strong>🏋️ Exercise: Replace Inheritance with Traits</strong> (click to expand)</summary>
+<summary><strong>🏋️ Упражнение: замените наследование трейтами</strong> (нажмите, чтобы раскрыть)</summary>
 
-This C# code uses inheritance. Rewrite it in Rust using trait composition:
+Этот C#-код использует наследование. Перепишите его на Rust, используя композицию трейтов:
 
 ```csharp
 public abstract class Shape { public abstract double Area(); }
@@ -199,14 +199,14 @@ public class Cylinder : Shape3D
 }
 ```
 
-Requirements:
-1. `HasArea` trait with `fn area(&self) -> f64`
-2. `HasVolume` trait with `fn volume(&self) -> f64`
-3. `Cylinder` struct implementing both
-4. A function `fn print_shape_info(shape: &(impl HasArea + HasVolume))` — note the trait bound composition (no inheritance needed)
+Требования:
+1. Трейт `HasArea` с методом `fn area(&self) -> f64`
+2. Трейт `HasVolume` с методом `fn volume(&self) -> f64`
+3. Структура `Cylinder`, реализующая оба трейта
+4. Функция `fn print_shape_info(shape: &(impl HasArea + HasVolume))` — обратите внимание на композицию трейт-границ (наследование не нужно)
 
 <details>
-<summary>🔑 Solution</summary>
+<summary>🔑 Решение</summary>
 
 ```rust
 use std::f64::consts::PI;
@@ -247,7 +247,7 @@ fn main() {
 }
 ```
 
-**Key insight**: C# needs a 3-level hierarchy (Shape → Shape3D → Cylinder). Rust uses flat trait composition — `impl HasArea + HasVolume` combines capabilities without inheritance depth.
+**Ключевая мысль**: C# требует трёхуровневой иерархии (Shape → Shape3D → Cylinder). Rust использует плоскую композицию трейтов — `impl HasArea + HasVolume` объединяет возможности без глубины наследования.
 
 </details>
 </details>

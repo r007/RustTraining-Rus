@@ -1,25 +1,25 @@
-## Lifetimes: Telling the Compiler How Long References Live
+## Времена жизни: как сообщить компилятору, сколько живут ссылки
 
-> **What you'll learn:** Why lifetimes exist (no GC means the compiler needs proof), lifetime annotation syntax,
-> elision rules, struct lifetimes, the `'static` lifetime, and common borrow checker errors with fixes.
+> **Что вы узнаете:** зачем нужны времена жизни (без GC компилятору нужно доказательство), синтаксис аннотаций времён жизни,
+> правила элизии, времена жизни в структурах, время жизни `'static`, а также типичные ошибки проверщика заимствований и способы их исправить.
 >
-> **Difficulty:** 🔴 Advanced
+> **Сложность:** 🔴 Продвинутый
 
-C# developers never think about reference lifetimes — the garbage collector handles reachability. In Rust, the compiler needs *proof* that every reference is valid for as long as it's used. Lifetimes are that proof.
+Разработчики C# никогда не думают о временах жизни ссылок — достижимостью занимается сборщик мусора. В Rust компилятору нужно *доказательство* того, что каждая ссылка действительна столько, сколько она используется. Времена жизни и есть это доказательство.
 
-### Why Lifetimes Exist
+### Зачем нужны времена жизни
 ```rust
-// This won't compile — the compiler can't prove the returned reference is valid
+// Этот код не скомпилируется — компилятор не может доказать, что возвращаемая ссылка действительна
 fn longest(a: &str, b: &str) -> &str {
     if a.len() > b.len() { a } else { b }
 }
-// ERROR: missing lifetime specifier — the compiler doesn't know
-// whether the return value borrows from `a` or `b`
+// ОШИБКА: пропущен specifier времени жизни — компилятор не знает,
+// заимствует ли возвращаемое значение из `a` или из `b`
 ```
 
-### Lifetime Annotations
+### Аннотации времён жизни
 ```rust
-// Lifetime 'a says: "the return value lives at least as long as BOTH inputs"
+// Время жизни 'a означает: «возвращаемое значение живёт не меньше, чем ОБА входных параметра»
 fn longest<'a>(a: &'a str, b: &'a str) -> &'a str {
     if a.len() > b.len() { a } else { b }
 }
@@ -30,45 +30,45 @@ fn main() {
     {
         let string2 = String::from("xyz");
         result = longest(&string1, &string2);
-        println!("Longest: {result}"); // ✅ both references still valid here
+        println!("Longest: {result}"); // ✅ обе ссылки здесь ещё действительны
     }
-    // println!("{result}"); // ❌ ERROR: string2 doesn't live long enough
+    // println!("{result}"); // ❌ ОШИБКА: string2 живёт недостаточно долго
 }
 ```
 
-### C# Comparison
+### Сравнение с C#
 ```csharp
-// C# — the GC keeps objects alive as long as any reference exists
+// C# — GC держит объекты живыми, пока существует хотя бы одна ссылка
 string Longest(string a, string b) => a.Length > b.Length ? a : b;
 
-// No lifetime issues — GC tracks reachability automatically
-// But: GC pauses, unpredictable memory usage, no compile-time proof
+// Проблем с временами жизни нет — GC сам отслеживает достижимость
+// Но: паузы GC, непредсказуемое потребление памяти, нет доказательств на этапе компиляции
 ```
 
-### Lifetime Elision Rules
+### Правила элизии времён жизни
 
-Most of the time you **don't need to write lifetime annotations**. The compiler applies three rules automatically:
+В большинстве случаев аннотации времён жизни **писать не нужно**. Компилятор применяет три правила автоматически:
 
-| Rule | Description | Example |
+| Правило | Описание | Пример |
 |------|-------------|---------|
-| **Rule 1** | Each reference parameter gets its own lifetime | `fn foo(x: &str, y: &str)` → `fn foo<'a, 'b>(x: &'a str, y: &'b str)` |
-| **Rule 2** | If there's exactly one input lifetime, it's assigned to all output lifetimes | `fn first(s: &str) -> &str` → `fn first<'a>(s: &'a str) -> &'a str` |
-| **Rule 3** | If one input is `&self` or `&mut self`, that lifetime is assigned to all outputs | `fn name(&self) -> &str` → works because of &self |
+| **Правило 1** | Каждый параметр-ссылка получает собственное время жизни | `fn foo(x: &str, y: &str)` → `fn foo<'a, 'b>(x: &'a str, y: &'b str)` |
+| **Правило 2** | Если есть ровно одно входное время жизни, оно присваивается всем выходным | `fn first(s: &str) -> &str` → `fn first<'a>(s: &'a str) -> &'a str` |
+| **Правило 3** | Если один из входов — `&self` или `&mut self`, его время жизни присваивается всем выходным | `fn name(&self) -> &str` → работает благодаря &self |
 
 ```rust
-// These are equivalent — the compiler adds lifetimes automatically:
-fn first_word(s: &str) -> &str { /* ... */ }           // elided
-fn first_word<'a>(s: &'a str) -> &'a str { /* ... */ } // explicit
+// Эти записи эквивалентны — компилятор добавляет времена жизни автоматически:
+fn first_word(s: &str) -> &str { /* ... */ }           // с элизией
+fn first_word<'a>(s: &'a str) -> &'a str { /* ... */ } // явно
 
-// But this REQUIRES explicit annotation — two inputs, which one does output borrow?
+// А вот здесь нужна явная аннотация — два входа, из какого из них заимствует выход?
 fn longest<'a>(a: &'a str, b: &'a str) -> &'a str { /* ... */ }
 ```
 
-### Struct Lifetimes
+### Времена жизни в структурах
 ```rust
-// A struct that borrows data (instead of owning it)
+// Структура, которая заимствует данные (а не владеет ими)
 struct Excerpt<'a> {
-    text: &'a str,  // borrows from some String that must outlive this struct
+    text: &'a str,  // заимствует из String, которая должна пережить эту структуру
 }
 
 impl<'a> Excerpt<'a> {
@@ -83,79 +83,79 @@ impl<'a> Excerpt<'a> {
 
 fn main() {
     let novel = String::from("Call me Ishmael. Some years ago...");
-    let excerpt = Excerpt::new(&novel); // excerpt borrows from novel
+    let excerpt = Excerpt::new(&novel); // excerpt заимствует из novel
     println!("First sentence: {}", excerpt.first_sentence());
-    // novel must stay alive as long as excerpt exists
+    // novel должен жить, пока существует excerpt
 }
 ```
 
 ```csharp
-// C# equivalent — no lifetime concerns, but no compile-time guarantee either
+// Аналог в C# — проблем с временами жизни нет, но и гарантий на этапе компиляции нет
 class Excerpt
 {
     public string Text { get; }
     public Excerpt(string text) => Text = text;
     public string FirstSentence() => Text.Split('.')[0];
 }
-// What if the string is mutated elsewhere? Runtime surprise.
+// Что если строку изменят где-то в другом месте? Сюрприз во время выполнения.
 ```
 
-### The `'static` Lifetime
+### Время жизни `'static`
 ```rust
-// 'static means "lives for the entire program duration"
-let s: &'static str = "I'm a string literal"; // stored in binary, always valid
+// 'static означает «живёт всё время работы программы»
+let s: &'static str = "I'm a string literal"; // хранится в бинарнике, всегда действителен
 
-// Common places you see 'static:
-// 1. String literals
-// 2. Global constants
-// 3. Thread::spawn requires 'static (thread might outlive the caller)
+// Типичные места, где встречается 'static:
+// 1. Строковые литералы
+// 2. Глобальные константы
+// 3. Thread::spawn требует 'static (поток может пережить вызывающий код)
 std::thread::spawn(move || {
-    // Closures sent to threads must own their data or use 'static references
+    // Замыкания, передаваемые в потоки, должны владеть своими данными или использовать ссылки 'static
     println!("{s}"); // OK: &'static str
 });
 
-// 'static does NOT mean "immortal" — it means "CAN live forever if needed"
+// 'static НЕ означает «бессмертный» — это значит «МОЖЕТ жить вечно, если потребуется»
 let owned = String::from("hello");
-// owned is NOT 'static, but it can be moved into a thread (ownership transfer)
+// owned не имеет времени жизни 'static, но его можно переместить в поток (передача владения)
 ```
 
-### Common Borrow Checker Errors and Fixes
+### Типичные ошибки проверщика заимствований и их исправление
 
-| Error | Cause | Fix |
-|-------|-------|-----|
-| `missing lifetime specifier` | Multiple input references, ambiguous output | Add `<'a>` annotation tying output to correct input |
-| `does not live long enough` | Reference outlives the data it points to | Extend the data's scope, or return owned data instead |
-| `cannot borrow as mutable` | Immutable borrow still active | Use the immutable reference before mutating, or restructure |
-| `cannot move out of borrowed content` | Trying to take ownership of borrowed data | Use `.clone()`, or restructure to avoid the move |
-| `lifetime may not live long enough` | Struct borrow outlives source | Ensure the source data's scope encompasses the struct's usage |
+| Ошибка | Причина | Исправление |
+|-------|-------|-------|
+| `missing lifetime specifier` | Несколько входных ссылок, неоднозначный выход | Добавьте `<'a>`, связав выход с нужным входом |
+| `does not live long enough` | Ссылка переживает данные, на которые указывает | Расширьте область видимости данных или верните владеемые данные |
+| `cannot borrow as mutable` | Неизменяемое заимствование ещё активно | Используйте неизменяемую ссылку до изменения или перестройте код |
+| `cannot move out of borrowed content` | Попытка забрать владение заимствованными данными | Используйте `.clone()` или перестройте код, чтобы избежать перемещения |
+| `lifetime may not live long enough` | Заимствование структуры переживает источник | Убедитесь, что область видимости исходных данных охватывает использование структуры |
 
-### Visualizing Lifetime Scopes
+### Визуализация областей видимости времён жизни
 
 ```mermaid
 graph TD
-    subgraph "Scope Visualization"
+    subgraph "Визуализация областей видимости"
         direction TB
         A["fn main()"] --> B["let s1 = String::from(&quot;hello&quot;)"]
-        B --> C["{ // inner scope"]
+        B --> C["{ // внутренняя область"]
         C --> D["let s2 = String::from(&quot;world&quot;)"]
         D --> E["let r = longest(&s1, &s2)"]
-        E --> F["println!(&quot;{r}&quot;)  ✅ both alive"]
-        F --> G["} // s2 dropped here"]
-        G --> H["println!(&quot;{r}&quot;)  ❌ s2 gone!"]
+        E --> F["println!(&quot;{r}&quot;)  ✅ обе живы"]
+        F --> G["} // s2 уничтожается здесь"]
+        G --> H["println!(&quot;{r}&quot;)  ❌ s2 уже нет!"]
     end
 
     style F fill:#c8e6c9,color:#000
     style H fill:#ffcdd2,color:#000
 ```
 
-### Multiple Lifetime Parameters
+### Несколько параметров времени жизни
 
-Sometimes references come from different sources with different lifetimes:
+Иногда ссылки приходят из разных источников с разными временами жизни:
 
 ```rust
-// Two independent lifetimes: the return borrows only from 'a, not 'b
+// Два независимых времени жизни: результат заимствует только из 'a, а не из 'b
 fn first_with_context<'a, 'b>(data: &'a str, _context: &'b str) -> &'a str {
-    // Return borrows from 'data' only — 'context' can have a shorter lifetime
+    // Результат заимствуется только из 'data' — у 'context' может быть более короткое время жизни
     data.split(',').next().unwrap_or(data)
 }
 
@@ -163,76 +163,76 @@ fn main() {
     let data = String::from("alice,bob,charlie");
     let result;
     {
-        let context = String::from("user lookup"); // shorter lifetime
+        let context = String::from("user lookup"); // более короткое время жизни
         result = first_with_context(&data, &context);
-    } // context dropped — but result borrows from data, not context ✅
+    } // context уничтожается — но result заимствует из data, а не из context ✅
     println!("{result}");
 }
 ```
 
 ```csharp
-// C# — no lifetime tracking means you can't express "borrows from A but not B"
+// C# — без отслеживания времён жизни нельзя выразить «заимствует из A, но не из B»
 string FirstWithContext(string data, string context) => data.Split(',')[0];
-// Fine for GC'd languages, but Rust can prove safety without a GC
+// Для языков с GC это нормально, но Rust может доказать безопасность без GC
 ```
 
-### Real-World Lifetime Patterns
+### Типичные паттерны из практики
 
-**Pattern 1: Iterator returning references**
+**Паттерн 1: итератор, возвращающий ссылки**
 ```rust
-// A parser that yields borrowed slices from the input
+// Парсер, который отдаёт заимствованные срезы из входной строки
 struct CsvRow<'a> {
     fields: Vec<&'a str>,
 }
 
 fn parse_csv_line(line: &str) -> CsvRow<'_> {
-    // '_ tells the compiler "infer the lifetime from the input"
+    // '_ говорит компилятору «выведи время жизни из входного параметра»
     CsvRow {
         fields: line.split(',').collect(),
     }
 }
 ```
 
-**Pattern 2: "Return owned when in doubt"**
+**Паттерн 2: «если сомневаешься — возвращай владеемые данные»**
 ```rust
-// When lifetimes get complex, returning owned data is the pragmatic fix
+// Когда времена жизни становятся сложными, практичное решение — вернуть владеемые данные
 fn format_greeting(first: &str, last: &str) -> String {
-    // Returns owned String — no lifetime annotation needed
+    // Возвращаем владеемую String — аннотация времени жизни не нужна
     format!("Hello, {first} {last}!")
 }
 
-// Only borrow when:
-// 1. Performance matters (avoiding allocation)
-// 2. The relationship between input and output lifetime is clear
+// Заимствуйте только тогда, когда:
+// 1. Важна производительность (избегаем выделения памяти)
+// 2. Связь между временем жизни входа и выхода очевидна
 ```
 
-**Pattern 3: Lifetime bounds on generics**
+**Паттерн 3: ограничения времён жизни для обобщений**
 ```rust
-// "T must live at least as long as 'a"
+// «T должен жить не меньше, чем 'a»
 fn store_reference<'a, T: 'a>(cache: &mut Vec<&'a T>, item: &'a T) {
     cache.push(item);
 }
 
-// Common in trait objects: Box<dyn Display + 'a>
+// Часто встречается в трейт-объектах: Box<dyn Display + 'a>
 fn make_printer<'a>(text: &'a str) -> Box<dyn std::fmt::Display + 'a> {
     Box::new(text)
 }
 ```
 
-### When to Reach for `'static`
+### Когда использовать `'static`
 
-| Scenario | Use `'static`? | Alternative |
+| Сценарий | Использовать `'static`? | Альтернатива |
 |----------|:-----------:|-------------|
-| String literals | ✅ Yes — they're always `'static` | — |
-| `thread::spawn` closure | Often — thread outlives caller | Use `thread::scope` for borrowed data |
-| Global config | ✅ `lazy_static!` or `OnceLock` | Pass references through params |
-| Trait objects stored long-term | Often — `Box<dyn Trait + 'static>` | Parameterize the container with `'a` |
-| Temporary borrowing | ❌ Never — over-constraining | Use the actual lifetime |
+| Строковые литералы | ✅ Да — они всегда `'static` | — |
+| Замыкание для `thread::spawn` | Часто — поток переживает вызывающий код | Используйте `thread::scope` для заимствованных данных |
+| Глобальная конфигурация | ✅ `lazy_static!` или `OnceLock` | Передавайте ссылки через параметры |
+| Трейт-объекты, которые хранятся долго | Часто — `Box<dyn Trait + 'static>` | Параметризуйте контейнер через `'a` |
+| Временные заимствования | ❌ Никогда — излишнее ограничение | Используйте реальное время жизни |
 
 <details>
-<summary><strong>🏋️ Exercise: Lifetime Annotations</strong> (click to expand)</summary>
+<summary><strong>🏋️ Упражнение: аннотации времён жизни</strong> (нажмите, чтобы раскрыть)</summary>
 
-**Challenge**: Add the correct lifetime annotations to make this compile:
+**Задача**: добавьте правильные аннотации времён жизни, чтобы код скомпилировался:
 
 ```rust
 struct Config {
@@ -240,12 +240,12 @@ struct Config {
     api_key: String,
 }
 
-// TODO: Add lifetime annotations
+// TODO: Добавьте аннотации времён жизни
 fn get_connection_info(config: &Config) -> (&str, &str) {
     (&config.db_url, &config.api_key)
 }
 
-// TODO: This struct borrows from Config — add lifetime parameter
+// TODO: Эта структура заимствует из Config — добавьте параметр времени жизни
 struct ConnectionInfo {
     db_url: &str,
     api_key: &str,
@@ -253,7 +253,7 @@ struct ConnectionInfo {
 ```
 
 <details>
-<summary>🔑 Solution</summary>
+<summary>🔑 Решение</summary>
 
 ```rust
 struct Config {
@@ -261,13 +261,13 @@ struct Config {
     api_key: String,
 }
 
-// Rule 3 doesn't apply (no &self), Rule 2 applies (one input → output)
-// So the compiler handles this automatically — no annotation needed!
+// Правило 3 не применяется (нет &self), применяется правило 2 (один вход → выход)
+// Поэтому компилятор справляется сам — аннотация не нужна!
 fn get_connection_info(config: &Config) -> (&str, &str) {
     (&config.db_url, &config.api_key)
 }
 
-// Struct lifetime annotation needed:
+// Аннотация времени жизни для структуры нужна:
 struct ConnectionInfo<'a> {
     db_url: &'a str,
     api_key: &'a str,
@@ -281,7 +281,7 @@ fn make_info<'a>(config: &'a Config) -> ConnectionInfo<'a> {
 }
 ```
 
-**Key takeaway**: Lifetime elision often saves you from writing annotations on functions, but structs that borrow data always need explicit `<'a>`.
+**Ключевая мысль**: элизия времён жизни часто избавляет от необходимости писать аннотации у функций, но структуры, которые заимствуют данные, всегда требуют явного `<'a>`.
 
 </details>
 </details>

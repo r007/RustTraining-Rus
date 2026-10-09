@@ -1,13 +1,13 @@
-## Crate-Level Error Types and Result Aliases
+## Типы ошибок уровня крейта и псевдонимы Result
 
-> **What you'll learn:** The production pattern of defining a per-crate error enum with `thiserror`,
-> creating a `Result<T>` type alias, and when to choose `thiserror` (libraries) vs `anyhow` (applications).
+> **Что вы узнаете:** производственный паттерн определения перечисления ошибок для каждого крейта с помощью `thiserror`,
+> создание псевдонима типа `Result<T>`, а также когда выбирать `thiserror` (библиотеки) или `anyhow` (приложения).
 >
-> **Difficulty:** 🟡 Intermediate
+> **Сложность:** 🟡 Средний
 
-A critical pattern for production Rust: define a per-crate error enum and a `Result` type alias to eliminate boilerplate.
+Ключевой паттерн для производственного кода на Rust: определить перечисление ошибок для каждого крейта и псевдоним типа `Result`, чтобы убрать шаблонный код.
 
-### The Pattern
+### Паттерн
 ```rust
 // src/error.rs
 use thiserror::Error;
@@ -30,21 +30,21 @@ pub enum AppError {
     NotFound { entity: String, id: String },
 }
 
-/// Crate-wide Result alias — every function returns this
+/// Псевдоним Result для всего крейта — каждая функция возвращает именно его
 pub type Result<T> = std::result::Result<T, AppError>;
 ```
 
-### Usage Throughout Your Crate
+### Использование во всём крейте
 ```rust
 use crate::error::{AppError, Result};
 
-// Assumes a database pool is available, e.g.:
+// Предполагается, что пул соединений с базой доступен, например:
 // async fn get_user(pool: &PgPool, id: Uuid) -> Result<User>
-// Here we show the pattern with `pool` as shorthand.
+// Здесь показан паттерн, где `pool` — сокращение.
 pub async fn get_user(id: Uuid) -> Result<User> {
     let user = sqlx::query_as!(User, "SELECT * FROM users WHERE id = $1", id)
         .fetch_optional(&pool)
-        .await?;  // sqlx::Error → AppError::Database via #[from]
+        .await?;  // sqlx::Error → AppError::Database через #[from]
 
     user.ok_or_else(|| AppError::NotFound {
         entity: "User".into(),
@@ -62,9 +62,9 @@ pub async fn create_user(req: CreateUserRequest) -> Result<User> {
 }
 ```
 
-### C# Comparison
+### Сравнение с C#
 ```csharp
-// C# equivalent pattern
+// Аналогичный паттерн в C#
 public class AppException : Exception
 {
     public string ErrorCode { get; }
@@ -74,31 +74,31 @@ public class AppException : Exception
     }
 }
 
-// But in C#, callers don't know what exceptions to expect!
-// In Rust, the error type is in the function signature.
+// Но в C# вызывающий код не знает, какие исключения ожидать!
+// В Rust тип ошибки указан в сигнатуре функции.
 ```
 
-### Why This Matters
-- **`thiserror`** generates `Display` and `Error` impls automatically
-- **`#[from]`** enables the `?` operator to convert library errors automatically
-- The `Result<T>` alias means every function signature is clean: `fn foo() -> Result<Bar>`
-- **Unlike C# exceptions**, callers see all possible error variants in the type
+### Почему это важно
+- **`thiserror`** автоматически генерирует реализации `Display` и `Error`
+- **`#[from]`** позволяет оператору `?` автоматически преобразовывать ошибки библиотек
+- Псевдоним `Result<T>` делает каждую сигнатуру функции чистой: `fn foo() -> Result<Bar>`
+- **В отличие от исключений C#** вызывающий код видит все возможные варианты ошибок в типе
 
 
-### thiserror vs anyhow: When to Use Which
+### thiserror против anyhow: что выбрать
 
-Two crates dominate Rust error handling. Choosing between them is the first decision you'll make:
+Обработку ошибок в Rust определяют два крейта. Выбор между ними — первое решение, которое вам предстоит принять:
 
 | | `thiserror` | `anyhow` |
 |---|---|---|
-| **Purpose** | Define structured error types for **libraries** | Quick error handling for **applications** |
-| **Output** | Custom enum you control | Opaque `anyhow::Error` wrapper |
-| **Caller sees** | All error variants in the type | Just `anyhow::Error` — opaque |
-| **Best for** | Library crates, APIs, any code with consumers | Binaries, scripts, prototypes, CLI tools |
-| **Downcasting** | `match` on variants directly | `error.downcast_ref::<MyError>()` |
+| **Назначение** | Определение структурированных типов ошибок для **библиотек** | Быстрая обработка ошибок для **приложений** |
+| **Результат** | Собственное перечисление, которым вы управляете | Непрозрачная обёртка `anyhow::Error` |
+| **Что видит вызывающий код** | Все варианты ошибок в типе | Просто `anyhow::Error` — непрозрачный |
+| **Лучше всего для** | Библиотечных крейтов, API, любого кода с потребителями | Бинарников, скриптов, прототипов, CLI-утилит |
+| **Приведение типов** | `match` по вариантам напрямую | `error.downcast_ref::<MyError>()` |
 
 ```rust
-// thiserror — for LIBRARIES (callers need to match on error variants)
+// thiserror — для БИБЛИОТЕК (вызывающему коду нужно сопоставлять варианты ошибок)
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -123,7 +123,7 @@ pub fn read_config(path: &str) -> Result<String, StorageError> {
 ```
 
 ```rust
-// anyhow — for APPLICATIONS (just propagate errors, don't define types)
+// anyhow — для ПРИЛОЖЕНИЙ (просто пробрасываем ошибки, не определяя типов)
 use anyhow::{Context, Result};
 
 fn main() -> Result<()> {
@@ -137,30 +137,30 @@ fn main() -> Result<()> {
     Ok(())
 }
 // anyhow::Result<T> = Result<T, anyhow::Error>
-// .context() adds human-readable context to any error
+// .context() добавляет понятный для человека контекст к любой ошибке
 ```
 
 ```csharp
-// C# comparison:
-// thiserror ≈ defining custom exception classes with specific properties
-// anyhow ≈ catching Exception and wrapping with message:
+// Сравнение с C#:
+// thiserror ≈ определение собственных классов исключений с конкретными свойствами
+// anyhow ≈ перехват Exception и оборачивание с сообщением:
 //   throw new InvalidOperationException("Failed to read config", ex);
 ```
 
-**Guideline**: If your code is a **library** (other code calls it), use `thiserror`. If your code is an **application** (the final binary), use `anyhow`. Many projects use both — `thiserror` for the library crate's public API, `anyhow` in the `main()` binary.
+**Правило**: если ваш код — **библиотека** (его вызывает другой код), используйте `thiserror`. Если ваш код — **приложение** (финальный бинарник), используйте `anyhow`. Многие проекты используют оба: `thiserror` для публичного API библиотечного крейта, `anyhow` в бинарнике в `main()`.
 
-### Error Recovery Patterns
+### Паттерны восстановления после ошибок
 
-C# developers are used to `try/catch` blocks that recover from specific exceptions. Rust uses combinators on `Result` for the same purpose:
+Разработчики C# привыкли к блокам `try/catch`, которые восстанавливаются после конкретных исключений. В Rust для того же используются комбинаторы над `Result`:
 
 ```rust
 use std::fs;
 
-// Pattern 1: Recover with a fallback value
+// Паттерн 1: восстановление через значение по умолчанию
 let config = fs::read_to_string("config.toml")
-    .unwrap_or_else(|_| String::from("port = 8080"));  // default if missing
+    .unwrap_or_else(|_| String::from("port = 8080"));  // значение по умолчанию, если файла нет
 
-// Pattern 2: Recover from specific errors, propagate others
+// Паттерн 2: восстанавливаемся после конкретных ошибок, остальные пробрасываем
 fn read_or_create(path: &str) -> Result<String, std::io::Error> {
     match fs::read_to_string(path) {
         Ok(content) => Ok(content),
@@ -169,11 +169,11 @@ fn read_or_create(path: &str) -> Result<String, std::io::Error> {
             fs::write(path, &default)?;
             Ok(default)
         }
-        Err(e) => Err(e),  // propagate permission errors, etc.
+        Err(e) => Err(e),  // пробрасываем ошибки доступа и прочие
     }
 }
 
-// Pattern 3: Add context before propagating
+// Паттерн 3: добавляем контекст перед распространением
 use anyhow::Context;
 
 fn load_config() -> anyhow::Result<Config> {
@@ -184,7 +184,7 @@ fn load_config() -> anyhow::Result<Config> {
     Ok(config)
 }
 
-// Pattern 4: Map errors to your domain type
+// Паттерн 4: преобразуем ошибки в доменный тип
 fn parse_port(s: &str) -> Result<u16, AppError> {
     s.parse::<u16>()
         .map_err(|_| AppError::Validation {
@@ -194,35 +194,35 @@ fn parse_port(s: &str) -> Result<u16, AppError> {
 ```
 
 ```csharp
-// C# equivalents:
+// Аналоги в C#:
 try { config = File.ReadAllText("config.toml"); }
-catch (FileNotFoundException) { config = "port = 8080"; }  // Pattern 1
+catch (FileNotFoundException) { config = "port = 8080"; }  // Паттерн 1
 
 try { /* ... */ }
-catch (FileNotFoundException) { /* create file */ }        // Pattern 2
-catch { throw; }                                            // re-throw others
+catch (FileNotFoundException) { /* создать файл */ }        // Паттерн 2
+catch { throw; }                                            // остальные пробрасываем
 ```
 
-**When to recover vs propagate:**
-- **Recover** when the error has a sensible default or retry strategy
-- **Propagate with `?`** when the *caller* should decide what to do
-- **Add context** (`.context()`) at module boundaries to build an error trail
+**Когда восстанавливаться, а когда пробрасывать:**
+- **Восстанавливайтесь**, когда у ошибки есть разумное значение по умолчанию или стратегия повтора
+- **Пробрасывайте через `?`**, когда решение должен принимать *вызывающий* код
+- **Добавляйте контекст** (`.context()`) на границах модулей, чтобы построить цепочку ошибок
 
 ---
 
-## Exercises
+## Упражнения
 
 <details>
-<summary><strong>🏋️ Exercise: Design a Crate Error Type</strong> (click to expand)</summary>
+<summary><strong>🏋️ Упражнение: спроектируйте тип ошибок крейта</strong> (нажмите, чтобы раскрыть)</summary>
 
-You're building a user registration service. Design the error type using `thiserror`:
+Вы создаёте сервис регистрации пользователей. Спроектируйте тип ошибок с помощью `thiserror`:
 
-1. Define `RegistrationError` with variants: `DuplicateEmail(String)`, `WeakPassword(String)`, `DatabaseError(#[from] sqlx::Error)`, `RateLimited { retry_after_secs: u64 }`
-2. Create a `type Result<T> = std::result::Result<T, RegistrationError>;` alias
-3. Write a `register_user(email: &str, password: &str) -> Result<()>` that demonstrates `?` propagation and explicit error construction
+1. Определите `RegistrationError` с вариантами: `DuplicateEmail(String)`, `WeakPassword(String)`, `DatabaseError(#[from] sqlx::Error)`, `RateLimited { retry_after_secs: u64 }`
+2. Создайте псевдоним `type Result<T> = std::result::Result<T, RegistrationError>;`
+3. Напишите `register_user(email: &str, password: &str) -> Result<()>`, которая демонстрирует распространение через `?` и явное создание ошибок
 
 <details>
-<summary>🔑 Solution</summary>
+<summary>🔑 Решение</summary>
 
 ```rust
 use thiserror::Error;
@@ -251,10 +251,10 @@ pub fn register_user(email: &str, password: &str) -> Result<()> {
         ));
     }
 
-    // This ? converts sqlx::Error → RegistrationError::Database automatically
+    // Этот ? преобразует sqlx::Error → RegistrationError::Database автоматически
     // db.check_email_unique(email).await?;
 
-    // This is explicit construction for domain logic
+    // Это явное создание ошибки для доменной логики
     if email.contains("+spam") {
         return Err(RegistrationError::DuplicateEmail(email.to_string()));
     }
@@ -263,7 +263,7 @@ pub fn register_user(email: &str, password: &str) -> Result<()> {
 }
 ```
 
-**Key pattern**: `#[from]` enables `?` for library errors; explicit `Err(...)` for domain logic. The Result alias keeps every signature clean.
+**Ключевой паттерн**: `#[from]` включает `?` для ошибок библиотек; явный `Err(...)` — для доменной логики. Псевдоним Result делает каждую сигнатуру чистой.
 
 </details>
 </details>

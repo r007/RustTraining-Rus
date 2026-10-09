@@ -1,26 +1,26 @@
-## Smart Pointers: When Single Ownership Isn't Enough
+## Умные указатели: когда единоличного владения недостаточно
 
-> **What you'll learn:** `Box<T>`, `Rc<T>`, `Arc<T>`, `Cell<T>`, `RefCell<T>`, and `Cow<'a, T>` —
-> when to use each, how they compare to C#'s GC-managed references, `Drop` as Rust's `IDisposable`,
-> `Deref` coercion, and a decision tree for choosing the right smart pointer.
+> **Что вы узнаете:** `Box<T>`, `Rc<T>`, `Arc<T>`, `Cell<T>`, `RefCell<T>` и `Cow<'a, T>` —
+> когда что использовать, как они соотносятся со ссылками, которыми управляет GC в C#, `Drop` как аналог `IDisposable` в Rust,
+> приведение через `Deref`, а также дерево решений для выбора подходящего умного указателя.
 >
-> **Difficulty:** 🔴 Advanced
+> **Сложность:** 🔴 Продвинутый
 
-In C#, every object is essentially reference-counted by the GC. In Rust, single ownership is the default — but sometimes you need shared ownership, heap allocation, or interior mutability. That's where smart pointers come in.
+В C# каждый объект по сути подсчитывается сборщиком мусора. В Rust по умолчанию действует единоличное владение, но иногда нужны разделяемое владение, выделение в куче или внутренняя изменяемость. Для этого и существуют умные указатели.
 
-### Box&lt;T&gt; — Simple Heap Allocation
+### Box&lt;T&gt; — простое выделение в куче
 ```rust
-// Stack allocation (default in Rust)
-let x = 42;           // on the stack
+// Выделение на стеке (по умолчанию в Rust)
+let x = 42;           // на стеке
 
-// Heap allocation with Box
-let y = Box::new(42); // on the heap, like C# `new int(42)` (boxed)
-println!("{}", y);     // auto-derefs: prints 42
+// Выделение в куче через Box
+let y = Box::new(42); // в куче, как `new int(42)` в C# (упаковка)
+println!("{}", y);     // автоматическое разыменование: выводит 42
 
-// Common use: recursive types (can't know size at compile time)
+// Типичное применение: рекурсивные типы (размер неизвестен на этапе компиляции)
 #[derive(Debug)]
 enum List {
-    Cons(i32, Box<List>),  // Box gives a known pointer size
+    Cons(i32, Box<List>),  // Box даёт указатель известного размера
     Nil,
 }
 
@@ -28,32 +28,32 @@ let list = List::Cons(1, Box::new(List::Cons(2, Box::new(List::Nil))));
 ```
 
 ```csharp
-// C# — everything on the heap already (reference types)
-// Box<T> is only needed in Rust because stack is the default
-var list = new LinkedListNode<int>(1);  // always heap-allocated
+// C# — всё уже в куче (ссылочные типы)
+// Box<T> нужен в Rust только потому, что стек — это умолчание
+var list = new LinkedListNode<int>(1);  // всегда выделяется в куче
 ```
 
-### Rc&lt;T&gt; — Shared Ownership (Single Thread)
+### Rc&lt;T&gt; — разделяемое владение (один поток)
 ```rust
 use std::rc::Rc;
 
-// Multiple owners of the same data — like multiple C# references
+// Несколько владельцев одних и тех же данных — как несколько ссылок в C#
 let shared = Rc::new(vec![1, 2, 3]);
-let clone1 = Rc::clone(&shared); // reference count: 2
-let clone2 = Rc::clone(&shared); // reference count: 3
+let clone1 = Rc::clone(&shared); // счётчик ссылок: 2
+let clone2 = Rc::clone(&shared); // счётчик ссылок: 3
 
 println!("Count: {}", Rc::strong_count(&shared)); // 3
-// Data is dropped when last Rc goes out of scope
+// Данные уничтожаются, когда выходит из области видимости последний Rc
 
-// Common use: shared configuration, graph nodes, tree structures
+// Типичное применение: общая конфигурация, узлы графа, древовидные структуры
 ```
 
-### Arc&lt;T&gt; — Shared Ownership (Thread-Safe)
+### Arc&lt;T&gt; — разделяемое владение (потокобезопасное)
 ```rust
 use std::sync::Arc;
 use std::thread;
 
-// Arc = Atomic Reference Counting — safe to share across threads
+// Arc = Atomic Reference Counting — безопасно разделяется между потоками
 let data = Arc::new(vec![1, 2, 3]);
 
 let handles: Vec<_> = (0..3).map(|i| {
@@ -67,17 +67,17 @@ for h in handles { h.join().unwrap(); }
 ```
 
 ```csharp
-// C# — all references are thread-safe by default (GC handles it)
+// C# — все ссылки потокобезопасны по умолчанию (этим занимается GC)
 var data = new List<int> { 1, 2, 3 };
-// Can share freely across threads (but mutation is still unsafe!)
+// Можно свободно разделять между потоками (но мутация по-прежнему небезопасна!)
 ```
 
-### Cell&lt;T&gt; and RefCell&lt;T&gt; — Interior Mutability
+### Cell&lt;T&gt; и RefCell&lt;T&gt; — внутренняя изменяемость
 ```rust
 use std::cell::RefCell;
 
-// Sometimes you need to mutate data behind a shared reference.
-// RefCell moves borrow checking from compile time to runtime.
+// Иногда нужно изменять данные за разделяемой ссылкой.
+// RefCell переносит проверку заимствований из времени компиляции во время выполнения.
 struct Logger {
     entries: RefCell<Vec<String>>,
 }
@@ -87,7 +87,7 @@ impl Logger {
         Logger { entries: RefCell::new(Vec::new()) }
     }
 
-    fn log(&self, msg: &str) { // &self, not &mut self!
+    fn log(&self, msg: &str) { // &self, а не &mut self!
         self.entries.borrow_mut().push(msg.to_string());
     }
 
@@ -97,60 +97,60 @@ impl Logger {
         }
     }
 }
-// ⚠️ RefCell panics at runtime if borrow rules are violated
-// Use sparingly — prefer compile-time checking when possible
+// ⚠️ RefCell вызывает панику во время выполнения, если нарушены правила заимствования
+// Используйте осторожно — по возможности предпочитайте проверку на этапе компиляции
 ```
 
-### Cow&lt;'a, str&gt; — Clone on Write
+### Cow&lt;'a, str&gt; — копирование при записи (Clone on Write)
 ```rust
 use std::borrow::Cow;
 
-// Sometimes you have a &str that MIGHT need to become a String
+// Иногда есть &str, который МОЖЕТ понадобиться превратить в String
 fn normalize(input: &str) -> Cow<'_, str> {
     if input.contains('\t') {
-        // Only allocate when we need to modify
+        // Выделяем память, только когда нужно изменить данные
         Cow::Owned(input.replace('\t', "    "))
     } else {
-        // Borrow the original — zero allocation
+        // Заимствуем исходные данные — без выделения памяти
         Cow::Borrowed(input)
     }
 }
 
-let clean = normalize("hello");           // Cow::Borrowed — no allocation
-let dirty = normalize("hello\tworld");    // Cow::Owned — allocated
-// Both can be used as &str via Deref
+let clean = normalize("hello");           // Cow::Borrowed — без выделения памяти
+let dirty = normalize("hello\tworld");    // Cow::Owned — выделено
+// Оба можно использовать как &str через Deref
 println!("{clean} / {dirty}");
 ```
 
-### Drop: Rust's `IDisposable`
+### Drop: аналог `IDisposable` в Rust
 
-In C#, `IDisposable` + `using` handles resource cleanup. Rust's equivalent is the `Drop` trait — but it's **automatic**, not opt-in:
+В C# очисткой ресурсов занимаются `IDisposable` и `using`. Аналог в Rust — трейт `Drop`, но он **автоматический**, а не включаемый по желанию:
 
 ```csharp
-// C# — must remember to use 'using' or call Dispose()
+// C# — нужно не забыть использовать 'using' или вызвать Dispose()
 using var file = File.OpenRead("data.bin");
-// Dispose() called at end of scope
+// Dispose() вызывается в конце области видимости
 
-// Forgetting 'using' is a resource leak!
+// Забыть 'using' — значит получить утечку ресурса!
 var file2 = File.OpenRead("data.bin");
-// GC will *eventually* finalize, but timing is unpredictable
+// GC в итоге финализирует объект, но момент непредсказуем
 ```
 
 ```rust
-// Rust — Drop runs automatically when value goes out of scope
+// Rust — Drop выполняется автоматически, когда значение выходит из области видимости
 {
     let file = File::open("data.bin")?;
-    // use file...
-}   // file.drop() called HERE, deterministically — no 'using' needed
+    // работаем с file...
+}   // file.drop() вызывается ЗДЕСЬ, детерминированно — 'using' не нужен
 
-// Custom Drop (like implementing IDisposable)
+// Собственный Drop (аналог реализации IDisposable)
 struct TempFile {
     path: std::path::PathBuf,
 }
 
 impl Drop for TempFile {
     fn drop(&mut self) {
-        // Guaranteed to run when TempFile goes out of scope
+        // Гарантированно выполняется, когда TempFile выходит из области видимости
         let _ = std::fs::remove_file(&self.path);
         println!("Cleaned up {:?}", self.path);
     }
@@ -158,81 +158,81 @@ impl Drop for TempFile {
 
 fn main() {
     let tmp = TempFile { path: "scratch.tmp".into() };
-    // ... use tmp ...
-}   // scratch.tmp deleted automatically here
+    // ... используем tmp ...
+}   // scratch.tmp удаляется автоматически здесь
 ```
 
-**Key difference from C#:** In Rust, *every* type can have deterministic cleanup. You never forget `using` because there's nothing to forget — `Drop` runs when the owner goes out of scope. This pattern is called **RAII** (Resource Acquisition Is Initialization).
+**Ключевое отличие от C#:** в Rust *любой* тип может иметь детерминированную очистку. Вы никогда не забудете `using`, потому что забывать нечего — `Drop` выполняется, когда владелец выходит из области видимости. Этот паттерн называется **RAII** (Resource Acquisition Is Initialization — получение ресурса есть инициализация).
 
-> **Rule**: If your type holds a resource (file handle, network connection, lock guard, temp file), implement `Drop`. The ownership system guarantees it runs exactly once.
+> **Правило**: если ваш тип хранит ресурс (дескриптор файла, сетевое соединение, охранник блокировки, временный файл), реализуйте `Drop`. Система владения гарантирует, что он выполнится ровно один раз.
 
-### Deref Coercion: Automatic Smart Pointer Unwrapping
+### Приведение через Deref: автоматическое разворачивание умных указателей
 
-Rust automatically "unwraps" smart pointers when you call methods or pass them to functions. This is called **Deref coercion**:
+Rust автоматически «разворачивает» умные указатели, когда вы вызываете методы или передаёте их в функции. Это называется **приведением через Deref** (Deref coercion):
 
 ```rust
 let boxed: Box<String> = Box::new(String::from("hello"));
 
-// Deref coercion chain: Box<String> → String → str
-println!("Length: {}", boxed.len());   // calls str::len() — auto-deref!
+// Цепочка приведения через Deref: Box<String> → String → str
+println!("Length: {}", boxed.len());   // вызывается str::len() — автоматическое разыменование!
 
 fn greet(name: &str) {
     println!("Hello, {name}");
 }
 
 let s = String::from("Alice");
-greet(&s);       // &String → &str via Deref coercion
-greet(&boxed);   // &Box<String> → &String → &str — two levels!
+greet(&s);       // &String → &str через приведение Deref
+greet(&boxed);   // &Box<String> → &String → &str — два уровня!
 ```
 
 ```csharp
-// C# has no equivalent — you'd need explicit casts or .ToString()
-// Closest: implicit conversion operators, but those require explicit definition
+// В C# аналога нет — понадобились бы явные приведения или .ToString()
+// Ближайшее — неявные операторы преобразования, но их нужно явно определить
 ```
 
-**Why this matters:** You can pass `&String` where `&str` is expected, `&Vec<T>` where `&[T]` is expected, and `&Box<T>` where `&T` is expected — all without explicit conversion. This is why Rust APIs typically accept `&str` and `&[T]` rather than `&String` and `&Vec<T>`.
+**Почему это важно:** вы можете передать `&String` там, где ожидается `&str`, `&Vec<T>` там, где ожидается `&[T]`, и `&Box<T>` там, где ожидается `&T`, — и всё это без явного преобразования. Поэтому API на Rust обычно принимают `&str` и `&[T]`, а не `&String` и `&Vec<T>`.
 
-### Rc vs Arc: When to Use Which
+### Rc против Arc: что выбрать
 
 | | `Rc<T>` | `Arc<T>` |
 |---|---|---|
-| **Thread safety** | ❌ Single-thread only | ✅ Thread-safe (atomic ops) |
-| **Overhead** | Lower (non-atomic refcount) | Higher (atomic refcount) |
-| **Compiler enforced** | Won't compile across `thread::spawn` | Works everywhere |
-| **Combine with** | `RefCell<T>` for mutation | `Mutex<T>` or `RwLock<T>` for mutation |
+| **Потокобезопасность** | ❌ Только один поток | ✅ Потокобезопасен (атомарные операции) |
+| **Накладные расходы** | Ниже (неатомарный счётчик ссылок) | Выше (атомарный счётчик ссылок) |
+| **Проверка компилятором** | Не скомпилируется при передаче в `thread::spawn` | Работает везде |
+| **Сочетается с** | `RefCell<T>` для изменения | `Mutex<T>` или `RwLock<T>` для изменения |
 
-**Rule of thumb:** Start with `Rc`. The compiler will tell you if you need `Arc`.
+**Эмпирическое правило:** начинайте с `Rc`. Компилятор подскажет, если понадобится `Arc`.
 
-### Decision Tree: Which Smart Pointer?
+### Дерево решений: какой умный указатель выбрать?
 
 ```mermaid
 graph TD
-    START["Need shared ownership<br/>or heap allocation?"]
-    HEAP["Just need heap allocation?"]
-    SHARED["Shared ownership needed?"]
-    THREADED["Shared across threads?"]
-    MUTABLE["Need interior mutability?"]
-    MAYBE_OWN["Sometimes borrowed,<br/>sometimes owned?"]
+    START["Нужно разделяемое владение<br/>или выделение в куче?"]
+    HEAP["Нужно только выделение в куче?"]
+    SHARED["Нужно разделяемое владение?"]
+    THREADED["Разделяется между потоками?"]
+    MUTABLE["Нужна внутренняя изменяемость?"]
+    MAYBE_OWN["Иногда заимствуется,<br/>иногда владеется?"]
 
-    BOX["Use Box&lt;T&gt;"]
-    RC["Use Rc&lt;T&gt;"]
-    ARC["Use Arc&lt;T&gt;"]
-    REFCELL["Use RefCell&lt;T&gt;<br/>(or Rc&lt;RefCell&lt;T&gt;&gt;)"]
-    MUTEX["Use Arc&lt;Mutex&lt;T&gt;&gt;"]
-    COW["Use Cow&lt;'a, T&gt;"]
-    OWN["Use owned type<br/>(String, Vec, etc.)"]
+    BOX["Используйте Box&lt;T&gt;"]
+    RC["Используйте Rc&lt;T&gt;"]
+    ARC["Используйте Arc&lt;T&gt;"]
+    REFCELL["Используйте RefCell&lt;T&gt;<br/>(или Rc&lt;RefCell&lt;T&gt;&gt;)"]
+    MUTEX["Используйте Arc&lt;Mutex&lt;T&gt;&gt;"]
+    COW["Используйте Cow&lt;'a, T&gt;"]
+    OWN["Используйте владеемый тип<br/>(String, Vec и т. д.)"]
 
-    START -->|Yes| HEAP
-    START -->|No| OWN
-    HEAP -->|Yes| BOX
-    HEAP -->|Shared| SHARED
-    SHARED -->|Single thread| RC
-    SHARED -->|Multi thread| THREADED
-    THREADED -->|Read only| ARC
-    THREADED -->|Read + write| MUTEX
-    RC -->|Need mutation?| MUTABLE
-    MUTABLE -->|Yes| REFCELL
-    MAYBE_OWN -->|Yes| COW
+    START -->|Да| HEAP
+    START -->|Нет| OWN
+    HEAP -->|Да| BOX
+    HEAP -->|Разделяемое| SHARED
+    SHARED -->|Один поток| RC
+    SHARED -->|Несколько потоков| THREADED
+    THREADED -->|Только чтение| ARC
+    THREADED -->|Чтение и запись| MUTEX
+    RC -->|Нужна мутация?| MUTABLE
+    MUTABLE -->|Да| REFCELL
+    MAYBE_OWN -->|Да| COW
 
     style BOX fill:#e3f2fd,color:#000
     style RC fill:#e8f5e8,color:#000
@@ -244,30 +244,29 @@ graph TD
 ```
 
 <details>
-<summary><strong>🏋️ Exercise: Choose the Right Smart Pointer</strong> (click to expand)</summary>
+<summary><strong>🏋️ Упражнение: выберите подходящий умный указатель</strong> (нажмите, чтобы раскрыть)</summary>
 
-**Challenge**: For each scenario, choose the correct smart pointer and explain why.
+**Задача**: для каждого сценария выберите подходящий умный указатель и объясните почему.
 
-1. A recursive tree data structure
-2. A shared configuration object read by multiple components (single thread)
-3. A request counter shared across HTTP handler threads
-4. A cache that might return borrowed or owned strings
-5. A logging buffer that needs mutation through a shared reference
+1. Рекурсивная древовидная структура данных
+2. Общий объект конфигурации, который читают несколько компонентов (один поток)
+3. Счётчик запросов, разделяемый между обработчиками HTTP-запросов в разных потоках
+4. Кэш, который может возвращать заимствованные или владеемые строки
+5. Буфер логов, который нужно изменять через разделяемую ссылку
 
 <details>
-<summary>🔑 Solution</summary>
+<summary>🔑 Решение</summary>
 
-1. **`Box<T>`** — recursive types need indirection for known size at compile time
-2. **`Rc<T>`** — shared read-only access, single thread, no `Arc` overhead needed
-3. **`Arc<Mutex<u64>>`** — shared across threads (`Arc`) with mutation (`Mutex`)
-4. **`Cow<'a, str>`** — sometimes returns `&str` (cache hit), sometimes `String` (cache miss)
-5. **`RefCell<Vec<String>>`** — interior mutability behind `&self` (single thread)
+1. **`Box<T>`** — рекурсивным типам нужна косвенная адресация, чтобы размер был известен на этапе компиляции
+2. **`Rc<T>`** — разделяемый доступ только для чтения, один поток, накладные расходы `Arc` не нужны
+3. **`Arc<Mutex<u64>>`** — разделяется между потоками (`Arc`) с изменением (`Mutex`)
+4. **`Cow<'a, str>`** — иногда возвращает `&str` (попадание в кэш), иногда `String` (промах кэша)
+5. **`RefCell<Vec<String>>`** — внутренняя изменяемость за `&self` (один поток)
 
-**Rule of thumb**: Start with owned types. Reach for `Box` when you need indirection, `Rc`/`Arc` when you need sharing, `RefCell`/`Mutex` when you need interior mutability, `Cow` when you want zero-copy for the common case.
+**Эмпирическое правило**: начинайте с владеемых типов. Берите `Box`, когда нужна косвенная адресация, `Rc`/`Arc`, когда нужно разделение, `RefCell`/`Mutex`, когда нужна внутренняя изменяемость, и `Cow`, когда хотите работать без копирования в типичном случае.
 
 </details>
 </details>
 
 ***
-
 

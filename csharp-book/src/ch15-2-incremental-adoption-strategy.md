@@ -1,15 +1,15 @@
-## Incremental Adoption Strategy
+## Стратегия постепенного внедрения
 
-> **What you'll learn:** A phased approach to introducing Rust in a C#/.NET organization —
-> from learning exercises (weeks 1–4) to performance-critical replacements (weeks 5–8)
-> to new microservices (weeks 9–12), with concrete team adoption timelines.
+> **Что вы узнаете:** поэтапный подход к внедрению Rust в организации, работающие на C#/.NET —
+> от учебных упражнений (недели 1–4) через замену компонентов, критичных к производительности (недели 5–8),
+> до новых микросервисов (недели 9–12), с конкретными сроками освоения для команды.
 >
-> **Difficulty:** 🟡 Intermediate
+> **Сложность:** 🟡 Средний
 
-### Phase 1: Learning and Experimentation (Weeks 1-4)
+### Этап 1: обучение и эксперименты (недели 1–4)
 ```rust
-// Start with command-line tools and utilities
-// Example: Log file analyzer
+// Начинаем с инструментов командной строки и утилит
+// Пример: анализатор файлов логов
 use std::fs;
 use std::collections::HashMap;
 use clap::Parser;
@@ -48,10 +48,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-### Phase 2: Replace Performance-Critical Components (Weeks 5-8)
+### Этап 2: замена компонентов, критичных к производительности (недели 5–8)
 ```rust
-// Replace CPU-intensive data processing
-// Example: Image processing microservice
+// Замена ресурсоёмкой обработки данных
+// Пример: микросервис обработки изображений
 use image::{DynamicImage, ImageBuffer, Rgb};
 use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -120,10 +120,10 @@ struct ProcessingError(String);
 impl warp::reject::Reject for ProcessingError {}
 ```
 
-### Phase 3: New Microservices (Weeks 9-12)
+### Этап 3: новые микросервисы (недели 9–12)
 ```rust
-// Build new services from scratch in Rust
-// Example: Authentication service
+// Строим новые сервисы с нуля на Rust
+// Пример: сервис аутентификации
 use axum::{
     extract::{Query, State},
     http::StatusCode,
@@ -165,9 +165,9 @@ async fn login(
     State(state): State<AppState>,
     Json(request): Json<LoginRequest>,
 ) -> Result<Json<LoginResponse>, StatusCode> {
-    // Note: sqlx::query!() is compile-time checked and requires DATABASE_URL
-    // pointing to a live database during build. For runtime-checked queries,
-    // use sqlx::query() or sqlx::query_as() instead.
+    // Примечание: sqlx::query!() проверяется на этапе компиляции и требует, чтобы DATABASE_URL
+    // указывал на работающую базу данных во время сборки. Для запросов, проверяемых во время выполнения,
+    // используйте sqlx::query() или sqlx::query_as().
     let user = sqlx::query!(
         "SELECT id, password_hash FROM users WHERE email = $1",
         request.email
@@ -230,22 +230,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ***
 
-## Team Adoption Timeline
+## Календарь освоения для команды
 
-### Month 1: Foundation
-**Week 1-2: Syntax and Ownership**
-- Basic syntax differences from C#
-- Understanding ownership, borrowing, and lifetimes
-- Small exercises: CLI tools, file processing
+### Месяц 1: основы
+**Недели 1–2: синтаксис и владение**
+- Базовые синтаксические отличия от C#
+- Понимание владения, заимствования и времён жизни
+- Небольшие упражнения: CLI-утилиты, обработка файлов
 
-**Week 3-4: Error Handling and Types**
-- `Result<T, E>` vs exceptions
-- `Option<T>` vs nullable types
-- Pattern matching and exhaustive checking
+**Недели 3–4: обработка ошибок и типы**
+- `Result<T, E>` против исключений
+- `Option<T>` против nullable-типов
+- Сопоставление с образцом и проверка исчерпываемости
 
-**Recommended exercises:**
+**Рекомендуемые упражнения:**
 ```rust
-// Week 1-2: File processor
+// Недели 1–2: обработчик файлов
 fn process_log_file(path: &str) -> Result<Vec<String>, std::io::Error> {
     let content = std::fs::read_to_string(path)?;
     let errors: Vec<String> = content
@@ -256,7 +256,7 @@ fn process_log_file(path: &str) -> Result<Vec<String>, std::io::Error> {
     Ok(errors)
 }
 
-// Week 3-4: JSON processor with error handling
+// Недели 3–4: обработчик JSON с обработкой ошибок
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -272,20 +272,20 @@ fn parse_log_entries(json_str: &str) -> Result<Vec<LogEntry>, Box<dyn std::error
 }
 ```
 
-### Month 2: Practical Applications
-**Week 5-6: Traits and Generics**
-- Trait system vs interfaces
-- Generic constraints and bounds
-- Common patterns and idioms
+### Месяц 2: практическое применение
+**Недели 5–6: трейты и обобщения**
+- Система трейтов против интерфейсов
+- Ограничения обобщений и границы
+- Распространённые паттерны и идиомы
 
-**Week 7-8: Async Programming and Concurrency**
-- `async`/`await` similarities and differences
-- Channels for communication
-- Thread safety guarantees
+**Недели 7–8: асинхронное программирование и конкурентность**
+- Сходства и различия `async`/`await`
+- Каналы для коммуникации
+- Гарантии потокобезопасности
 
-**Recommended projects:**
+**Рекомендуемые проекты:**
 ```rust
-// Week 5-6: Generic data processor
+// Недели 5–6: обобщённый обработчик данных
 trait DataProcessor<T> {
     type Output;
     type Error;
@@ -304,7 +304,7 @@ impl DataProcessor<&str> for JsonProcessor {
     }
 }
 
-// Week 7-8: Async web client
+// Недели 7–8: асинхронный веб-клиент
 async fn fetch_and_process_data(urls: Vec<&str>) -> Result<(), Box<dyn std::error::Error>> {
     let client = reqwest::Client::new();
     
@@ -329,17 +329,17 @@ async fn fetch_and_process_data(urls: Vec<&str>) -> Result<(), Box<dyn std::erro
 }
 ```
 
-### Month 3+: Production Integration
-**Week 9-12: Real Project Work**
-- Choose a non-critical component to rewrite
-- Implement comprehensive error handling
-- Add logging, metrics, and testing
-- Performance profiling and optimization
+### Месяц 3 и далее: интеграция в продакшен
+**Недели 9–12: работа над реальным проектом**
+- Выберите некритичный компонент для переписывания
+- Реализуйте полноценную обработку ошибок
+- Добавьте логирование, метрики и тестирование
+- Профилирование производительности и оптимизация
 
-**Ongoing: Team Review and Mentoring**
-- Code reviews focusing on Rust idioms
-- Pair programming sessions
-- Knowledge sharing sessions
+**Постоянно: командный ревью и менторство**
+- Код-ревью с фокусом на идиомах Rust
+- Парное программирование
+- Сессии обмена знаниями
 
 ***
 

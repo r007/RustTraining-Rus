@@ -1,80 +1,81 @@
-## References vs Pointers
+## Ссылки против указателей
 
-> **What you'll learn:** Rust references vs C# pointers and unsafe contexts, lifetime basics,
-> and why compile-time safety proofs are stronger than C#'s runtime checks (bounds checking, null guards).
+> **Что вы узнаете:** ссылки Rust против указателей и небезопасных контекстов C#, основы времён жизни,
+> а также почему доказательства безопасности на этапе компиляции надёжнее проверок времени выполнения в C#
+> (проверка границ, защита от null).
 >
-> **Difficulty:** 🟡 Intermediate
+> **Сложность:** 🟡 Средний
 
-### C# Pointers (Unsafe Context)
+### Указатели в C# (небезопасный контекст)
 ```csharp
-// C# unsafe pointers (rarely used)
+// Небезопасные указатели в C# (используются редко)
 unsafe void UnsafeExample()
 {
     int value = 42;
-    int* ptr = &value;  // Pointer to value
-    *ptr = 100;         // Dereference and modify
+    int* ptr = &value;  // Указатель на value
+    *ptr = 100;         // Разыменование и изменение
     Console.WriteLine(value);  // 100
 }
 ```
 
-### Rust References (Safe by Default)
+### Ссылки в Rust (безопасны по умолчанию)
 ```rust
-// Rust references (always safe)
+// Ссылки в Rust (всегда безопасны)
 fn safe_example() {
     let mut value = 42;
-    let ptr = &mut value;  // Mutable reference
-    *ptr = 100;           // Dereference and modify
+    let ptr = &mut value;  // Изменяемая ссылка
+    *ptr = 100;           // Разыменование и изменение
     println!("{}", value); // 100
 }
 
-// No "unsafe" keyword needed - borrow checker ensures safety
+// Ключевое слово "unsafe" не нужно — проверщик заимствований гарантирует безопасность
 ```
 
-### Lifetime Basics for C# Developers
+### Основы времён жизни для разработчиков C#
 ```csharp
-// C# - Can return references that might become invalid
+// C# — можно вернуть ссылки, которые могут стать недействительными
 public class LifetimeIssues
 {
     public string GetFirstWord(string input)
     {
-        return input.Split(' ')[0];  // Returns new string (safe)
+        return input.Split(' ')[0];  // Возвращает новую строку (безопасно)
     }
     
     public unsafe char* GetFirstChar(string input)
     {
-        // This would be dangerous - returning pointer to managed memory
+        // Это было бы опасно — возврат указателя на управляемую память
         fixed (char* ptr = input)
-            return ptr;  // ❌ Bad: ptr becomes invalid after method ends
+            return ptr;  // ❌ Плохо: ptr становится недействительным после выхода из метода
     }
 }
 ```
 
 ```rust
-// Rust - Lifetime checking prevents dangling references
+// Rust — проверка времён жизни предотвращает висячие ссылки
 fn get_first_word(input: &str) -> &str {
     input.split_whitespace().next().unwrap_or("")
-    // ✅ Safe: returned reference has same lifetime as input
+    // ✅ Безопасно: возвращаемая ссылка имеет то же время жизни, что и input
 }
 
 fn invalid_reference() -> &str {
     let temp = String::from("hello");
-    &temp  // ❌ Compile error: temp doesn't live long enough
-    // temp would be dropped at end of function
+    &temp  // ❌ Ошибка компиляции: temp живёт недостаточно долго
+    // temp будет уничтожена в конце функции
 }
 
 fn valid_reference() -> String {
     let temp = String::from("hello");
-    temp  // ✅ Works: ownership is transferred to caller
+    temp  // ✅ Работает: владение передаётся вызывающему коду
 }
 ```
 
 ***
 
-## Memory Safety: Runtime Checks vs Compile-Time Proofs
+## Безопасность памяти: проверки во время выполнения против доказательств на этапе компиляции
 
-### C# - Runtime Safety Net
+### C# — страховка времени выполнения
 ```csharp
-// C# relies on runtime checks and GC
+// C# полагается на проверки во время выполнения и GC
 public class Buffer
 {
     private byte[] data;
@@ -86,39 +87,39 @@ public class Buffer
     
     public void ProcessData(int index)
     {
-        // Runtime bounds checking
+        // Проверка границ во время выполнения
         if (index >= data.Length)
             throw new IndexOutOfRangeException();
             
-        data[index] = 42;  // Safe, but checked at runtime
+        data[index] = 42;  // Безопасно, но проверяется во время выполнения
     }
     
-    // Memory leaks still possible with events/static references
+    // Утечки памяти всё равно возможны через события и статические ссылки
     public static event Action<string> GlobalEvent;
     
     public void Subscribe()
     {
-        GlobalEvent += HandleEvent;  // Can create memory leaks
-        // Forgot to unsubscribe - object won't be collected
+        GlobalEvent += HandleEvent;  // Может создать утечку памяти
+        // Забыли отписаться — объект не будет собран сборщиком мусора
     }
     
     private void HandleEvent(string message) { /* ... */ }
     
-    // Null reference exceptions are still possible
+    // Исключения NullReferenceException по-прежнему возможны
     public void ProcessUser(User user)
     {
-        Console.WriteLine(user.Name.ToUpper());  // NullReferenceException if user.Name is null
+        Console.WriteLine(user.Name.ToUpper());  // NullReferenceException, если user.Name равен null
     }
     
-    // Array access can fail at runtime
+    // Доступ к массиву может завершиться ошибкой во время выполнения
     public int GetValue(int[] array, int index)
     {
-        return array[index];  // IndexOutOfRangeException possible
+        return array[index];  // Возможно IndexOutOfRangeException
     }
 }
 ```
 
-### Rust - Compile-Time Guarantees
+### Rust — гарантии на этапе компиляции
 ```rust
 struct Buffer {
     data: Vec<u8>,
@@ -132,72 +133,72 @@ impl Buffer {
     }
     
     fn process_data(&mut self, index: usize) {
-        // Bounds checking can be optimized away by compiler when proven safe
+        // Проверку границ компилятор может убрать, если безопасность доказана
         if let Some(item) = self.data.get_mut(index) {
-            *item = 42;  // Safe access, proven at compile time
+            *item = 42;  // Безопасный доступ, доказанный на этапе компиляции
         }
-        // Or use indexing with explicit bounds check:
-        // self.data[index] = 42;  // Panics in debug, but memory-safe
+        // Или используйте индексирование с явной проверкой границ:
+        // self.data[index] = 42;  // Паника в debug-сборке, но память в безопасности
     }
     
-    // Memory leaks impossible - ownership system prevents them
+    // Утечки памяти невозможны — система владения их предотвращает
     fn process_with_closure<F>(&mut self, processor: F) 
     where F: FnOnce(&mut Vec<u8>)
     {
         processor(&mut self.data);
-        // When processor goes out of scope, it's automatically cleaned up
-        // No way to create dangling references or memory leaks
+        // Когда processor выходит из области видимости, он автоматически очищается
+        // Создать висячие ссылки или утечку памяти нельзя
     }
     
-    // Null pointer dereferences impossible - no null pointers!
+    // Разыменование null-указателей невозможно — null-указателей здесь нет!
     fn process_user(&self, user: &User) {
-        println!("{}", user.name.to_uppercase());  // user.name cannot be null
+        println!("{}", user.name.to_uppercase());  // user.name не может быть null
     }
     
-    // Array access is bounds-checked or explicitly unsafe
+    // Доступ к массиву либо проверяется на границы, либо явно небезопасен
     fn get_value(array: &[i32], index: usize) -> Option<i32> {
-        array.get(index).copied()  // Returns None if out of bounds
+        array.get(index).copied()  // Возвращает None, если индекс вне границ
     }
     
-    // Or explicitly unsafe if you know what you're doing:
+    // Или явно небезопасно, если вы точно знаете, что делаете:
     /// # Safety
-    /// `index` must be less than `array.len()`.
+    /// `index` должен быть меньше `array.len()`.
     unsafe fn get_value_unchecked(array: &[i32], index: usize) -> i32 {
-        *array.get_unchecked(index)  // Fast but must prove bounds manually
+        *array.get_unchecked(index)  // Быстро, но границы нужно доказать вручную
     }
 }
 
 struct User {
-    name: String,  // String cannot be null in Rust
+    name: String,  // String в Rust не может быть null
 }
 
-// Ownership prevents use-after-free
+// Владение предотвращает использование после освобождения
 fn ownership_example() {
     let data = vec![1, 2, 3, 4, 5];
-    let reference = &data[0];  // Borrow data
+    let reference = &data[0];  // Заимствуем data
     
-    // drop(data);  // ERROR: cannot drop while borrowed
-    println!("{}", reference);  // This is guaranteed safe
+    // drop(data);  // ОШИБКА: нельзя уничтожить, пока есть заимствование
+    println!("{}", reference);  // Это гарантированно безопасно
 }
 
-// Borrowing prevents data races
+// Заимствование предотвращает гонки данных
 fn borrowing_example(data: &mut Vec<i32>) {
-    let first = &data[0];  // Immutable borrow
-    // data.push(6);  // ERROR: cannot mutably borrow while immutably borrowed
-    println!("{}", first);  // Guaranteed no data race
+    let first = &data[0];  // Неизменяемое заимствование
+    // data.push(6);  // ОШИБКА: нельзя заимствовать изменяемо, пока есть неизменяемое заимствование
+    println!("{}", first);  // Гарантированно нет гонки данных
 }
 ```
 
 ```mermaid
 graph TD
-    subgraph "C# Runtime Safety"
-        CS_RUNTIME["Runtime Checks"]
-        CS_GC["Garbage Collector"]
-        CS_EXCEPTIONS["Exception Handling"]
-        CS_BOUNDS["Runtime bounds checking"]
-        CS_NULL["Null reference exceptions"]
-        CS_LEAKS["Memory leaks possible"]
-        CS_OVERHEAD["Performance overhead"]
+    subgraph "Безопасность во время выполнения в C#"
+        CS_RUNTIME["Проверки во время выполнения"]
+        CS_GC["Сборщик мусора"]
+        CS_EXCEPTIONS["Обработка исключений"]
+        CS_BOUNDS["Проверка границ во время выполнения"]
+        CS_NULL["Исключения null-ссылок"]
+        CS_LEAKS["Возможны утечки памяти"]
+        CS_OVERHEAD["Накладные расходы производительности"]
         
         CS_RUNTIME --> CS_BOUNDS
         CS_RUNTIME --> CS_NULL
@@ -205,14 +206,14 @@ graph TD
         CS_EXCEPTIONS --> CS_OVERHEAD
     end
     
-    subgraph "Rust Compile-Time Safety"
-        RUST_OWNERSHIP["Ownership System"]
-        RUST_BORROWING["Borrow Checker"]
-        RUST_TYPES["Type System"]
-        RUST_ZERO_COST["Zero-cost abstractions"]
-        RUST_NO_NULL["No null pointers"]
-        RUST_NO_LEAKS["No memory leaks"]
-        RUST_FAST["Optimal performance"]
+    subgraph "Безопасность на этапе компиляции в Rust"
+        RUST_OWNERSHIP["Система владения"]
+        RUST_BORROWING["Проверщик заимствований"]
+        RUST_TYPES["Система типов"]
+        RUST_ZERO_COST["Абстракции с нулевой стоимостью"]
+        RUST_NO_NULL["Нет null-указателей"]
+        RUST_NO_LEAKS["Нет утечек памяти"]
+        RUST_FAST["Оптимальная производительность"]
         
         RUST_OWNERSHIP --> RUST_NO_LEAKS
         RUST_BORROWING --> RUST_NO_NULL
@@ -230,12 +231,12 @@ graph TD
 
 ---
 
-## Exercises
+## Упражнения
 
 <details>
-<summary><strong>🏋️ Exercise: Spot the Safety Bug</strong> (click to expand)</summary>
+<summary><strong>🏋️ Упражнение: найдите ошибку безопасности</strong> (нажмите, чтобы раскрыть)</summary>
 
-This C# code has a subtle safety bug. Identify it, then write the Rust equivalent and explain why the Rust version **won't compile**:
+В этом C#-коде есть тонкая ошибка безопасности. Найдите её, затем напишите эквивалент на Rust и объясните, почему версия на Rust **не скомпилируется**:
 
 ```csharp
 public List<int> GetEvenNumbers(List<int> numbers)
@@ -246,7 +247,7 @@ public List<int> GetEvenNumbers(List<int> numbers)
         if (n % 2 == 0)
         {
             result.Add(n);
-            numbers.Remove(n);  // Bug: modifying collection while iterating
+            numbers.Remove(n);  // Ошибка: изменение коллекции во время перебора
         }
     }
     return result;
@@ -254,9 +255,9 @@ public List<int> GetEvenNumbers(List<int> numbers)
 ```
 
 <details>
-<summary>🔑 Solution</summary>
+<summary>🔑 Решение</summary>
 
-**C# bug**: Modifying `numbers` while iterating throws `InvalidOperationException` at *runtime*. Easy to miss in code review.
+**Ошибка в C#**: изменение `numbers` во время перебора приводит к `InvalidOperationException` во *время выполнения*. Её легко пропустить на код-ревью.
 
 ```rust
 fn get_even_numbers(numbers: &mut Vec<i32>) -> Vec<i32> {
@@ -265,17 +266,17 @@ fn get_even_numbers(numbers: &mut Vec<i32>) -> Vec<i32> {
         if n % 2 == 0 {
             result.push(n);
             // numbers.retain(|&x| x != n);
-            // ❌ ERROR: cannot borrow `*numbers` as mutable because
-            //    it is also borrowed as immutable (by the iterator)
+            // ❌ ОШИБКА: нельзя заимствовать `*numbers` как изменяемое, потому что
+            //    оно уже заимствовано как неизменяемое (итератором)
         }
     }
     result
 }
 
-// Idiomatic Rust: use partition or retain
+// Идиоматичный Rust: используйте retain или partition
 fn get_even_numbers_idiomatic(numbers: &mut Vec<i32>) -> Vec<i32> {
     let evens: Vec<i32> = numbers.iter().copied().filter(|n| n % 2 == 0).collect();
-    numbers.retain(|n| n % 2 != 0); // remove evens after iteration
+    numbers.retain(|n| n % 2 != 0); // удаляем чётные после перебора
     evens
 }
 
@@ -287,12 +288,10 @@ fn main() {
 }
 ```
 
-**Key insight**: Rust's borrow checker prevents the entire *category* of "mutate while iterating" bugs at compile time. C# catches this at runtime; many languages don't catch it at all.
+**Ключевая мысль**: проверщик заимствований Rust предотвращает целую *категорию* ошибок «изменение во время перебора» на этапе компиляции. C# ловит это во время выполнения; многие языки не ловят вообще.
 
 </details>
 </details>
 
 ***
-
-
 

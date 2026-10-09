@@ -1,17 +1,17 @@
-## Modules and Crates: Code Organization
+## Модули и крейты: организация кода
 
-> **What you'll learn:** Rust's module system vs C# namespaces and assemblies, `pub`/`pub(crate)`/`pub(super)` visibility,
-> file-based module organization, and how crates map to .NET assemblies.
+> **Что вы узнаете:** систему модулей Rust в сравнении с пространствами имён и сборками C#, модификаторы видимости `pub`/`pub(crate)`/`pub(super)`,
+> организацию модулей по файлам и то, как крейты соответствуют сборкам .NET.
 >
-> **Difficulty:** 🟢 Beginner
+> **Сложность:** 🟢 Начальный
 
-Understanding Rust's module system is essential for organizing code and managing dependencies. For C# developers, this is analogous to understanding namespaces, assemblies, and NuGet packages.
+Понимание системы модулей Rust необходимо для организации кода и управления зависимостями. Разработчикам C# это аналогично пониманию пространств имён, сборок и пакетов NuGet.
 
-### Rust Modules vs C# Namespaces
+### Модули Rust против пространств имён C#
 
-#### C# Namespace Organization
+#### Организация пространств имён в C#
 ```csharp
-// File: Models/User.cs
+// Файл: Models/User.cs
 namespace MyApp.Models
 {
     public class User
@@ -21,7 +21,7 @@ namespace MyApp.Models
     }
 }
 
-// File: Services/UserService.cs
+// Файл: Services/UserService.cs
 using MyApp.Models;
 
 namespace MyApp.Services
@@ -35,7 +35,7 @@ namespace MyApp.Services
     }
 }
 
-// File: Program.cs
+// Файл: Program.cs
 using MyApp.Models;
 using MyApp.Services;
 
@@ -52,9 +52,9 @@ namespace MyApp
 }
 ```
 
-#### Rust Module Organization
+#### Организация модулей в Rust
 ```rust
-// File: src/models.rs
+// Файл: src/models.rs
 pub struct User {
     pub name: String,
     pub age: u32,
@@ -66,7 +66,7 @@ impl User {
     }
 }
 
-// File: src/services.rs
+// Файл: src/services.rs
 use crate::models::User;
 
 pub struct UserService;
@@ -77,7 +77,7 @@ impl UserService {
     }
 }
 
-// File: src/lib.rs (or main.rs)
+// Файл: src/lib.rs (или main.rs)
 pub mod models;
 pub mod services;
 
@@ -90,14 +90,14 @@ fn main() {
 }
 ```
 
-### Module Hierarchy and Visibility
+### Иерархия модулей и видимость
 
 ```mermaid
 graph TD
-    Crate["crate (root)"] --> ModA["mod data"]
+    Crate["crate (корень)"] --> ModA["mod data"]
     Crate --> ModB["mod api"]
     ModA --> SubA1["pub struct Repo"]
-    ModA --> SubA2["fn helper  (private)"]
+    ModA --> SubA2["fn helper  (приватная)"]
     ModB --> SubB1["pub fn handle()"]
     ModB --> SubB2["pub(crate) fn internal()"]
     ModB --> SubB3["pub(super) fn parent_only()"]
@@ -109,71 +109,71 @@ graph TD
     style SubB3 fill:#fff9c4,color:#000
 ```
 
-> 🟢 Green = public everywhere &nbsp;|&nbsp; 🟡 Yellow = restricted visibility &nbsp;|&nbsp; 🔴 Red = private
+> 🟢 Зелёный = публичный везде &nbsp;|&nbsp; 🟡 Жёлтый = ограниченная видимость &nbsp;|&nbsp; 🔴 Красный = приватный
 
-#### C# Visibility Modifiers
+#### Модификаторы видимости в C#
 ```csharp
 namespace MyApp.Data
 {
-    // public - accessible from anywhere
+    // public — доступен откуда угодно
     public class Repository
     {
-        // private - only within this class
+        // private — только внутри этого класса
         private string connectionString;
         
-        // internal - within this assembly
+        // internal — внутри этой сборки
         internal void Connect() { }
         
-        // protected - this class and subclasses
+        // protected — этот класс и его наследники
         protected virtual void Initialize() { }
         
-        // public - accessible from anywhere
+        // public — доступен откуда угодно
         public void Save(object data) { }
     }
 }
 ```
 
-#### Rust Visibility Rules
+#### Правила видимости в Rust
 ```rust
-// Everything is private by default in Rust
+// В Rust всё по умолчанию приватно
 mod data {
-    struct Repository {  // Private struct
-        connection_string: String,  // Private field
+    struct Repository {  // Приватная структура
+        connection_string: String,  // Приватное поле
     }
     
     impl Repository {
-        fn new() -> Repository {  // Private function
+        fn new() -> Repository {  // Приватная функция
             Repository {
                 connection_string: "localhost".to_string(),
             }
         }
         
-        pub fn connect(&self) {  // Public method
-            // Only accessible within this module and its children
+        pub fn connect(&self) {  // Публичный метод
+            // Доступен только внутри этого модуля и его потомков
         }
         
-        pub(crate) fn initialize(&self) {  // Crate-level public
-            // Accessible anywhere in this crate
+        pub(crate) fn initialize(&self) {  // Публичен на уровне крейта
+            // Доступен из любого места этого крейта
         }
         
-        pub(super) fn internal_method(&self) {  // Parent module public
-            // Accessible in parent module
+        pub(super) fn internal_method(&self) {  // Публичен для родительского модуля
+            // Доступен в родительском модуле
         }
     }
     
-    // Public struct - accessible from outside the module
+    // Публичная структура — доступна извне модуля
     pub struct PublicRepository {
-        pub data: String,  // Public field
-        private_data: String,  // Private field (no pub)
+        pub data: String,  // Публичное поле
+        private_data: String,  // Приватное поле (без pub)
     }
 }
 
-pub use data::PublicRepository;  // Re-export for external use
+pub use data::PublicRepository;  // Реэкспорт для внешнего использования
 ```
 
-### Module File Organization
+### Организация файлов модулей
 
-#### C# Project Structure
+#### Структура проекта C#
 ```text
 MyApp/
 ├── MyApp.csproj
@@ -188,18 +188,18 @@ MyApp/
 └── Program.cs
 ```
 
-#### Rust Module File Structure
+#### Структура файлов модулей в Rust
 ```text
 my_app/
 ├── Cargo.toml
 └── src/
-    ├── main.rs (or lib.rs)
+    ├── main.rs (или lib.rs)
     ├── models/
-    │   ├── mod.rs        // Module declaration
+    │   ├── mod.rs        // Объявление модуля
     │   ├── user.rs
     │   └── product.rs
     ├── services/
-    │   ├── mod.rs        // Module declaration
+    │   ├── mod.rs        // Объявление модуля
     │   ├── user_service.rs
     │   └── product_service.rs
     └── controllers/
@@ -207,38 +207,38 @@ my_app/
         └── api_controller.rs
 ```
 
-#### Module Declaration Patterns
+#### Паттерны объявления модулей
 ```rust
 // src/models/mod.rs
-pub mod user;      // Declares user.rs as a submodule
-pub mod product;   // Declares product.rs as a submodule
+pub mod user;      // Объявляет user.rs как подмодуль
+pub mod product;   // Объявляет product.rs как подмодуль
 
-// Re-export commonly used types
+// Реэкспорт часто используемых типов
 pub use user::User;
 pub use product::Product;
 
 // src/main.rs
-mod models;     // Declares models/ as a module
-mod services;   // Declares services/ as a module
+mod models;     // Объявляет models/ как модуль
+mod services;   // Объявляет services/ как модуль
 
-// Import specific items
+// Импорт конкретных элементов
 use models::{User, Product};
 use services::UserService;
 
-// Or import the entire module
-use models::user::*;  // Import all public items from user module
+// Или импорт всего модуля
+use models::user::*;  // Импортирует все публичные элементы модуля user
 ```
 
 ***
 
-## Crates vs .NET Assemblies
+## Крейты против сборок .NET
 
-### Understanding Crates
-In Rust, a **crate** is the fundamental unit of compilation and code distribution, similar to how an **assembly** works in .NET.
+### Понятие крейта
+В Rust **крейт** — это базовая единица компиляции и распространения кода, похожая на **сборку** (assembly) в .NET.
 
-#### C# Assembly Model
+#### Модель сборок C#
 ```csharp
-// MyLibrary.dll - Compiled assembly
+// MyLibrary.dll — скомпилированная сборка
 namespace MyLibrary
 {
     public class Calculator
@@ -247,7 +247,7 @@ namespace MyLibrary
     }
 }
 
-// MyApp.exe - Executable assembly that references MyLibrary.dll
+// MyApp.exe — исполняемая сборка, которая ссылается на MyLibrary.dll
 using MyLibrary;
 
 class Program
@@ -260,9 +260,9 @@ class Program
 }
 ```
 
-#### Rust Crate Model
+#### Модель крейтов Rust
 ```toml
-# Cargo.toml for library crate
+# Cargo.toml для библиотечного крейта
 [package]
 name = "my_calculator"
 version = "0.1.0"
@@ -273,7 +273,7 @@ name = "my_calculator"
 ```
 
 ```rust
-// src/lib.rs - Library crate
+// src/lib.rs — библиотечный крейт
 pub struct Calculator;
 
 impl Calculator {
@@ -284,7 +284,7 @@ impl Calculator {
 ```
 
 ```toml
-# Cargo.toml for binary crate that uses the library
+# Cargo.toml для бинарного крейта, который использует библиотеку
 [package]
 name = "my_app"
 version = "0.1.0"
@@ -295,7 +295,7 @@ my_calculator = { path = "../my_calculator" }
 ```
 
 ```rust
-// src/main.rs - Binary crate
+// src/main.rs — бинарный крейт
 use my_calculator::Calculator;
 
 fn main() {
@@ -304,21 +304,21 @@ fn main() {
 }
 ```
 
-### Crate Types Comparison
+### Сравнение типов крейтов
 
-| C# Concept | Rust Equivalent | Purpose |
+| Концепция C# | Аналог в Rust | Назначение |
 |------------|----------------|---------|
-| Class Library (.dll) | Library crate | Reusable code |
-| Console App (.exe) | Binary crate | Executable program |
-| NuGet Package | Published crate | Distribution unit |
-| Assembly (.dll/.exe) | Compiled crate | Compilation unit |
-| Solution (.sln) | Workspace | Multi-project organization |
+| Библиотека классов (.dll) | Библиотечный крейт | Повторно используемый код |
+| Консольное приложение (.exe) | Бинарный крейт | Исполняемая программа |
+| Пакет NuGet | Опубликованный крейт | Единица распространения |
+| Сборка (.dll/.exe) | Скомпилированный крейт | Единица компиляции |
+| Solution (.sln) | Workspace | Организация нескольких проектов |
 
-### Workspace vs Solution
+### Workspace против Solution
 
-#### C# Solution Structure
+#### Структура Solution в C#
 ```xml
-<!-- MySolution.sln structure -->
+<!-- Структура MySolution.sln -->
 <Solution>
     <Project Include="WebApi/WebApi.csproj" />
     <Project Include="Business/Business.csproj" />
@@ -327,9 +327,9 @@ fn main() {
 </Solution>
 ```
 
-#### Rust Workspace Structure
+#### Структура Workspace в Rust
 ```toml
-# Cargo.toml at workspace root
+# Cargo.toml в корне workspace
 [workspace]
 members = [
     "web_api",
@@ -339,7 +339,7 @@ members = [
 ]
 
 [workspace.dependencies]
-serde = "1.0"           # Shared dependency versions
+serde = "1.0"           # Общие версии зависимостей
 tokio = "1.0"
 ```
 
@@ -352,18 +352,18 @@ edition = "2021"
 
 [dependencies]
 business = { path = "../business" }
-serde = { workspace = true }    # Use workspace version
+serde = { workspace = true }    # Использовать версию из workspace
 tokio = { workspace = true }
 ```
 
 ---
 
-## Exercises
+## Упражнения
 
 <details>
-<summary><strong>🏋️ Exercise: Design a Module Tree</strong> (click to expand)</summary>
+<summary><strong>🏋️ Упражнение: спроектируйте дерево модулей</strong> (нажмите, чтобы раскрыть)</summary>
 
-Given this C# project layout, design the equivalent Rust module tree:
+Дана такая структура проекта на C#. Спроектируйте эквивалентное дерево модулей на Rust:
 
 ```csharp
 // C#
@@ -373,15 +373,15 @@ namespace MyApp.Models { public class User { } }
 namespace MyApp.Models { public class Session { } }
 ```
 
-Requirements:
-1. `AuthService` and both models must be public
-2. `TokenStore` must be private to the `services` module
-3. Provide the file layout **and** the `mod` / `pub` declarations in `lib.rs`
+Требования:
+1. `AuthService` и обе модели должны быть публичными
+2. `TokenStore` должен быть приватным для модуля `services`
+3. Приведите структуру файлов **и** объявления `mod` / `pub` в `lib.rs`
 
 <details>
-<summary>🔑 Solution</summary>
+<summary>🔑 Решение</summary>
 
-File layout:
+Структура файлов:
 ```
 src/
 ├── lib.rs
@@ -401,20 +401,20 @@ pub mod services;
 pub mod models;
 
 // src/services/mod.rs
-mod token_store;          // private — like C# internal
-pub mod auth_service;     // public
+mod token_store;          // приватный — как internal в C#
+pub mod auth_service;     // публичный
 
 // src/services/auth_service.rs
-use super::token_store::TokenStore; // visible within the module
+use super::token_store::TokenStore; // виден внутри модуля
 
 pub struct AuthService;
 
 impl AuthService {
-    pub fn login(&self) { /* uses TokenStore internally */ }
+    pub fn login(&self) { /* использует TokenStore внутри */ }
 }
 
 // src/services/token_store.rs
-pub(super) struct TokenStore; // visible to parent (services) only
+pub(super) struct TokenStore; // виден только родительскому модулю (services)
 
 // src/models/mod.rs
 pub mod user;

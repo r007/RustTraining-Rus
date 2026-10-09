@@ -1,31 +1,31 @@
-## Generic Constraints: where vs trait bounds
+## Ограничения обобщений: where и ограничения трейтов
 
-> **What you'll learn:** Rust's trait bounds vs C#'s `where` constraints, the `where` clause syntax,
-> conditional trait implementations, associated types, and higher-ranked trait bounds (HRTBs).
+> **Что вы узнаете:** ограничения трейтов Rust в сравнении с ограничениями `where` в C#, синтаксис предложения `where`,
+> условные реализации трейтов, ассоциированные типы и границы трейтов высокого ранга (HRTB).
 >
-> **Difficulty:** 🔴 Advanced
+> **Сложность:** 🔴 Продвинутый
 
-### C# Generic Constraints
+### Ограничения обобщений в C#
 ```csharp
-// C# Generic constraints with where clause
+// Ограничения обобщений в C# через предложение where
 public class Repository<T> where T : class, IEntity, new()
 {
     public T Create()
     {
-        return new T();  // new() constraint allows parameterless constructor
+        return new T();  // Ограничение new() позволяет конструктор без параметров
     }
     
     public void Save(T entity)
     {
-        if (entity.Id == 0)  // IEntity constraint provides Id property
+        if (entity.Id == 0)  // Ограничение IEntity даёт свойство Id
         {
             entity.Id = GenerateId();
         }
-        // Save to database
+        // Сохранение в базу данных
     }
 }
 
-// Multiple type parameters with constraints
+// Несколько параметров типа с ограничениями
 public class Converter<TInput, TOutput> 
     where TInput : IConvertible
     where TOutput : class, new()
@@ -33,29 +33,29 @@ public class Converter<TInput, TOutput>
     public TOutput Convert(TInput input)
     {
         var output = new TOutput();
-        // Conversion logic using IConvertible
+        // Логика преобразования через IConvertible
         return output;
     }
 }
 
-// Variance in generics
+// Вариантность в обобщениях
 public interface IRepository<out T> where T : IEntity
 {
-    IEnumerable<T> GetAll();  // Covariant - can return more derived types
+    IEnumerable<T> GetAll();  // Ковариантность — может возвращать более производные типы
 }
 
 public interface IWriter<in T> where T : IEntity
 {
-    void Write(T entity);  // Contravariant - can accept more base types
+    void Write(T entity);  // Контравариантность — может принимать более базовые типы
 }
 ```
 
-### Rust Generic Constraints with Trait Bounds
+### Ограничения обобщений Rust через трейт-границы
 ```rust
 use std::fmt::{Debug, Display};
 use std::clone::Clone;
 
-// Basic trait bounds
+// Базовые трейт-границы
 pub struct Repository<T> 
 where 
     T: Clone + Debug + Default,
@@ -72,35 +72,35 @@ where
     }
     
     pub fn create(&self) -> T {
-        T::default()  // Default trait provides default value
+        T::default()  // Трейт Default предоставляет значение по умолчанию
     }
     
     pub fn add(&mut self, item: T) {
-        println!("Adding item: {:?}", item);  // Debug trait for printing
+        println!("Adding item: {:?}", item);  // Трейт Debug для вывода
         self.items.push(item);
     }
     
     pub fn get_all(&self) -> Vec<T> {
-        self.items.clone()  // Clone trait for duplication
+        self.items.clone()  // Трейт Clone для копирования
     }
 }
 
-// Multiple trait bounds with different syntaxes
+// Несколько трейт-границ с разным синтаксисом
 pub fn process_data<T, U>(input: T) -> U 
 where 
     T: Display + Clone,
     U: From<T> + Debug,
 {
-    println!("Processing: {}", input);  // Display trait
-    let cloned = input.clone();         // Clone trait
-    let output = U::from(cloned);       // From trait for conversion
-    println!("Result: {:?}", output);   // Debug trait
+    println!("Processing: {}", input);  // Трейт Display
+    let cloned = input.clone();         // Трейт Clone
+    let output = U::from(cloned);       // Трейт From для преобразования
+    println!("Result: {:?}", output);   // Трейт Debug
     output
 }
 
-// Associated types (similar to C# generic constraints)
+// Ассоциированные типы (аналог ограничений обобщений в C#)
 pub trait Iterator {
-    type Item;  // Associated type instead of generic parameter
+    type Item;  // Ассоциированный тип вместо параметра обобщения
     
     fn next(&mut self) -> Option<Self::Item>;
 }
@@ -109,15 +109,15 @@ pub trait Collect<T> {
     fn collect<I: Iterator<Item = T>>(iter: I) -> Self;
 }
 
-// Higher-ranked trait bounds (advanced)
+// Границы трейтов высокого ранга (продвинутый уровень)
 fn apply_to_all<F>(items: &[String], f: F) -> Vec<String>
 where 
-    F: for<'a> Fn(&'a str) -> String,  // Function works with any lifetime
+    F: for<'a> Fn(&'a str) -> String,  // Функция работает с любым временем жизни
 {
     items.iter().map(|s| f(s)).collect()
 }
 
-// Conditional trait implementations
+// Условные реализации трейтов
 impl<T> PartialEq for Repository<T> 
 where 
     T: PartialEq + Clone + Debug + Default,
@@ -130,12 +130,12 @@ where
 
 ```mermaid
 graph TD
-    subgraph "C# Generic Constraints"
+    subgraph "Ограничения обобщений в C#"
         CS_WHERE["where T : class, IInterface, new()"]
-        CS_RUNTIME["[ERROR] Some runtime type checking<br/>Virtual method dispatch"]
-        CS_VARIANCE["[OK] Covariance/Contravariance<br/>in/out keywords"]
-        CS_REFLECTION["[ERROR] Runtime reflection possible<br/>typeof(T), is, as operators"]
-        CS_BOXING["[ERROR] Value type boxing<br/>for interface constraints"]
+        CS_RUNTIME["[ERROR] Проверка типов частично во время выполнения<br/>Диспетчеризация виртуальных методов"]
+        CS_VARIANCE["[OK] Ковариантность/контравариантность<br/>ключевые слова in/out"]
+        CS_REFLECTION["[ERROR] Возможна рефлексия во время выполнения<br/>операторы typeof(T), is, as"]
+        CS_BOXING["[ERROR] Упаковка значимых типов<br/>для ограничений интерфейсов"]
         
         CS_WHERE --> CS_RUNTIME
         CS_WHERE --> CS_VARIANCE
@@ -143,12 +143,12 @@ graph TD
         CS_WHERE --> CS_BOXING
     end
     
-    subgraph "Rust Trait Bounds"
+    subgraph "Трейт-границы Rust"
         RUST_WHERE["where T: Trait + Clone + Debug"]
-        RUST_COMPILE["[OK] Compile-time resolution<br/>Monomorphization"]
-        RUST_ZERO["[OK] Zero-cost abstractions<br/>No runtime overhead"]
-        RUST_ASSOCIATED["[OK] Associated types<br/>More flexible than generics"]
-        RUST_HKT["[OK] Higher-ranked trait bounds<br/>Advanced type relationships"]
+        RUST_COMPILE["[OK] Разрешение на этапе компиляции<br/>Мономорфизация"]
+        RUST_ZERO["[OK] Абстракции с нулевой стоимостью<br/>Без накладных расходов рантайма"]
+        RUST_ASSOCIATED["[OK] Ассоциированные типы<br/>Гибче, чем обобщения"]
+        RUST_HKT["[OK] Границы трейтов высокого ранга<br/>Продвинутые связи между типами"]
         
         RUST_WHERE --> RUST_COMPILE
         RUST_WHERE --> RUST_ZERO
@@ -156,9 +156,9 @@ graph TD
         RUST_WHERE --> RUST_HKT
     end
     
-    subgraph "Flexibility Comparison"
-        CS_FLEX["C# Flexibility<br/>[OK] Variance<br/>[OK] Runtime type info<br/>[ERROR] Performance cost"]
-        RUST_FLEX["Rust Flexibility<br/>[OK] Zero cost<br/>[OK] Compile-time safety<br/>[ERROR] No variance (yet)"]
+    subgraph "Сравнение гибкости"
+        CS_FLEX["Гибкость C#<br/>[OK] Вариантность<br/>[OK] Информация о типах во время выполнения<br/>[ERROR] Затраты на производительность"]
+        RUST_FLEX["Гибкость Rust<br/>[OK] Нулевая стоимость<br/>[OK] Безопасность на этапе компиляции<br/>[ERROR] Вариантности пока нет"]
     end
     
     style CS_RUNTIME fill:#fff3e0,color:#000
@@ -171,12 +171,12 @@ graph TD
 
 ---
 
-## Exercises
+## Упражнения
 
 <details>
-<summary><strong>🏋️ Exercise: Generic Repository</strong> (click to expand)</summary>
+<summary><strong>🏋️ Упражнение: обобщённый репозиторий</strong> (нажмите, чтобы раскрыть)</summary>
 
-Translate this C# generic repository interface to Rust traits:
+Переведите этот обобщённый интерфейс репозитория C# на трейты Rust:
 
 ```csharp
 public interface IRepository<T> where T : IEntity, new()
@@ -187,14 +187,14 @@ public interface IRepository<T> where T : IEntity, new()
 }
 ```
 
-Requirements:
-1. Define an `Entity` trait with `fn id(&self) -> u64`
-2. Define a `Repository<T>` trait where `T: Entity + Clone`
-3. Implement a `InMemoryRepository<T>` that stores items in a `Vec<T>`
-4. The `find` method should accept `impl Fn(&T) -> bool`
+Требования:
+1. Определите трейт `Entity` с методом `fn id(&self) -> u64`
+2. Определите трейт `Repository<T>`, где `T: Entity + Clone`
+3. Реализуйте `InMemoryRepository<T>`, который хранит элементы в `Vec<T>`
+4. Метод `find` должен принимать `impl Fn(&T) -> bool`
 
 <details>
-<summary>🔑 Solution</summary>
+<summary>🔑 Решение</summary>
 
 ```rust
 trait Entity: Clone {
@@ -248,7 +248,7 @@ fn main() {
 }
 ```
 
-**Key differences from C#**: No `new()` constraint (use `Default` trait instead). `Fn(&T) -> bool` replaces `Func<T, bool>`. Return `Option` instead of throwing.
+**Ключевые отличия от C#**: ограничения `new()` нет (вместо него используется трейт `Default`). `Fn(&T) -> bool` заменяет `Func<T, bool>`. Вместо генерации исключения возвращается `Option`.
 
 </details>
 </details>

@@ -1,86 +1,86 @@
-## Understanding Ownership
+## Понимание владения
 
-> **What you'll learn:** Rust's ownership system — why `let s2 = s1` invalidates `s1` (unlike C# reference copying),
-> the three ownership rules, `Copy` vs `Move` types, borrowing with `&` and `&mut`,
-> and how the borrow checker replaces garbage collection.
+> **Что вы узнаете:** систему владения Rust — почему `let s2 = s1` делает `s1` недействительным (в отличие от копирования ссылок в C#),
+> три правила владения, типы `Copy` и `Move`, заимствование через `&` и `&mut`,
+> а также то, как проверщик заимствований заменяет сборку мусора.
 >
-> **Difficulty:** 🟡 Intermediate
+> **Сложность:** 🟡 Средний
 
-Ownership is Rust's most unique feature and the biggest conceptual shift for C# developers. Let's approach it step by step.
+Владение — самая уникальная особенность Rust и самый большой концептуальный сдвиг для разработчиков C#. Разберём её шаг за шагом.
 
-### C# Memory Model (Review)
+### Модель памяти C# (повторение)
 ```csharp
-// C# - Automatic memory management
+// C# — автоматическое управление памятью
 public void ProcessData()
 {
     var data = new List<int> { 1, 2, 3, 4, 5 };
     ProcessList(data);
-    // data is still accessible here
-    Console.WriteLine(data.Count);  // Works fine
+    // data здесь по-прежнему доступен
+    Console.WriteLine(data.Count);  // Работает нормально
     
-    // GC will clean up when no references remain
+    // GC очистит память, когда не останется ссылок
 }
 
 public void ProcessList(List<int> list)
 {
-    list.Add(6);  // Modifies the original list
+    list.Add(6);  // Изменяет исходный список
 }
 ```
 
-### Rust Ownership Rules
-1. **Each value has exactly one owner** (unless you opt into shared ownership with `Rc<T>`/`Arc<T>` — see [Smart Pointers](ch07-3-smart-pointers-beyond-single-ownership.md))
-2. **When the owner goes out of scope, the value is dropped** (deterministic cleanup — see [Drop](ch07-3-smart-pointers-beyond-single-ownership.md#drop-rusts-idisposable))
-3. **Ownership can be transferred (moved)**
+### Правила владения в Rust
+1. **У каждого значения ровно один владелец** (если вы не выберете разделяемое владение через `Rc<T>`/`Arc<T>` — см. [Умные указатели](ch07-3-smart-pointers-beyond-single-ownership.md))
+2. **Когда владелец выходит из области видимости, значение уничтожается** (детерминированная очистка — см. [Drop](ch07-3-smart-pointers-beyond-single-ownership.md#drop-аналог-idisposable-в-rust))
+3. **Владение можно передать (переместить)**
 
 ```rust
-// Rust - Explicit ownership management
+// Rust — явное управление владением
 fn process_data() {
-    let data = vec![1, 2, 3, 4, 5];  // data owns the vector
-    process_list(data);              // Ownership moved to function
-    // println!("{:?}", data);       // ❌ Error: data no longer owned here
+    let data = vec![1, 2, 3, 4, 5];  // data владеет вектором
+    process_list(data);              // Владение передано функции
+    // println!("{:?}", data);       // ❌ Ошибка: data здесь больше не владеет значением
 }
 
-fn process_list(mut list: Vec<i32>) {  // list now owns the vector
+fn process_list(mut list: Vec<i32>) {  // list теперь владеет вектором
     list.push(6);
-    // list is dropped here when function ends
+    // list уничтожается здесь, при завершении функции
 }
 ```
 
-### Understanding "Move" for C# Developers
+### Понятие «перемещения» для разработчиков C#
 ```csharp
-// C# - References are copied, objects stay in place
-// (Only reference types — classes — work this way;
-//  C# value types like struct behave differently)
+// C# — ссылки копируются, объекты остаются на месте
+// (так работают только ссылочные типы — классы;
+//  значимые типы C#, такие как struct, ведут себя иначе)
 var original = new List<int> { 1, 2, 3 };
-var reference = original;  // Both variables point to same object
+var reference = original;  // Обе переменные указывают на один объект
 original.Add(4);
-Console.WriteLine(reference.Count);  // 4 - same object
+Console.WriteLine(reference.Count);  // 4 — тот же объект
 ```
 
 ```rust
-// Rust - Ownership is transferred
+// Rust — владение передаётся
 let original = vec![1, 2, 3];
-let moved = original;       // Ownership transferred
-// println!("{:?}", original);  // ❌ Error: original no longer owns the data
-println!("{:?}", moved);    // ✅ Works: moved now owns the data
+let moved = original;       // Владение передано
+// println!("{:?}", original);  // ❌ Ошибка: original больше не владеет данными
+println!("{:?}", moved);    // ✅ Работает: moved теперь владеет данными
 ```
 
-### Copy Types vs Move Types
+### Типы Copy и типы Move
 ```rust
-// Copy types (like C# value types) - copied, not moved
-let x = 5;        // i32 implements Copy
-let y = x;        // x is copied to y
-println!("{}", x); // ✅ Works: x is still valid
+// Типы Copy (как значимые типы в C#) — копируются, а не перемещаются
+let x = 5;        // i32 реализует Copy
+let y = x;        // x копируется в y
+println!("{}", x); // ✅ Работает: x по-прежнему действителен
 
-// Move types (like C# reference types) - moved, not copied  
-let s1 = String::from("hello");  // String doesn't implement Copy
-let s2 = s1;                     // s1 is moved to s2
-// println!("{}", s1);           // ❌ Error: s1 is no longer valid
+// Типы Move (как ссылочные типы в C#) — перемещаются, а не копируются
+let s1 = String::from("hello");  // String не реализует Copy
+let s2 = s1;                     // s1 перемещается в s2
+// println!("{}", s1);           // ❌ Ошибка: s1 больше не действителен
 ```
 
-### Practical Example: Swapping Values
+### Практический пример: обмен значениями
 ```csharp
-// C# - Simple reference swapping
+// C# — простой обмен ссылками
 public void SwapLists(ref List<int> a, ref List<int> b)
 {
     var temp = a;
@@ -90,19 +90,19 @@ public void SwapLists(ref List<int> a, ref List<int> b)
 ```
 
 ```rust
-// Rust - Ownership-aware swapping
+// Rust — обмен с учётом владения
 fn swap_vectors(a: &mut Vec<i32>, b: &mut Vec<i32>) {
-    std::mem::swap(a, b);  // Built-in swap function
+    std::mem::swap(a, b);  // Встроенная функция обмена
 }
 
-// Or manual approach
+// Или ручной вариант
 fn manual_swap() {
     let mut a = vec![1, 2, 3];
     let mut b = vec![4, 5, 6];
     
-    let temp = a;  // Move a to temp
-    a = b;         // Move b to a
-    b = temp;      // Move temp to b
+    let temp = a;  // Перемещаем a во временную переменную
+    a = b;         // Перемещаем b в a
+    b = temp;      // Перемещаем temp в b
     
     println!("a: {:?}, b: {:?}", a, b);
 }
@@ -110,19 +110,19 @@ fn manual_swap() {
 
 ***
 
-## Borrowing Basics
+## Основы заимствования
 
-Borrowing is like getting a reference in C#, but with compile-time safety guarantees.
+Заимствование похоже на получение ссылки в C#, но с гарантиями безопасности на этапе компиляции.
 
-### C# Reference Parameters
+### Ссылочные параметры в C#
 ```csharp
-// C# - ref and out parameters
+// C# — параметры ref и out
 public void ModifyValue(ref int value)
 {
     value += 10;
 }
 
-public void ReadValue(in int value)  // readonly reference
+public void ReadValue(in int value)  // ссылка только для чтения
 {
     Console.WriteLine(value);
 }
@@ -133,87 +133,87 @@ public bool TryParse(string input, out int result)
 }
 ```
 
-### Rust Borrowing
+### Заимствование в Rust
 ```rust
-// Rust - borrowing with & and &mut
-fn modify_value(value: &mut i32) {  // Mutable borrow
+// Rust — заимствование через & и &mut
+fn modify_value(value: &mut i32) {  // Изменяемое заимствование
     *value += 10;
 }
 
-fn read_value(value: &i32) {        // Immutable borrow
+fn read_value(value: &i32) {        // Неизменяемое заимствование
     println!("{}", value);
 }
 
 fn main() {
     let mut x = 5;
     
-    read_value(&x);      // Borrow immutably
-    modify_value(&mut x); // Borrow mutably
+    read_value(&x);      // Заимствуем неизменяемо
+    modify_value(&mut x); // Заимствуем изменяемо
     
-    println!("{}", x);   // x is still owned here
+    println!("{}", x);   // x по-прежнему принадлежит нам
 }
 ```
 
-### Borrowing Rules (Enforced at Compile Time!)
+### Правила заимствования (проверяются на этапе компиляции!)
 ```rust
 fn borrowing_rules() {
     let mut data = vec![1, 2, 3];
     
-    // Rule 1: Multiple immutable borrows are OK
+    // Правило 1: несколько неизменяемых заимствований допустимы
     let r1 = &data;
     let r2 = &data;
-    println!("{:?} {:?}", r1, r2);  // ✅ Works
+    println!("{:?} {:?}", r1, r2);  // ✅ Работает
     
-    // Rule 2: Only one mutable borrow at a time
+    // Правило 2: одновременно — только одно изменяемое заимствование
     let r3 = &mut data;
-    // let r4 = &mut data;  // ❌ Error: cannot borrow mutably twice
-    // let r5 = &data;      // ❌ Error: cannot borrow immutably while borrowed mutably
+    // let r4 = &mut data;  // ❌ Ошибка: нельзя заимствовать изменяемо дважды
+    // let r5 = &data;      // ❌ Ошибка: нельзя заимствовать неизменяемо, пока есть изменяемое заимствование
     
-    r3.push(4);  // Use the mutable borrow
-    // r3 goes out of scope here
+    r3.push(4);  // Используем изменяемое заимствование
+    // r3 выходит из области видимости здесь
     
-    // Rule 3: Can borrow again after previous borrows end
-    let r6 = &data;  // ✅ Works now
+    // Правило 3: можно заимствовать снова после окончания предыдущих заимствований
+    let r6 = &data;  // ✅ Теперь работает
     println!("{:?}", r6);
 }
 ```
 
-### C# vs Rust: Reference Safety
+### C# против Rust: безопасность ссылок
 ```csharp
-// C# - Potential runtime errors
+// C# — возможны ошибки времени выполнения
 public class ReferenceSafety
 {
     private List<int> data = new List<int>();
     
-    public List<int> GetData() => data;  // Returns reference to internal data
+    public List<int> GetData() => data;  // Возвращает ссылку на внутреннее состояние
     
     public void UnsafeExample()
     {
         var reference = GetData();
         
-        // Another thread could modify data here!
+        // Другой поток может изменить data прямо здесь!
         Thread.Sleep(1000);
         
-        // reference might be invalid or changed
-        reference.Add(42);  // Potential race condition
+        // reference может быть недействительным или изменённым
+        reference.Add(42);  // Возможное состояние гонки
     }
 }
 ```
 
 ```rust
-// Rust - Compile-time safety
+// Rust — безопасность на этапе компиляции
 pub struct SafeContainer {
     data: Vec<i32>,
 }
 
 impl SafeContainer {
-    // Return immutable borrow - caller can't modify
-    // Prefer &[i32] over &Vec<i32> — accept the broadest type
+    // Возвращаем неизменяемое заимствование — вызывающий код не может изменить данные
+    // Предпочитайте &[i32] вместо &Vec<i32> — принимайте самый широкий тип
     pub fn get_data(&self) -> &[i32] {
         &self.data
     }
     
-    // Return mutable borrow - exclusive access guaranteed
+    // Возвращаем изменяемое заимствование — эксклюзивный доступ гарантирован
     pub fn get_data_mut(&mut self) -> &mut Vec<i32> {
         &mut self.data
     }
@@ -223,23 +223,23 @@ fn safe_example() {
     let mut container = SafeContainer { data: vec![1, 2, 3] };
     
     let reference = container.get_data();
-    // container.get_data_mut();  // ❌ Error: can't borrow mutably while immutably borrowed
+    // container.get_data_mut();  // ❌ Ошибка: нельзя заимствовать изменяемо, пока есть неизменяемое заимствование
     
-    println!("{:?}", reference);  // Use immutable reference
-    // reference goes out of scope here
+    println!("{:?}", reference);  // Используем неизменяемую ссылку
+    // reference выходит из области видимости здесь
     
-    let mut_reference = container.get_data_mut();  // ✅ Now OK
+    let mut_reference = container.get_data_mut();  // ✅ Теперь можно
     mut_reference.push(4);
 }
 ```
 
 ***
 
-## Move Semantics
+## Семантика перемещения
 
-### C# Value Types vs Reference Types
+### Значимые и ссылочные типы в C#
 ```csharp
-// C# - Value types are copied
+// C# — значимые типы копируются
 struct Point
 {
     public int X { get; set; }
@@ -247,20 +247,20 @@ struct Point
 }
 
 var p1 = new Point { X = 1, Y = 2 };
-var p2 = p1;  // Copy
+var p2 = p1;  // Копирование
 p2.X = 10;
-Console.WriteLine(p1.X);  // Still 1
+Console.WriteLine(p1.X);  // По-прежнему 1
 
-// C# - Reference types share the object
+// C# — ссылочные типы разделяют объект
 var list1 = new List<int> { 1, 2, 3 };
-var list2 = list1;  // Reference copy
+var list2 = list1;  // Копирование ссылки
 list2.Add(4);
-Console.WriteLine(list1.Count);  // 4 - same object
+Console.WriteLine(list1.Count);  // 4 — тот же объект
 ```
 
-### Rust Move Semantics
+### Семантика перемещения в Rust
 ```rust
-// Rust - Move by default for non-Copy types
+// Rust — по умолчанию перемещение для типов, не реализующих Copy
 #[derive(Debug)]
 struct Point {
     x: i32,
@@ -269,12 +269,12 @@ struct Point {
 
 fn move_example() {
     let p1 = Point { x: 1, y: 2 };
-    let p2 = p1;  // Move (not copy)
-    // println!("{:?}", p1);  // ❌ Error: p1 was moved
-    println!("{:?}", p2);    // ✅ Works
+    let p2 = p1;  // Перемещение (не копирование)
+    // println!("{:?}", p1);  // ❌ Ошибка: p1 перемещён
+    println!("{:?}", p2);    // ✅ Работает
 }
 
-// To enable copying, implement Copy trait
+// Чтобы включить копирование, реализуйте трейт Copy
 #[derive(Debug, Copy, Clone)]
 struct CopyablePoint {
     x: i32,
@@ -283,61 +283,61 @@ struct CopyablePoint {
 
 fn copy_example() {
     let p1 = CopyablePoint { x: 1, y: 2 };
-    let p2 = p1;  // Copy (because it implements Copy)
-    println!("{:?}", p1);  // ✅ Works
-    println!("{:?}", p2);  // ✅ Works
+    let p2 = p1;  // Копирование (потому что реализован Copy)
+    println!("{:?}", p1);  // ✅ Работает
+    println!("{:?}", p2);  // ✅ Работает
 }
 ```
 
-### When Values Are Moved
+### Когда значения перемещаются
 ```rust
 fn demonstrate_moves() {
     let s = String::from("hello");
     
-    // 1. Assignment moves
-    let s2 = s;  // s moved to s2
+    // 1. Присваивание перемещает
+    let s2 = s;  // s перемещается в s2
     
-    // 2. Function calls move
-    take_ownership(s2);  // s2 moved into function
+    // 2. Вызовы функций перемещают
+    take_ownership(s2);  // s2 перемещается в функцию
     
-    // 3. Returning from functions moves
-    let s3 = give_ownership();  // Return value moved to s3
+    // 3. Возврат из функций перемещает
+    let s3 = give_ownership();  // Возвращаемое значение перемещается в s3
     
-    println!("{}", s3);  // s3 is valid
+    println!("{}", s3);  // s3 действителен
 }
 
 fn take_ownership(s: String) {
     println!("{}", s);
-    // s is dropped here
+    // s уничтожается здесь
 }
 
 fn give_ownership() -> String {
-    String::from("yours")  // Ownership moved to caller
+    String::from("yours")  // Владение перемещается к вызывающему коду
 }
 ```
 
-### Avoiding Moves with Borrowing
+### Избегаем перемещений с помощью заимствования
 ```rust
 fn demonstrate_borrowing() {
     let s = String::from("hello");
     
-    // Borrow instead of move
-    let len = calculate_length(&s);  // s is borrowed
-    println!("'{}' has length {}", s, len);  // s is still valid
+    // Заимствуем вместо перемещения
+    let len = calculate_length(&s);  // s заимствуется
+    println!("'{}' has length {}", s, len);  // s по-прежнему действителен
 }
 
 fn calculate_length(s: &String) -> usize {
-    s.len()  // s is not owned, so it's not dropped
+    s.len()  // s не принадлежит нам, поэтому не уничтожается
 }
 ```
 
 ***
 
-## Memory Management: GC vs RAII
+## Управление памятью: GC против RAII
 
-### C# Garbage Collection
+### Сборка мусора в C#
 ```csharp
-// C# - Automatic memory management
+// C# — автоматическое управление памятью
 public class Person
 {
     public string Name { get; set; }
@@ -345,20 +345,20 @@ public class Person
     
     public void AddHobby(string hobby)
     {
-        Hobbies.Add(hobby);  // Memory allocated automatically
+        Hobbies.Add(hobby);  // Память выделяется автоматически
     }
     
-    // No explicit cleanup needed - GC handles it
-    // But IDisposable pattern for resources
+    // Явная очистка не нужна — GC с ней справляется
+    // Но для ресурсов существует паттерн IDisposable
 }
 
 using var file = new FileStream("data.txt", FileMode.Open);
-// 'using' ensures Dispose() is called
+// 'using' гарантирует вызов Dispose()
 ```
 
-### Rust Ownership and RAII
+### Владение и RAII в Rust
 ```rust
-// Rust - Compile-time memory management
+// Rust — управление памятью на этапе компиляции
 pub struct Person {
     name: String,
     hobbies: Vec<String>,
@@ -366,32 +366,32 @@ pub struct Person {
 
 impl Person {
     pub fn add_hobby(&mut self, hobby: String) {
-        self.hobbies.push(hobby);  // Memory management tracked at compile time
+        self.hobbies.push(hobby);  // Управление памятью отслеживается на этапе компиляции
     }
     
-        // Drop trait automatically implemented - cleanup is guaranteed
-    // Compare to C#'s IDisposable:
-    //   C#:   using var file = new FileStream(...)    // Dispose() called at end of using block
-    //   Rust: let file = File::open(...)?             // drop() called at end of scope — no 'using' needed
+        // Трейт Drop реализуется автоматически — очистка гарантирована
+    // Сравните с IDisposable в C#:
+    //   C#:   using var file = new FileStream(...)    // Dispose() вызывается в конце блока using
+    //   Rust: let file = File::open(...)?             // drop() вызывается в конце области видимости — 'using' не нужен
 }
 
-// RAII - Resource Acquisition Is Initialization
+// RAII — Resource Acquisition Is Initialization (получение ресурса есть инициализация)
 {
     let file = std::fs::File::open("data.txt")?;
-    // File automatically closed when 'file' goes out of scope
-    // No 'using' statement needed - handled by type system
+    // Файл автоматически закрывается, когда 'file' выходит из области видимости
+    // Оператор using не нужен — это обеспечивает система типов
 }
 ```
 
 ```mermaid
 graph TD
-    subgraph "C# Memory Management"
-        CS_ALLOC["Object Allocation<br/>new Person()"]
-        CS_HEAP["Managed Heap"]
-        CS_REF["References point to heap"]
-        CS_GC_CHECK["GC periodically checks<br/>for unreachable objects"]
-        CS_SWEEP["Mark and sweep<br/>collection"]
-        CS_PAUSE["[ERROR] GC pause times"]
+    subgraph "Управление памятью в C#"
+        CS_ALLOC["Выделение объекта<br/>new Person()"]
+        CS_HEAP["Управляемая куча"]
+        CS_REF["Ссылки указывают на кучу"]
+        CS_GC_CHECK["GC периодически проверяет<br/>недостижимые объекты"]
+        CS_SWEEP["Сборка по принципу<br/>mark and sweep"]
+        CS_PAUSE["[ERROR] Паузы GC"]
         
         CS_ALLOC --> CS_HEAP
         CS_HEAP --> CS_REF
@@ -399,22 +399,22 @@ graph TD
         CS_GC_CHECK --> CS_SWEEP
         CS_SWEEP --> CS_PAUSE
         
-        CS_ISSUES["[ERROR] Non-deterministic cleanup<br/>[ERROR] Memory pressure<br/>[ERROR] Finalization complexity<br/>[OK] Easy to use"]
+        CS_ISSUES["[ERROR] Недетерминированная очистка<br/>[ERROR] Давление на память<br/>[ERROR] Сложность финализации<br/>[OK] Легко использовать"]
     end
     
-    subgraph "Rust Ownership System"
-        RUST_ALLOC["Value Creation<br/>Person { ... }"]
-        RUST_OWNER["Single owner<br/>on stack or heap"]
-        RUST_BORROW["Borrowing system<br/>&T, &mut T"]
-        RUST_SCOPE["Scope-based cleanup<br/>Drop trait"]
-        RUST_COMPILE["Compile-time verification"]
+    subgraph "Система владения Rust"
+        RUST_ALLOC["Создание значения<br/>Person { ... }"]
+        RUST_OWNER["Единственный владелец<br/>на стеке или в куче"]
+        RUST_BORROW["Система заимствований<br/>&T, &mut T"]
+        RUST_SCOPE["Очистка по области видимости<br/>трейт Drop"]
+        RUST_COMPILE["Проверка на этапе компиляции"]
         
         RUST_ALLOC --> RUST_OWNER
         RUST_OWNER --> RUST_BORROW
         RUST_BORROW --> RUST_SCOPE
         RUST_SCOPE --> RUST_COMPILE
         
-        RUST_BENEFITS["[OK] Deterministic cleanup<br/>[OK] Zero runtime cost<br/>[OK] No memory leaks<br/>[ERROR] Learning curve"]
+        RUST_BENEFITS["[OK] Детерминированная очистка<br/>[OK] Нулевые накладные расходы рантайма<br/>[OK] Никаких утечек памяти<br/>[ERROR] Кривая обучения"]
     end
     
     style CS_ISSUES fill:#ffebee,color:#000
@@ -427,67 +427,67 @@ graph TD
 
 
 <details>
-<summary><strong>🏋️ Exercise: Fix the Borrow Checker Errors</strong> (click to expand)</summary>
+<summary><strong>🏋️ Упражнение: исправьте ошибки проверщика заимствований</strong> (нажмите, чтобы раскрыть)</summary>
 
-**Challenge**: Each snippet below has a borrow checker error. Fix them without changing the output.
+**Задача**: в каждом фрагменте ниже есть ошибка проверщика заимствований. Исправьте их, не меняя вывод.
 
 ```rust
-// 1. Move after use
+// 1. Перемещение после использования
 fn problem_1() {
     let name = String::from("Alice");
     let greeting = format!("Hello, {name}!");
-    let upper = name.to_uppercase();  // hint: borrow instead of move
+    let upper = name.to_uppercase();  // подсказка: заимствуйте вместо перемещения
     println!("{greeting} — {upper}");
 }
 
-// 2. Mutable + immutable borrow overlap
+// 2. Пересечение изменяемого и неизменяемого заимствований
 fn problem_2() {
     let mut numbers = vec![1, 2, 3];
     let first = &numbers[0];
-    numbers.push(4);            // hint: reorder operations
+    numbers.push(4);            // подсказка: переупорядочьте операции
     println!("first = {first}");
 }
 
-// 3. Returning a reference to a local
+// 3. Возврат ссылки на локальную переменную
 fn problem_3() -> String {
     let s = String::from("hello");
-    s   // hint: return owned value, not &str
+    s   // подсказка: верните владеемое значение, а не &str
 }
 ```
 
 <details>
-<summary>🔑 Solution</summary>
+<summary>🔑 Решение</summary>
 
 ```rust
-// 1. format! already borrows — the fix is that format! takes a reference.
-//    The original code actually compiles! But if we had `let greeting = name;`
-//    then fix by using &name:
+// 1. format! уже заимствует — исправление в том, что format! принимает ссылку.
+//    Исходный код на самом деле компилируется! Но если бы было `let greeting = name;`,
+//    исправили бы через &name:
 fn solution_1() {
     let name = String::from("Alice");
-    let greeting = format!("Hello, {}!", &name); // borrow
-    let upper = name.to_uppercase();             // name still valid
+    let greeting = format!("Hello, {}!", &name); // заимствование
+    let upper = name.to_uppercase();             // name по-прежнему действителен
     println!("{greeting} — {upper}");
 }
 
-// 2. Use the immutable borrow before the mutable operation:
+// 2. Используем неизменяемое заимствование до изменяющей операции:
 fn solution_2() {
     let mut numbers = vec![1, 2, 3];
-    let first = numbers[0]; // copy the i32 value (i32 is Copy)
+    let first = numbers[0]; // копируем значение i32 (i32 реализует Copy)
     numbers.push(4);
     println!("first = {first}");
 }
 
-// 3. Return the owned String (already correct — common beginner confusion):
+// 3. Возвращаем владеемую String (уже правильно — частая путаница у новичков):
 fn solution_3() -> String {
     let s = String::from("hello");
-    s // ownership transferred to caller — this is the correct pattern
+    s // владение передаётся вызывающему коду — это правильный паттерн
 }
 ```
 
-**Key takeaways**:
-- `format!()` borrows its arguments — it doesn't move them
-- Primitive types like `i32` implement `Copy`, so indexing copies the value
-- Returning an owned value transfers ownership to the caller — no lifetime issues
+**Ключевые выводы**:
+- `format!()` заимствует свои аргументы — он их не перемещает
+- Примитивные типы вроде `i32` реализуют `Copy`, поэтому индексация копирует значение
+- Возврат владеемого значения передаёт владение вызывающему коду — проблем с временами жизни нет
 
 </details>
 </details>

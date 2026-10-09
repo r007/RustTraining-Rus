@@ -1,63 +1,63 @@
-## Macros: Code That Writes Code
+## Макросы: код, который пишет код
 
-> **What you'll learn:** Why Rust needs macros (no overloading, no variadic args), `macro_rules!` basics,
-> the `!` suffix convention, common derive macros, and `dbg!()` for quick debugging.
+> **Что вы узнаете:** зачем Rust нужны макросы (нет перегрузки и вариативных аргументов), основы `macro_rules!`,
+> соглашение о суффиксе `!`, распространённые производные макросы и `dbg!()` для быстрой отладки.
 >
-> **Difficulty:** 🟡 Intermediate
+> **Сложность:** 🟡 Средний
 
-C# has no direct equivalent to Rust macros. Understanding why they exist and how they work removes a major source of confusion for C# developers.
+В C# нет прямого аналога макросам Rust. Понимание того, зачем они нужны и как работают, устраняет крупный источник путаницы для разработчиков C#.
 
-### Why Macros Exist in Rust
+### Зачем в Rust нужны макросы
 
 ```mermaid
 graph LR
-    SRC["vec![1, 2, 3]"] -->|"compile time"| EXP["{
+    SRC["vec![1, 2, 3]"] -->|"на этапе компиляции"| EXP["{
   let mut v = Vec::new();
   v.push(1);
   v.push(2);
   v.push(3);
   v
 }"]
-    EXP -->|"compiles to"| BIN["machine code"]
+    EXP -->|"компилируется в"| BIN["машинный код"]
 
     style SRC fill:#fff9c4,color:#000
     style EXP fill:#c8e6c9,color:#000
 ```
 
 ```csharp
-// C# has features that make macros unnecessary:
-Console.WriteLine("Hello");           // Method overloading (1-16 params)
-Console.WriteLine("{0}, {1}", a, b);  // Variadic via params array
-var list = new List<int> { 1, 2, 3 }; // Collection initializer syntax
+// В C# есть возможности, которые делают макросы ненужными:
+Console.WriteLine("Hello");           // Перегрузка методов (1–16 параметров)
+Console.WriteLine("{0}, {1}", a, b);  // Вариативность через массив params
+var list = new List<int> { 1, 2, 3 }; // Синтаксис инициализатора коллекции
 ```
 
 ```rust
-// Rust has NO function overloading, NO variadic arguments, NO special syntax.
-// Macros fill these gaps:
-println!("Hello");                    // Macro — handles 0+ args at compile time
-println!("{}, {}", a, b);             // Macro — type-checked at compile time
-let list = vec![1, 2, 3];            // Macro — expands to Vec::new() + push()
+// В Rust НЕТ перегрузки функций, НЕТ вариативных аргументов, НЕТ особого синтаксиса.
+// Макросы закрывают эти пробелы:
+println!("Hello");                    // Макрос — принимает 0 и более аргументов на этапе компиляции
+println!("{}, {}", a, b);             // Макрос — типы проверяются на этапе компиляции
+let list = vec![1, 2, 3];            // Макрос — раскрывается в Vec::new() + push()
 ```
 
-### Recognizing Macros: The `!` Suffix
+### Распознавание макросов: суффикс `!`
 
-Every macro invocation ends with `!`. If you see `!`, it's a macro, not a function:
+Каждый вызов макроса заканчивается на `!`. Если вы видите `!`, это макрос, а не функция:
 
 ```rust
-println!("hello");     // macro — generates format string code at compile time
-format!("{x}");        // macro — returns String, compile-time format checking
-vec![1, 2, 3];         // macro — creates and populates a Vec
-todo!();               // macro — panics with "not yet implemented"
-dbg!(expression);      // macro — prints file:line + expression + value, returns value
-assert_eq!(a, b);      // macro — panics with diff if a ≠ b
-cfg!(target_os = "linux"); // macro — compile-time platform detection
+println!("hello");     // макрос — генерирует код форматирования на этапе компиляции
+format!("{x}");        // макрос — возвращает String, проверка формата на этапе компиляции
+vec![1, 2, 3];         // макрос — создаёт и заполняет Vec
+todo!();               // макрос — паникует с сообщением "not yet implemented"
+dbg!(expression);      // макрос — выводит файл:строку + выражение + значение, возвращает значение
+assert_eq!(a, b);      // макрос — паникует с дифом, если a ≠ b
+cfg!(target_os = "linux"); // макрос — определение платформы на этапе компиляции
 ```
 
-### Writing a Simple Macro with `macro_rules!`
+### Простой макрос на `macro_rules!`
 ```rust
-// Define a macro that creates a HashMap from key-value pairs
+// Определяем макрос, который создаёт HashMap из пар ключ-значение
 macro_rules! hashmap {
-    // Pattern: key => value pairs separated by commas
+    // Шаблон: пары ключ => значение, разделённые запятыми
     ( $( $key:expr => $value:expr ),* $(,)? ) => {{
         let mut map = std::collections::HashMap::new();
         $( map.insert($key, $value); )*
@@ -75,83 +75,83 @@ fn main() {
 }
 ```
 
-### Derive Macros: Auto-Implementing Traits
+### Производные макросы: автоматическая реализация трейтов
 ```rust
-// #[derive] is a procedural macro that generates trait implementations
+// #[derive] — это процедурный макрос, который генерирует реализации трейтов
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct User {
     name: String,
     age: u32,
 }
-// The compiler generates Debug::fmt, Clone::clone, PartialEq::eq, etc.
-// automatically by examining the struct fields.
+// Компилятор автоматически генерирует Debug::fmt, Clone::clone, PartialEq::eq и т. д.,
+// анализируя поля структуры.
 ```
 
 ```csharp
-// C# equivalent: none — you'd manually implement IEquatable, ICloneable, etc.
-// Or use records: public record User(string Name, int Age);
-// Records auto-generate Equals, GetHashCode, ToString — similar idea!
+// Аналога в C# нет — пришлось бы вручную реализовывать IEquatable, ICloneable и т. д.
+// Или использовать records: public record User(string Name, int Age);
+// Records автоматически генерируют Equals, GetHashCode, ToString — похожая идея!
 ```
 
-### Common Derive Macros
+### Распространённые производные макросы
 
-| Derive | Purpose | C# Equivalent |
+| Derive | Назначение | Аналог в C# |
 |--------|---------|---------------|
-| `Debug` | `{:?}` format string output | `ToString()` override |
-| `Clone` | Deep copy via `.clone()` | `ICloneable` |
-| `Copy` | Implicit bitwise copy (no `.clone()` needed) | Value type (`struct`) semantics |
-| `PartialEq`, `Eq` | `==` comparison | `IEquatable<T>` |
-| `PartialOrd`, `Ord` | `<`, `>` comparison + sorting | `IComparable<T>` |
-| `Hash` | Hashing for `HashMap` keys | `GetHashCode()` |
-| `Default` | Default values via `Default::default()` | Parameterless constructor |
-| `Serialize`, `Deserialize` | JSON/TOML/etc. (serde) | `[JsonProperty]` attributes |
+| `Debug` | Вывод в формате `{:?}` | Переопределение `ToString()` |
+| `Clone` | Глубокое копирование через `.clone()` | `ICloneable` |
+| `Copy` | Неявное побитовое копирование (`.clone()` не нужен) | Семантика значимого типа (`struct`) |
+| `PartialEq`, `Eq` | Сравнение `==` | `IEquatable<T>` |
+| `PartialOrd`, `Ord` | Сравнение `<`, `>` и сортировка | `IComparable<T>` |
+| `Hash` | Хеширование для ключей `HashMap` | `GetHashCode()` |
+| `Default` | Значения по умолчанию через `Default::default()` | Конструктор без параметров |
+| `Serialize`, `Deserialize` | JSON/TOML и т. д. (serde) | Атрибуты `[JsonProperty]` |
 
-> **Rule of thumb:** Start with `#[derive(Debug)]` on every type. Add `Clone`, `PartialEq` when needed. Add `Serialize, Deserialize` for any type that crosses a boundary (API, file, database).
+> **Эмпирическое правило:** начинайте с `#[derive(Debug)]` на каждом типе. Добавляйте `Clone`, `PartialEq`, когда это нужно. Добавляйте `Serialize, Deserialize` для любого типа, который пересекает границу (API, файл, база данных).
 
-### Procedural & Attribute Macros (Awareness Level)
+### Процедурные и атрибутные макросы (на уровне понимания)
 
-Derive macros are one kind of **procedural macro** — code that runs at compile time to generate code. You'll encounter two other forms:
+Производные макросы — это один из видов **процедурных макросов**: кода, который выполняется на этапе компиляции и генерирует код. Вы встретите ещё две формы:
 
-**Attribute macros** — attached to items with `#[...]`:
+**Атрибутные макросы** — присоединяются к элементам через `#[...]`:
 ```rust
-#[tokio::main]          // turns main() into an async runtime entry point
+#[tokio::main]          // превращает main() в точку входа асинхронного рантайма
 async fn main() { }
 
-#[test]                 // marks a function as a unit test
+#[test]                 // помечает функцию как модульный тест
 fn it_works() { assert_eq!(2 + 2, 4); }
 
-#[cfg(test)]            // conditionally compile this module only during testing
+#[cfg(test)]            // условно компилирует этот модуль только во время тестирования
 mod tests { /* ... */ }
 ```
 
-**Function-like macros** — look like function calls:
+**Функциональные макросы** — выглядят как вызовы функций:
 ```rust
-// sqlx::query! verifies your SQL against the database at compile time
+// sqlx::query! проверяет ваш SQL по базе данных на этапе компиляции
 let users = sqlx::query!("SELECT id, name FROM users WHERE active = $1", true)
     .fetch_all(&pool)
     .await?;
 ```
 
-> **Key insight for C# developers:** You rarely *write* procedural macros — they're an advanced library-author tool. But you *use* them constantly (`#[derive(...)]`, `#[tokio::main]`, `#[test]`). Think of them like C# source generators: you benefit from them without implementing them.
+> **Ключевая мысль для разработчиков C#:** процедурные макросы вы редко *пишете* — это инструмент для авторов библиотек продвинутого уровня. Но вы *используете* их постоянно (`#[derive(...)]`, `#[tokio::main]`, `#[test]`). Думайте о них как об источниках генерации кода (source generators) в C#: вы получаете выгоду, не реализуя их сами.
 
-### Conditional Compilation with `#[cfg]`
+### Условная компиляция через `#[cfg]`
 
-Rust's `#[cfg]` attributes are like C#'s `#if DEBUG` preprocessor directives, but type-checked:
+Атрибуты `#[cfg]` в Rust похожи на директивы препроцессора `#if DEBUG` в C#, но с проверкой типов:
 
 ```rust
-// Compile this function only on Linux
+// Компилируем эту функцию только для Linux
 #[cfg(target_os = "linux")]
 fn platform_specific() {
     println!("Running on Linux");
 }
 
-// Debug-only assertions (like C# Debug.Assert)
+// Проверки только для отладки (как Debug.Assert в C#)
 #[cfg(debug_assertions)]
 fn expensive_check(data: &[u8]) {
     assert!(data.len() < 1_000_000, "data unexpectedly large");
 }
 
-// Feature flags (like C# #if FEATURE_X, but declared in Cargo.toml)
+// Feature-флаги (как #if FEATURE_X в C#, но объявляются в Cargo.toml)
 #[cfg(feature = "json")]
 pub fn to_json<T: Serialize>(val: &T) -> String {
     serde_json::to_string(val).unwrap()
@@ -159,42 +159,42 @@ pub fn to_json<T: Serialize>(val: &T) -> String {
 ```
 
 ```csharp
-// C# equivalent
+// Аналог в C#
 #if DEBUG
     Debug.Assert(data.Length < 1_000_000);
 #endif
 ```
 
-### `dbg!()` — Your Best Friend for Debugging
+### `dbg!()` — ваш лучший друг при отладке
 ```rust
 fn calculate(x: i32) -> i32 {
-    let intermediate = dbg!(x * 2);     // prints: [src/main.rs:3] x * 2 = 10
-    let result = dbg!(intermediate + 1); // prints: [src/main.rs:4] intermediate + 1 = 11
+    let intermediate = dbg!(x * 2);     // выводит: [src/main.rs:3] x * 2 = 10
+    let result = dbg!(intermediate + 1); // выводит: [src/main.rs:4] intermediate + 1 = 11
     result
 }
-// dbg! prints to stderr, includes file:line, and returns the value
-// Far more useful than Console.WriteLine for debugging!
+// dbg! пишет в stderr, включает файл:строку и возвращает значение
+// Гораздо полезнее, чем Console.WriteLine для отладки!
 ```
 
 <details>
-<summary><strong>🏋️ Exercise: Write a min! Macro</strong> (click to expand)</summary>
+<summary><strong>🏋️ Упражнение: напишите макрос min!</strong> (нажмите, чтобы раскрыть)</summary>
 
-**Challenge**: Write a `min!` macro that accepts 2 or more arguments and returns the smallest.
+**Задача**: напишите макрос `min!`, который принимает два или более аргументов и возвращает наименьший.
 
 ```rust
-// Should work like:
+// Должно работать так:
 let smallest = min!(5, 3, 8, 1, 4); // → 1
 let pair = min!(10, 20);             // → 10
 ```
 
 <details>
-<summary>🔑 Solution</summary>
+<summary>🔑 Решение</summary>
 
 ```rust
 macro_rules! min {
-    // Base case: single value
+    // Базовый случай: одно значение
     ($x:expr) => ($x);
-    // Recursive: compare first with min of rest
+    // Рекурсивно: сравниваем первое со минимумом остальных
     ($x:expr, $($rest:expr),+) => {{
         let first = $x;
         let rest = min!($($rest),+);
@@ -210,7 +210,7 @@ fn main() {
 }
 ```
 
-**Key takeaway**: `macro_rules!` uses pattern matching on token trees — it's like `match` but for code structure instead of values.
+**Ключевая мысль**: `macro_rules!` выполняет сопоставление с образцом по деревьям токенов — это как `match`, только для структуры кода, а не значений.
 
 </details>
 </details>

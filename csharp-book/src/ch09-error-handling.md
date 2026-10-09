@@ -1,16 +1,16 @@
-## Exceptions vs `Result<T, E>`
+## Исключения против `Result<T, E>`
 
-> **What you'll learn:** Why Rust replaces exceptions with `Result<T, E>` and `Option<T>`,
-> the `?` operator for concise error propagation, and how explicit error handling
-> eliminates hidden control flow that plagues C# `try`/`catch` code.
+> **Что вы узнаете:** почему Rust заменяет исключения на `Result<T, E>` и `Option<T>`,
+> оператор `?` для краткого распространения ошибок, и как явная обработка ошибок
+> устраняет скрытый поток управления, который осложняет код с `try`/`catch` в C#.
 >
-> **Difficulty:** 🟡 Intermediate
+> **Сложность:** 🟡 Средний
 >
-> **See also**: [Crate-Level Error Types](ch09-1-crate-level-error-types-and-result-alias.md) for production error patterns with `thiserror` and `anyhow`, and [Essential Crates](ch15-1-essential-crates-for-c-developers.md) for the error crate ecosystem.
+> **См. также**: [Собственные типы ошибок уровня крейта](ch09-1-crate-level-error-types-and-result-alias.md) — производственные паттерны с `thiserror` и `anyhow`, и [Основные крейты](ch15-1-essential-crates-for-c-developers.md) — экосистема крейтов для ошибок.
 
-### C# Exception-Based Error Handling
+### Обработка ошибок через исключения в C#
 ```csharp
-// C# - Exception-based error handling
+// C# — обработка ошибок через исключения
 public class UserService
 {
     public User GetUser(int userId)
@@ -44,13 +44,13 @@ public class UserService
         catch (Exception ex)
         {
             logger.Error(ex, "Unexpected error getting user email");
-            throw; // Re-throw
+            throw; // Повторно выбрасываем
         }
     }
 }
 ```
 
-### Rust Result-Based Error Handling
+### Обработка ошибок через Result в Rust
 ```rust
 use std::fmt;
 
@@ -82,7 +82,7 @@ pub struct User {
 }
 
 pub struct UserService {
-    users: Vec<User>,  // Simulated database
+    users: Vec<User>,  // Имитация базы данных
 }
 
 impl UserService {
@@ -95,13 +95,13 @@ impl UserService {
             return Err(UserError::InvalidId(user_id));
         }
         
-        // Simulate database lookup
+        // Имитация поиска в базе данных
         self.database_find_user(user_id)
             .ok_or(UserError::NotFound(user_id))
     }
     
     pub fn get_user_email(&self, user_id: i32) -> Result<String, UserError> {
-        let user = self.get_user(user_id)?; // ? operator propagates errors
+        let user = self.get_user(user_id)?; // Оператор ? пробрасывает ошибку
         
         user.email
             .ok_or(UserError::NoEmail)
@@ -125,13 +125,13 @@ impl UserService {
 
 ```mermaid
 graph TD
-    subgraph "C# Exception Model"
-        CS_CALL["Method Call"]
-        CS_SUCCESS["Success Path"]
+    subgraph "Модель исключений C#"
+        CS_CALL["Вызов метода"]
+        CS_SUCCESS["Путь успеха"]
         CS_EXCEPTION["throw Exception"]
-        CS_STACK["Stack unwinding<br/>(Runtime cost)"]
-        CS_CATCH["try/catch block"]
-        CS_HIDDEN["[ERROR] Hidden control flow<br/>[ERROR] Performance cost<br/>[ERROR] Easy to ignore"]
+        CS_STACK["Раскрутка стека<br/>(затраты во время выполнения)"]
+        CS_CATCH["Блок try/catch"]
+        CS_HIDDEN["[ERROR] Скрытый поток управления<br/>[ERROR] Затраты на производительность<br/>[ERROR] Легко проигнорировать"]
         
         CS_CALL --> CS_SUCCESS
         CS_CALL --> CS_EXCEPTION
@@ -140,13 +140,13 @@ graph TD
         CS_EXCEPTION --> CS_HIDDEN
     end
     
-    subgraph "Rust Result Model"
-        RUST_CALL["Function Call"]
+    subgraph "Модель Result в Rust"
+        RUST_CALL["Вызов функции"]
         RUST_OK["Ok(value)"]
         RUST_ERR["Err(error)"]
         RUST_MATCH["match result"]
-        RUST_QUESTION["? operator<br/>(early return)"]
-        RUST_EXPLICIT["[OK] Explicit error handling<br/>[OK] Zero runtime cost<br/>[OK] Cannot ignore errors"]
+        RUST_QUESTION["Оператор ?<br/>(ранний возврат)"]
+        RUST_EXPLICIT["[OK] Явная обработка ошибок<br/>[OK] Нулевые затраты во время выполнения<br/>[OK] Ошибки нельзя проигнорировать"]
         
         RUST_CALL --> RUST_OK
         RUST_CALL --> RUST_ERR
@@ -165,23 +165,23 @@ graph TD
 
 ***
 
-### The ? Operator: Propagating Errors Concisely
+### Оператор ?: краткое распространение ошибок
 ```csharp
-// C# - Exception propagation (implicit)
+// C# — распространение исключений (неявное)
 public async Task<string> ProcessFileAsync(string path)
 {
-    var content = await File.ReadAllTextAsync(path);  // Throws on error
-    var processed = ProcessContent(content);          // Throws on error
+    var content = await File.ReadAllTextAsync(path);  // Бросает исключение при ошибке
+    var processed = ProcessContent(content);          // Бросает исключение при ошибке
     return processed;
 }
 ```
 
 ```rust
-// Rust - Error propagation with ?
+// Rust — распространение ошибок через ?
 fn process_file(path: &str) -> Result<String, ConfigError> {
-    let content = read_config(path)?;  // ? propagates error if Err
-    let processed = process_content(&content)?;  // ? propagates error if Err
-    Ok(processed)  // Wrap success value in Ok
+    let content = read_config(path)?;  // ? пробрасывает ошибку, если это Err
+    let processed = process_content(&content)?;  // ? пробрасывает ошибку, если это Err
+    Ok(processed)  // Оборачиваем успешное значение в Ok
 }
 
 fn process_content(content: &str) -> Result<String, ConfigError> {
@@ -193,13 +193,13 @@ fn process_content(content: &str) -> Result<String, ConfigError> {
 }
 ```
 
-### `Option<T>` for Nullable Values
+### `Option<T>` для значений, которые могут отсутствовать
 ```csharp
-// C# - Nullable reference types
+// C# — ссылочные типы с поддержкой null
 public string? FindUserName(int userId)
 {
     var user = database.FindUser(userId);
-    return user?.Name;  // Returns null if user not found
+    return user?.Name;  // Возвращает null, если пользователь не найден
 }
 
 public void ProcessUser(int userId)
@@ -217,9 +217,9 @@ public void ProcessUser(int userId)
 ```
 
 ```rust
-// Rust - Option<T> for optional values
+// Rust — Option<T> для необязательных значений
 fn find_user_name(user_id: u32) -> Option<String> {
-    // Simulate database lookup
+    // Имитация поиска в базе данных
     if user_id == 1 {
         Some("Alice".to_string())
     } else {
@@ -233,7 +233,7 @@ fn process_user(user_id: u32) {
         None => println!("User not found"),
     }
     
-    // Or use if let (pattern matching shorthand)
+    // Или используйте if let (сокращённая форма сопоставления с образцом)
     if let Some(name) = find_user_name(user_id) {
         println!("User: {}", name);
     } else {
@@ -242,7 +242,7 @@ fn process_user(user_id: u32) {
 }
 ```
 
-### Combining Option and Result
+### Комбинирование Option и Result
 ```rust
 fn safe_divide(a: f64, b: f64) -> Option<f64> {
     if b != 0.0 {
@@ -253,9 +253,9 @@ fn safe_divide(a: f64, b: f64) -> Option<f64> {
 }
 
 fn parse_and_divide(a_str: &str, b_str: &str) -> Result<Option<f64>, ParseFloatError> {
-    let a: f64 = a_str.parse()?;  // Return parse error if invalid
-    let b: f64 = b_str.parse()?;  // Return parse error if invalid
-    Ok(safe_divide(a, b))         // Return Ok(Some(result)) or Ok(None)
+    let a: f64 = a_str.parse()?;  // Возвращаем ошибку разбора, если значение некорректно
+    let b: f64 = b_str.parse()?;  // Возвращаем ошибку разбора, если значение некорректно
+    Ok(safe_divide(a, b))         // Возвращаем Ok(Some(result)) или Ok(None)
 }
 
 use std::num::ParseFloatError;
@@ -273,23 +273,23 @@ fn main() {
 
 
 <details>
-<summary><strong>🏋️ Exercise: Build a Crate-Level Error Type</strong> (click to expand)</summary>
+<summary><strong>🏋️ Упражнение: создайте тип ошибок уровня крейта</strong> (нажмите, чтобы раскрыть)</summary>
 
-**Challenge**: Create an `AppError` enum for a file processing application that can fail due to I/O errors, JSON parse errors, and validation errors. Implement `From` conversions for automatic `?` propagation.
+**Задача**: создайте перечисление `AppError` для приложения обработки файлов, которое может завершиться ошибкой из-за ошибок ввода-вывода, ошибок разбора JSON и ошибок валидации. Реализуйте преобразования `From` для автоматического распространения через `?`.
 
 ```rust
-// Starter code
+// Стартовый код
 use std::io;
 
-// TODO: Define AppError with variants:
+// TODO: Определите AppError с вариантами:
 //   Io(io::Error), Json(serde_json::Error), Validation(String)
-// TODO: Implement Display and Error traits
-// TODO: Implement From<io::Error> and From<serde_json::Error>
-// TODO: Define type alias: type Result<T> = std::result::Result<T, AppError>;
+// TODO: Реализуйте трейты Display и Error
+// TODO: Реализуйте From<io::Error> и From<serde_json::Error>
+// TODO: Определите псевдоним типа: type Result<T> = std::result::Result<T, AppError>;
 
 fn load_config(path: &str) -> Result<Config> {
     let content = std::fs::read_to_string(path)?;  // io::Error → AppError
-    let config: Config = serde_json::from_str(&content)?;  // serde error → AppError
+    let config: Config = serde_json::from_str(&content)?;  // ошибка serde → AppError
     if config.name.is_empty() {
         return Err(AppError::Validation("name cannot be empty".into()));
     }
@@ -298,7 +298,7 @@ fn load_config(path: &str) -> Result<Config> {
 ```
 
 <details>
-<summary>🔑 Solution</summary>
+<summary>🔑 Решение</summary>
 
 ```rust
 use std::io;
@@ -334,11 +334,11 @@ fn load_config(path: &str) -> Result<Config> {
 }
 ```
 
-**Key takeaways**:
-- `thiserror` generates `Display` and `Error` impls from attributes
-- `#[from]` generates `From<T>` impls, enabling automatic `?` conversion
-- The `Result<T>` alias eliminates boilerplate throughout your crate
-- Unlike C# exceptions, the error type is visible in every function signature
+**Ключевые выводы**:
+- `thiserror` генерирует реализации `Display` и `Error` на основе атрибутов
+- `#[from]` генерирует реализации `From<T>`, что позволяет автоматически преобразовывать ошибки через `?`
+- Псевдоним `Result<T>` убирает шаблонный код во всём крейте
+- В отличие от исключений C#, тип ошибки виден в каждой сигнатуре функции
 
 </details>
 </details>

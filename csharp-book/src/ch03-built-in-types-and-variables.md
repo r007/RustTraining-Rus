@@ -1,57 +1,57 @@
-## Variables and Mutability
+## Переменные и изменяемость
 
-> **What you'll learn:** Rust's variable declaration and mutability model vs C#'s `var`/`const`,
-> primitive type mappings, the critical `String` vs `&str` distinction, type inference,
-> and how Rust handles casting and conversions differently from C#.
+> **Что вы узнаете:** модель объявления переменных и изменяемости в Rust в сравнении с `var`/`const` в C#,
+> соответствие примитивных типов, важнейшее различие между `String` и `&str`, вывод типов,
+> а также то, как Rust по-другому обрабатывает приведение и преобразования типов.
 >
-> **Difficulty:** 🟢 Beginner
+> **Сложность:** 🟢 Начальный
 
-### C# Variable Declaration
+### Объявление переменных в C#
 ```csharp
-// C# - Variables are mutable by default
-int count = 0;           // Mutable
-count = 5;               // ✅ Works
+// C# — переменные по умолчанию изменяемы
+int count = 0;           // Изменяемая
+count = 5;               // ✅ Работает
 
-// readonly fields (class-level only, not for local variables)
-// readonly int maxSize = 100;  // Immutable after initialization
+// readonly-поля (только на уровне класса, не для локальных переменных)
+// readonly int maxSize = 100;  // Неизменяемо после инициализации
 
-const int BUFFER_SIZE = 1024; // Compile-time constant (works as local or field)
+const int BUFFER_SIZE = 1024; // Константа времени компиляции (работает как локальная переменная или поле)
 ```
 
-### Rust Variable Declaration
+### Объявление переменных в Rust
 ```rust
-// Rust - Variables are immutable by default
-let count = 0;           // Immutable by default
-// count = 5;            // ❌ Compile error: cannot assign twice to immutable variable
+// Rust — переменные по умолчанию неизменяемы
+let count = 0;           // Неизменяемая по умолчанию
+// count = 5;            // ❌ Ошибка компиляции: нельзя дважды присвоить неизменяемой переменной
 
-let mut count = 0;       // Explicitly mutable
-count = 5;               // ✅ Works
+let mut count = 0;       // Явно изменяемая
+count = 5;               // ✅ Работает
 
-const BUFFER_SIZE: usize = 1024; // Compile-time constant
+const BUFFER_SIZE: usize = 1024; // Константа времени компиляции
 ```
 
-### Key Mental Shift for C# Developers
+### Ключевой сдвиг мышления для разработчиков C#
 ```rust
-// Think of 'let' as C#'s readonly field semantics applied to all variables
-let name = "John";       // Like a readonly field: once set, cannot change
-let mut age = 30;        // Like: int age = 30;
+// Думайте о 'let' как о семантике readonly-поля, применённой ко всем переменным
+let name = "John";       // Как readonly-поле: после присваивания изменить нельзя
+let mut age = 30;        // Как: int age = 30;
 
-// Variable shadowing (unique to Rust)
-let spaces = "   ";      // String
-let spaces = spaces.len(); // Now it's a number (usize)
-// This is different from mutation - we're creating a new variable
+// Затенение переменных (особенность Rust)
+let spaces = "   ";      // Строка
+let spaces = spaces.len(); // Теперь это число (usize)
+// Это не мутация — мы создаём новую переменную
 ```
 
-### Practical Example: Counter
+### Практический пример: счётчик
 ```csharp
-// C# version
+// Версия на C#
 public class Counter
 {
     private int value = 0;
     
     public void Increment()
     {
-        value++;  // Mutation
+        value++;  // Мутация
     }
     
     public int GetValue() => value;
@@ -59,9 +59,9 @@ public class Counter
 ```
 
 ```rust
-// Rust version
+// Версия на Rust
 pub struct Counter {
-    value: i32,  // Private by default
+    value: i32,  // По умолчанию приватное
 }
 
 impl Counter {
@@ -69,7 +69,7 @@ impl Counter {
         Counter { value: 0 }
     }
     
-    pub fn increment(&mut self) {  // &mut needed for mutation
+    pub fn increment(&mut self) {  // &mut нужен для мутации
         self.value += 1;
     }
     
@@ -81,114 +81,114 @@ impl Counter {
 
 ***
 
-## Data Types Comparison
+## Сравнение типов данных
 
-### Primitive Types
+### Примитивные типы
 
-| C# Type | Rust Type | Size | Range |
+| Тип C# | Тип Rust | Размер | Диапазон |
 |---------|-----------|------|-------|
-| `byte` | `u8` | 8 bits | 0 to 255 |
-| `sbyte` | `i8` | 8 bits | -128 to 127 |
-| `short` | `i16` | 16 bits | -32,768 to 32,767 |
-| `ushort` | `u16` | 16 bits | 0 to 65,535 |
-| `int` | `i32` | 32 bits | -2³¹ to 2³¹-1 |
-| `uint` | `u32` | 32 bits | 0 to 2³²-1 |
-| `long` | `i64` | 64 bits | -2⁶³ to 2⁶³-1 |
-| `ulong` | `u64` | 64 bits | 0 to 2⁶⁴-1 |
-| `float` | `f32` | 32 bits | IEEE 754 |
-| `double` | `f64` | 64 bits | IEEE 754 |
-| `bool` | `bool` | 1 bit | true/false |
-| `char` | `char` | 32 bits | Unicode scalar |
+| `byte` | `u8` | 8 бит | от 0 до 255 |
+| `sbyte` | `i8` | 8 бит | от -128 до 127 |
+| `short` | `i16` | 16 бит | от -32 768 до 32 767 |
+| `ushort` | `u16` | 16 бит | от 0 до 65 535 |
+| `int` | `i32` | 32 бита | от -2³¹ до 2³¹-1 |
+| `uint` | `u32` | 32 бита | от 0 до 2³²-1 |
+| `long` | `i64` | 64 бита | от -2⁶³ до 2⁶³-1 |
+| `ulong` | `u64` | 64 бита | от 0 до 2⁶⁴-1 |
+| `float` | `f32` | 32 бита | IEEE 754 |
+| `double` | `f64` | 64 бита | IEEE 754 |
+| `bool` | `bool` | 1 бит | true/false |
+| `char` | `char` | 32 бита | Скалярное значение Unicode |
 
-### Size Types (Important!)
+### Типы размера (важно!)
 ```csharp
-// C# - int is always 32-bit
+// C# — int всегда 32-битный
 int arrayIndex = 0;
 long fileSize = file.Length;
 ```
 
 ```rust
-// Rust - size types match pointer size (32-bit or 64-bit)
-let array_index: usize = 0;    // Like size_t in C
-let file_size: u64 = file.len(); // Explicit 64-bit
+// Rust — типы размера совпадают с размером указателя (32 или 64 бита)
+let array_index: usize = 0;    // Как size_t в C
+let file_size: u64 = file.len(); // Явно 64-битный
 ```
 
-### Type Inference
+### Вывод типов
 ```csharp
-// C# - var keyword
+// C# — ключевое слово var
 var name = "John";        // string
 var count = 42;           // int
 var price = 29.99;        // double
 ```
 
 ```rust
-// Rust - automatic type inference
-let name = "John";        // &str (string slice)
-let count = 42;           // i32 (default integer)
-let price = 29.99;        // f64 (default float)
+// Rust — автоматический вывод типов
+let name = "John";        // &str (срез строки)
+let count = 42;           // i32 (целое по умолчанию)
+let price = 29.99;        // f64 (вещественное по умолчанию)
 
-// Explicit type annotations
+// Явные аннотации типов
 let count: u32 = 42;
 let price: f32 = 29.99;
 ```
 
-### Arrays and Collections Overview
+### Обзор массивов и коллекций
 ```csharp
-// C# - reference types, heap allocated
-int[] numbers = new int[5];        // Fixed size
-List<int> list = new List<int>();  // Dynamic size
+// C# — ссылочные типы, размещаются в куче
+int[] numbers = new int[5];        // Фиксированный размер
+List<int> list = new List<int>();  // Динамический размер
 ```
 
 ```rust
-// Rust - multiple options
-let numbers: [i32; 5] = [1, 2, 3, 4, 5];  // Stack array, fixed size
-let mut list: Vec<i32> = Vec::new();       // Heap vector, dynamic size
+// Rust — несколько вариантов
+let numbers: [i32; 5] = [1, 2, 3, 4, 5];  // Массив на стеке, фиксированный размер
+let mut list: Vec<i32> = Vec::new();       // Вектор в куче, динамический размер
 ```
 
 ***
 
-## String Types: String vs &str
+## Типы строк: String и &str
 
-This is one of the most confusing concepts for C# developers, so let's break it down carefully.
+Это одна из самых запутанных концепций для разработчиков C#, поэтому разберём её внимательно.
 
-### C# String Handling
+### Работа со строками в C#
 ```csharp
-// C# - Simple string model
-string name = "John";           // String literal
-string greeting = "Hello, " + name;  // String concatenation
-string upper = name.ToUpper();  // Method call
+// C# — простая модель строк
+string name = "John";           // Строковый литерал
+string greeting = "Hello, " + name;  // Конкатенация строк
+string upper = name.ToUpper();  // Вызов метода
 ```
 
-### Rust String Types
+### Строковые типы Rust
 ```rust
-// Rust - Two main string types
+// Rust — два основных строковых типа
 
-// 1. &str (string slice) - like ReadOnlySpan<char> in C#
-let name: &str = "John";        // String literal (immutable, borrowed)
+// 1. &str (срез строки) — похож на ReadOnlySpan<char> в C#
+let name: &str = "John";        // Строковый литерал (неизменяемый, заимствованный)
 
-// 2. String - like StringBuilder or mutable string
-let mut greeting = String::new();       // Empty string
-greeting.push_str("Hello, ");          // Append
-greeting.push_str(name);               // Append
+// 2. String — похож на StringBuilder или изменяемую строку
+let mut greeting = String::new();       // Пустая строка
+greeting.push_str("Hello, ");          // Добавление
+greeting.push_str(name);               // Добавление
 
-// Or create directly
+// Или создаём сразу
 let greeting = String::from("Hello, John");
-let greeting = "Hello, John".to_string();  // Convert &str to String
+let greeting = "Hello, John".to_string();  // Преобразование &str в String
 ```
 
-### When to Use Which?
+### Когда что использовать?
 
-| Scenario | Use | C# Equivalent |
+| Сценарий | Использовать | Аналог в C# |
 |----------|-----|---------------|
-| String literals | `&str` | `string` literal |
-| Function parameters (read-only) | `&str` | `string` or `ReadOnlySpan<char>` |
-| Owned, mutable strings | `String` | `StringBuilder` |
-| Return owned strings | `String` | `string` |
+| Строковые литералы | `&str` | Строковый литерал `string` |
+| Параметры функций (только для чтения) | `&str` | `string` или `ReadOnlySpan<char>` |
+| Владеемые, изменяемые строки | `String` | `StringBuilder` |
+| Возврат владеемых строк | `String` | `string` |
 
-### Practical Examples
+### Практические примеры
 ```rust
-// Function that accepts any string type
-fn greet(name: &str) {  // Accepts both String and &str
+// Функция, принимающая любой строковый тип
+fn greet(name: &str) {  // Принимает и String, и &str
     println!("Hello, {}!", name);
 }
 
@@ -196,109 +196,109 @@ fn main() {
     let literal = "John";                    // &str
     let owned = String::from("Jane");        // String
     
-    greet(literal);                          // Works
-    greet(&owned);                           // Works (borrow String as &str)
-    greet("Bob");                            // Works
+    greet(literal);                          // Работает
+    greet(&owned);                           // Работает (заимствуем String как &str)
+    greet("Bob");                            // Работает
 }
 
-// Function that returns owned string
+// Функция, возвращающая владеемую строку
 fn create_greeting(name: &str) -> String {
-    format!("Hello, {}!", name)  // format! macro returns String
+    format!("Hello, {}!", name)  // Макрос format! возвращает String
 }
 ```
 
-### C# Developers: Think of it This Way
+### Разработчикам C# — смотрите так
 ```rust
-// &str is like ReadOnlySpan<char> - a view into string data
-// String is like a char[] that you own and can modify
+// &str — это как ReadOnlySpan<char>: представление данных строки
+// String — это как char[], которым вы владеете и которое можете изменять
 
-let borrowed: &str = "I don't own this data";
-let owned: String = String::from("I own this data");
+let borrowed: &str = "Я не владею этими данными";
+let owned: String = String::from("Я владею этими данными");
 
-// Convert between them
-let owned_copy: String = borrowed.to_string();  // Copy to owned
-let borrowed_view: &str = &owned;               // Borrow from owned
+// Преобразования между ними
+let owned_copy: String = borrowed.to_string();  // Копия во владение
+let borrowed_view: &str = &owned;               // Заимствование из owned
 ```
 
 ***
 
-## Printing and String Formatting
+## Вывод и форматирование строк
 
-C# developers rely heavily on `Console.WriteLine` and string interpolation (`$""`). Rust's formatting system is equally powerful but uses macros and format specifiers instead.
+Разработчики C# активно используют `Console.WriteLine` и интерполяцию строк (`$""`). Система форматирования Rust не менее мощная, но основана на макросах и спецификаторах формата.
 
-### Basic Output
+### Базовый вывод
 ```csharp
-// C# output
-Console.Write("no newline");
-Console.WriteLine("with newline");
-Console.Error.WriteLine("to stderr");
+// Вывод в C#
+Console.Write("без перевода строки");
+Console.WriteLine("с переводом строки");
+Console.Error.WriteLine("в stderr");
 
-// String interpolation (C# 6+)
+// Интерполяция строк (C# 6+)
 string name = "Alice";
 int age = 30;
 Console.WriteLine($"{name} is {age} years old");
 ```
 
 ```rust
-// Rust output — all macros (note the !)
-print!("no newline");              // → stdout, no newline
-println!("with newline");           // → stdout + newline
-eprint!("to stderr");              // → stderr, no newline  
-eprintln!("to stderr with newline"); // → stderr + newline
+// Вывод в Rust — всё через макросы (обратите внимание на !)
+print!("без перевода строки");              // → stdout, без перевода строки
+println!("с переводом строки");              // → stdout + перевод строки
+eprint!("в stderr");                          // → stderr, без перевода строки
+eprintln!("в stderr с переводом строки"); // → stderr + перевод строки
 
-// String formatting (like $"" interpolation)
+// Форматирование строк (аналог интерполяции $"")
 let name = "Alice";
 let age = 30;
-println!("{name} is {age} years old");     // Inline variable capture (Rust 1.58+)
-println!("{} is {} years old", name, age); // Positional arguments
+println!("{name} is {age} years old");     // Захват переменной прямо в строке (Rust 1.58+)
+println!("{} is {} years old", name, age); // Позиционные аргументы
 
-// format! returns a String instead of printing
+// format! возвращает String вместо вывода
 let msg = format!("{name} is {age} years old");
 ```
 
-### Format Specifiers
+### Спецификаторы формата
 ```csharp
-// C# format specifiers
-Console.WriteLine($"{price:F2}");         // Fixed decimal:  29.99
-Console.WriteLine($"{count:D5}");         // Padded integer: 00042
-Console.WriteLine($"{value,10}");         // Right-aligned, width 10
-Console.WriteLine($"{value,-10}");        // Left-aligned, width 10
-Console.WriteLine($"{hex:X}");            // Hexadecimal:    FF
-Console.WriteLine($"{ratio:P1}");         // Percentage:     85.0%
+// Спецификаторы формата в C#
+Console.WriteLine($"{price:F2}");         // Фиксированная запись: 29.99
+Console.WriteLine($"{count:D5}");         // Дополнение нулями: 00042
+Console.WriteLine($"{value,10}");         // Выравнивание по правому краю, ширина 10
+Console.WriteLine($"{value,-10}");        // Выравнивание по левому краю, ширина 10
+Console.WriteLine($"{hex:X}");            // Шестнадцатеричный: FF
+Console.WriteLine($"{ratio:P1}");         // Проценты: 85.0%
 ```
 
 ```rust
-// Rust format specifiers
-println!("{price:.2}");          // 2 decimal places:  29.99
-println!("{count:05}");          // Zero-padded, width 5: 00042
-println!("{value:>10}");         // Right-aligned, width 10
-println!("{value:<10}");         // Left-aligned, width 10
-println!("{value:^10}");         // Center-aligned, width 10
-println!("{hex:#X}");            // Hex with prefix: 0xFF
-println!("{hex:08X}");           // Hex zero-padded: 000000FF
-println!("{bits:#010b}");        // Binary with prefix: 0b00001010
-println!("{big}", big = 1_000_000); // Named parameter
+// Спецификаторы формата в Rust
+println!("{price:.2}");          // 2 знака после запятой: 29.99
+println!("{count:05}");          // Дополнение нулями, ширина 5: 00042
+println!("{value:>10}");         // Выравнивание по правому краю, ширина 10
+println!("{value:<10}");         // Выравнивание по левому краю, ширина 10
+println!("{value:^10}");         // Выравнивание по центру, ширина 10
+println!("{hex:#X}");            // Шестнадцатеричный с префиксом: 0xFF
+println!("{hex:08X}");           // Шестнадцатеричный с нулями: 000000FF
+println!("{bits:#010b}");        // Двоичный с префиксом: 0b00001010
+println!("{big}", big = 1_000_000); // Именованный параметр
 ```
 
-### Debug vs Display Printing
+### Вывод Debug и Display
 ```rust
-// {:?}  — Debug trait (for developers, auto-derived)
-// {:#?} — Pretty-printed Debug (indented, multi-line)
-// {}    — Display trait (for users, must implement manually)
+// {:?}  — трейт Debug (для разработчиков, реализуется автоматически)
+// {:#?} — Debug с красивым форматированием (с отступами, в несколько строк)
+// {}    — трейт Display (для пользователей, нужно реализовать вручную)
 
-#[derive(Debug)] // Auto-generates Debug output
+#[derive(Debug)] // Автоматически генерирует вывод Debug
 struct Point { x: f64, y: f64 }
 
 let p = Point { x: 1.5, y: 2.7 };
 
-println!("{:?}", p);   // Point { x: 1.5, y: 2.7 }   — compact debug
-println!("{:#?}", p);  // Point {                     — pretty debug
+println!("{:?}", p);   // Point { x: 1.5, y: 2.7 }   — компактный debug
+println!("{:#?}", p);  // Point {                     — debug с форматированием
                         //     x: 1.5,
                         //     y: 2.7,
                         // }
-// println!("{}", p);  // ❌ ERROR: Point doesn't implement Display
+// println!("{}", p);  // ❌ ОШИБКА: Point не реализует Display
 
-// Implement Display for user-facing output:
+// Реализуем Display для вывода, понятного пользователю:
 use std::fmt;
 
 impl fmt::Display for Point {
@@ -306,149 +306,149 @@ impl fmt::Display for Point {
         write!(f, "({}, {})", self.x, self.y)
     }
 }
-println!("{}", p);    // (1.5, 2.7)  — user-friendly
+println!("{}", p);    // (1.5, 2.7)  — удобно для пользователя
 ```
 
 ```csharp
-// C# equivalent:
-// {:?}  ≈ object.GetType().ToString() or reflection dump
+// Эквивалент в C#:
+// {:?}  ≈ object.GetType().ToString() или дамп через рефлексию
 // {}    ≈ object.ToString()
-// In C# you override ToString(); in Rust you implement Display
+// В C# вы переопределяете ToString(); в Rust вы реализуете Display
 ```
 
-### Quick Reference
+### Краткая справка
 
-| C# | Rust | Output |
+| C# | Rust | Вывод |
 |----|------|--------|
-| `Console.WriteLine(x)` | `println!("{x}")` | Display formatting |
-| `$"{x}"` (interpolation) | `format!("{x}")` | Returns `String` |
-| `x.ToString()` | `x.to_string()` | Requires `Display` trait |
-| Override `ToString()` | `impl Display` | User-facing output |
-| Debugger view | `{:?}` or `dbg!(x)` | Developer output |
-| `String.Format("{0:F2}", x)` | `format!("{x:.2}")` | Formatted `String` |
-| `Console.Error.WriteLine` | `eprintln!()` | Write to stderr |
+| `Console.WriteLine(x)` | `println!("{x}")` | Форматирование Display |
+| `$"{x}"` (интерполяция) | `format!("{x}")` | Возвращает `String` |
+| `x.ToString()` | `x.to_string()` | Требует трейт `Display` |
+| Переопределение `ToString()` | `impl Display` | Вывод для пользователя |
+| Просмотр в отладчике | `{:?}` или `dbg!(x)` | Вывод для разработчика |
+| `String.Format("{0:F2}", x)` | `format!("{x:.2}")` | Форматированная `String` |
+| `Console.Error.WriteLine` | `eprintln!()` | Запись в stderr |
 
 ***
 
-## Type Casting and Conversions
+## Приведение типов и преобразования
 
-C# has implicit conversions, explicit casts `(int)x`, and `Convert.To*()`. Rust is stricter — there are no implicit numeric conversions.
+В C# есть неявные преобразования, явные приведения `(int)x` и `Convert.To*()`. Rust строже — неявных числовых преобразований здесь нет.
 
-### Numeric Conversions
+### Числовые преобразования
 ```csharp
-// C# — implicit and explicit conversions
+// C# — неявные и явные преобразования
 int small = 42;
-long big = small;              // Implicit widening: OK
-double d = small;              // Implicit widening: OK
-int truncated = (int)3.14;     // Explicit narrowing: 3
-byte b = (byte)300;            // Silent overflow: 44
+long big = small;              // Неявное расширение: OK
+double d = small;              // Неявное расширение: OK
+int truncated = (int)3.14;     // Явное сужение: 3
+byte b = (byte)300;            // Тихое переполнение: 44
 
-// Safe conversion
+// Безопасное преобразование
 if (int.TryParse("42", out int parsed)) { /* ... */ }
 ```
 
 ```rust
-// Rust — ALL numeric conversions are explicit
+// Rust — ВСЕ числовые преобразования явные
 let small: i32 = 42;
-let big: i64 = small as i64;       // Widening: explicit with 'as'
-let d: f64 = small as f64;         // Int to float: explicit
-let truncated: i32 = 3.14_f64 as i32; // Narrowing: 3 (truncates)
-let b: u8 = 300_u16 as u8;        // Overflow: wraps to 44 (like C# unchecked)
+let big: i64 = small as i64;       // Расширение: явно через 'as'
+let d: f64 = small as f64;         // Целое в вещественное: явно
+let truncated: i32 = 3.14_f64 as i32; // Сужение: 3 (отбрасывается дробная часть)
+let b: u8 = 300_u16 as u8;        // Переполнение: оборачивается до 44 (как unchecked в C#)
 
-// Safe conversion with TryFrom
+// Безопасное преобразование через TryFrom
 use std::convert::TryFrom;
-let safe: Result<u8, _> = u8::try_from(300_u16); // Err — out of range
+let safe: Result<u8, _> = u8::try_from(300_u16); // Err — вне диапазона
 let ok: Result<u8, _>   = u8::try_from(42_u16);  // Ok(42)
 
-// String parsing — returns Result, not bool + out param
+// Разбор строки — возвращает Result, а не bool + out-параметр
 let parsed: Result<i32, _> = "42".parse::<i32>();   // Ok(42)
 let bad: Result<i32, _>    = "abc".parse::<i32>();  // Err(ParseIntError)
 
-// With turbofish syntax:
+// С синтаксисом turbofish:
 let n = "42".parse::<f64>().unwrap(); // 42.0
 ```
 
-### String Conversions
+### Преобразования строк
 ```csharp
 // C#
 int n = 42;
 string s = n.ToString();          // "42"
 string formatted = $"{n:X}";
-int back = int.Parse(s);          // 42 or throws
+int back = int.Parse(s);          // 42 или исключение
 bool ok = int.TryParse(s, out int result);
 ```
 
 ```rust
-// Rust — to_string() via Display, parse() via FromStr
+// Rust — to_string() через Display, parse() через FromStr
 let n: i32 = 42;
-let s: String = n.to_string();            // "42" (uses Display trait)
+let s: String = n.to_string();            // "42" (использует трейт Display)
 let formatted = format!("{n:X}");         // "2A"
-let back: i32 = s.parse().unwrap();       // 42 or panics
-let result: Result<i32, _> = s.parse();   // Ok(42) — safe version
+let back: i32 = s.parse().unwrap();       // 42 или panic
+let result: Result<i32, _> = s.parse();   // Ok(42) — безопасная версия
 
-// &str ↔ String conversions (most common conversion in Rust)
+// Преобразования &str ↔ String (самое частое преобразование в Rust)
 let owned: String = "hello".to_string();    // &str → String
-let owned2: String = String::from("hello"); // &str → String (equivalent)
-let borrowed: &str = &owned;               // String → &str (free, just a borrow)
+let owned2: String = String::from("hello"); // &str → String (то же самое)
+let borrowed: &str = &owned;               // String → &str (бесплатно, это просто заимствование)
 ```
 
-### Reference Conversions (No Inheritance Casting!)
+### Преобразования ссылочных типов (никакого приведения по наследованию!)
 ```csharp
-// C# — upcasting and downcasting
-Animal a = new Dog();              // Upcast (implicit)
-Dog d = (Dog)a;                    // Downcast (explicit, can throw)
-if (a is Dog dog) { /* ... */ }    // Safe downcast with pattern match
+// C# — приведение вверх и вниз по иерархии
+Animal a = new Dog();              // Приведение вверх (неявное)
+Dog d = (Dog)a;                    // Приведение вниз (явное, может бросить исключение)
+if (a is Dog dog) { /* ... */ }    // Безопасное приведение вниз через сопоставление с образцом
 ```
 
 ```rust
-// Rust — No inheritance, no upcasting/downcasting
-// Use trait objects for polymorphism:
+// Rust — нет наследования, нет приведения вверх и вниз
+// Для полиморфизма используйте трейт-объекты:
 let animal: Box<dyn Animal> = Box::new(Dog);
 
-// "Downcasting" requires the Any trait (rarely needed):
+// «Приведение вниз» требует трейта Any (нужно редко):
 use std::any::Any;
 if let Some(dog) = animal_any.downcast_ref::<Dog>() {
-    // Use dog
+    // Используем dog
 }
-// In practice, use enums instead of downcasting:
+// На практике вместо приведения вниз используйте перечисления:
 enum Animal {
     Dog(Dog),
     Cat(Cat),
 }
 match animal {
-    Animal::Dog(d) => { /* use d */ }
-    Animal::Cat(c) => { /* use c */ }
+    Animal::Dog(d) => { /* используем d */ }
+    Animal::Cat(c) => { /* используем c */ }
 }
 ```
 
-### Quick Reference
+### Краткая справка
 
-| C# | Rust | Notes |
+| C# | Rust | Примечания |
 |----|------|-------|
-| `(int)x` | `x as i32` | Truncating/wrapping cast |
-| Implicit widening | Must use `as` | No implicit numeric conversion |
-| `Convert.ToInt32(x)` | `i32::try_from(x)` | Safe, returns `Result` |
-| `int.Parse(s)` | `s.parse::<i32>().unwrap()` | Panics on failure |
-| `int.TryParse(s, out n)` | `s.parse::<i32>()` | Returns `Result<i32, _>` |
-| `(Dog)animal` | Not available | Use enums or `Any` |
-| `as Dog` / `is Dog` | `downcast_ref::<Dog>()` | Via `Any` trait; prefer enums |
+| `(int)x` | `x as i32` | Усечение/оборачивание при приведении |
+| Неявное расширение | Нужно использовать `as` | Неявных числовых преобразований нет |
+| `Convert.ToInt32(x)` | `i32::try_from(x)` | Безопасно, возвращает `Result` |
+| `int.Parse(s)` | `s.parse::<i32>().unwrap()` | Паника при ошибке |
+| `int.TryParse(s, out n)` | `s.parse::<i32>()` | Возвращает `Result<i32, _>` |
+| `(Dog)animal` | Недоступно | Используйте перечисления или `Any` |
+| `as Dog` / `is Dog` | `downcast_ref::<Dog>()` | Через трейт `Any`; предпочтительны перечисления |
 
 ***
 
-## Comments and Documentation
+## Комментарии и документация
 
-### Regular Comments
+### Обычные комментарии
 ```csharp
-// C# comments
-// Single line comment
-/* Multi-line
-   comment */
+// Комментарии в C#
+// Однострочный комментарий
+/* Многострочный
+   комментарий */
 
 /// <summary>
-/// XML documentation comment
+/// XML-комментарий документации
 /// </summary>
-/// <param name="name">The user's name</param>
-/// <returns>A greeting string</returns>
+/// <param name="name">Имя пользователя</param>
+/// <returns>Строка приветствия</returns>
 public string Greet(string name)
 {
     return $"Hello, {name}!";
@@ -456,23 +456,23 @@ public string Greet(string name)
 ```
 
 ```rust
-// Rust comments
-// Single line comment
-/* Multi-line
-   comment */
+// Комментарии в Rust
+// Однострочный комментарий
+/* Многострочный
+   комментарий */
 
-/// Documentation comment (like C# ///)
-/// This function greets a user by name.
+/// Комментарий документации (аналог C# ///)
+/// Эта функция приветствует пользователя по имени.
 /// 
-/// # Arguments
+/// # Аргументы
 /// 
-/// * `name` - The user's name as a string slice
+/// * `name` - Имя пользователя в виде среза строки
 /// 
-/// # Returns
+/// # Возвращает
 /// 
-/// A `String` containing the greeting
+/// `String`, содержащую приветствие
 /// 
-/// # Examples
+/// # Примеры
 /// 
 /// ```
 /// let greeting = greet("Alice");
@@ -483,30 +483,30 @@ pub fn greet(name: &str) -> String {
 }
 ```
 
-### Documentation Generation
+### Генерация документации
 ```bash
-# Generate documentation (like XML docs in C#)
+# Генерация документации (аналог XML-документации в C#)
 cargo doc --open
 
-# Run documentation tests
+# Запуск тестов документации
 cargo test --doc
 ```
 
 ---
 
-## Exercises
+## Упражнения
 
 <details>
-<summary><strong>🏋️ Exercise: Type-Safe Temperature</strong> (click to expand)</summary>
+<summary><strong>🏋️ Упражнение: температура с безопасными типами</strong> (нажмите, чтобы раскрыть)</summary>
 
-Create a Rust program that:
-1. Declares a `const` for absolute zero in Celsius (`-273.15`)
-2. Declares a `static` counter for how many conversions have been performed (use `AtomicU32`)
-3. Writes a function `celsius_to_fahrenheit(c: f64) -> f64` that rejects temperatures below absolute zero by returning `f64::NAN`
-4. Demonstrates shadowing by parsing a string `"98.6"` into an `f64`, then converting it
+Напишите программу на Rust, которая:
+1. Объявляет `const` для абсолютного нуля в градусах Цельсия (`-273.15`)
+2. Объявляет `static`-счётчик количества выполненных преобразований (используйте `AtomicU32`)
+3. Пишет функцию `celsius_to_fahrenheit(c: f64) -> f64`, которая отвергает температуры ниже абсолютного нуля, возвращая `f64::NAN`
+4. Демонстрирует затенение: разбирает строку `"98.6"` в `f64`, а затем преобразует её
 
 <details>
-<summary>🔑 Solution</summary>
+<summary>🔑 Решение</summary>
 
 ```rust
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -524,10 +524,10 @@ fn celsius_to_fahrenheit(c: f64) -> f64 {
 
 fn main() {
     let temp = "98.6";           // &str
-    let temp: f64 = temp.parse().unwrap(); // shadow as f64
-    let temp = celsius_to_fahrenheit(temp); // shadow as Fahrenheit
+    let temp: f64 = temp.parse().unwrap(); // затеняем как f64
+    let temp = celsius_to_fahrenheit(temp); // затеняем как Фаренгейт
     println!("{temp:.1}°F");
-    println!("Conversions: {}", CONVERSION_COUNT.load(Ordering::Relaxed));
+    println!("Преобразований: {}", CONVERSION_COUNT.load(Ordering::Relaxed));
 }
 ```
 

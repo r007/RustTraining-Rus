@@ -1,13 +1,13 @@
-## Exhaustive Pattern Matching: Compiler Guarantees vs Runtime Errors
+## Исчерпывающее сопоставление с образцом: гарантии компилятора против ошибок времени выполнения
 
-> **What you'll learn:** Why C# `switch` expressions silently miss cases while Rust's `match` catches them at compile time,
-> `Option<T>` vs `Nullable<T>` for null safety, and custom error types with `Result<T, E>`.
+> **Что вы узнаете:** почему выражения `switch` в C# молча пропускают случаи, тогда как `match` в Rust ловит их на этапе компиляции,
+> `Option<T>` против `Nullable<T>` для null-безопасности, а также собственные типы ошибок с `Result<T, E>`.
 >
-> **Difficulty:** 🟡 Intermediate
+> **Сложность:** 🟡 Средний
 
-### C# Switch Expressions - Still Incomplete
+### Выражения switch в C# — всё ещё неполные
 ```csharp
-// C# switch expressions look exhaustive but aren't guaranteed
+// Выражения switch в C# выглядят исчерпывающими, но это не гарантировано
 public enum HttpStatus { Ok, NotFound, ServerError, Unauthorized }
 
 public string HandleResponse(HttpStatus status) => status switch
@@ -15,11 +15,11 @@ public string HandleResponse(HttpStatus status) => status switch
     HttpStatus.Ok => "Success",
     HttpStatus.NotFound => "Resource not found",
     HttpStatus.ServerError => "Internal error",
-    // Missing Unauthorized case — compiles with warning CS8524, but NOT an error!
-    // Runtime: SwitchExpressionException if status is Unauthorized
+    // Нет варианта Unauthorized — компилируется с предупреждением CS8524, но это НЕ ошибка!
+    // Во время выполнения: SwitchExpressionException, если status равен Unauthorized
 };
 
-// Even with nullable warnings, this compiles:
+// Даже с предупреждениями о nullable этот код компилируется:
 public class User 
 {
     public string Name { get; set; }
@@ -30,24 +30,24 @@ public string ProcessUser(User? user) => user switch
 {
     { IsActive: true } => $"Active: {user.Name}",
     { IsActive: false } => $"Inactive: {user.Name}",
-    // Missing null case — compiler warning CS8655, but NOT an error!
-    // Runtime: SwitchExpressionException when user is null
+    // Нет случая для null — предупреждение компилятора CS8655, но НЕ ошибка!
+    // Во время выполнения: SwitchExpressionException, если user равен null
 };
 ```
 
 ```csharp
-// Adding an enum variant later doesn't break compilation of existing switches
+// Добавление варианта в перечисление позже не ломает компиляцию существующих switch
 public enum HttpStatus 
 { 
     Ok, 
     NotFound, 
     ServerError, 
     Unauthorized,
-    Forbidden  // Adding this produces another CS8524 warning but doesn't break compilation!
+    Forbidden  // Добавление этого даёт ещё одно предупреждение CS8524, но не ломает компиляцию!
 }
 ```
 
-### Rust Pattern Matching - True Exhaustiveness
+### Сопоставление с образцом в Rust — настоящая исчерпываемость
 ```rust
 #[derive(Debug)]
 enum HttpStatus {
@@ -63,41 +63,41 @@ fn handle_response(status: HttpStatus) -> &'static str {
         HttpStatus::NotFound => "Resource not found", 
         HttpStatus::ServerError => "Internal error",
         HttpStatus::Unauthorized => "Authentication required",
-        // Compiler ERROR if any case is missing!
-        // This literally will not compile
+        // Ошибка компилятора, если пропущен любой случай!
+        // Этот код буквально не скомпилируется
     }
 }
 
-// Adding a new variant breaks compilation everywhere it's used
+// Добавление нового варианта ломает компиляцию везде, где он используется
 #[derive(Debug)]
 enum HttpStatus {
     Ok,
     NotFound,
     ServerError, 
     Unauthorized,
-    Forbidden,  // Adding this breaks compilation in handle_response()
+    Forbidden,  // Добавление этого ломает компиляцию в handle_response()
 }
-// The compiler forces you to handle ALL cases
+// Компилятор заставляет обработать ВСЕ случаи
 
-// Option<T> pattern matching is also exhaustive
+// Сопоставление с образцом для Option<T> тоже исчерпывающее
 fn process_optional_value(value: Option<i32>) -> String {
     match value {
         Some(n) => format!("Got value: {}", n),
         None => "No value".to_string(),
-        // Forgetting either case = compilation error
+        // Пропуск любого из случаев = ошибка компиляции
     }
 }
 ```
 
 ```mermaid
 graph TD
-    subgraph "C# Pattern Matching Limitations"
-        CS_SWITCH["switch expression"]
-        CS_WARNING["⚠️ Compiler warnings only"]
-        CS_COMPILE["✅ Compiles successfully"]
-        CS_RUNTIME["💥 Runtime exceptions"]
-        CS_DEPLOY["❌ Bugs reach production"]
-        CS_SILENT["😰 Silent failures on enum changes"]
+    subgraph "Ограничения сопоставления с образцом в C#"
+        CS_SWITCH["switch-выражение"]
+        CS_WARNING["⚠️ Только предупреждения компилятора"]
+        CS_COMPILE["✅ Компилируется успешно"]
+        CS_RUNTIME["💥 Исключения во время выполнения"]
+        CS_DEPLOY["❌ Ошибки попадают в продакшен"]
+        CS_SILENT["😰 Тихие сбои при изменении перечислений"]
         
         CS_SWITCH --> CS_WARNING
         CS_WARNING --> CS_COMPILE
@@ -106,13 +106,13 @@ graph TD
         CS_SWITCH --> CS_SILENT
     end
     
-    subgraph "Rust Exhaustive Matching"
-        RUST_MATCH["match expression"]
-        RUST_ERROR["🛑 Compilation fails"]
-        RUST_FIX["✅ Must handle all cases"]
-        RUST_SAFE["✅ Zero runtime surprises"]
-        RUST_EVOLUTION["🔄 Enum changes break compilation"]
-        RUST_REFACTOR["🛠️ Forced refactoring"]
+    subgraph "Исчерпывающее сопоставление в Rust"
+        RUST_MATCH["match-выражение"]
+        RUST_ERROR["🛑 Компиляция падает"]
+        RUST_FIX["✅ Нужно обработать все случаи"]
+        RUST_SAFE["✅ Никаких сюрпризов во время выполнения"]
+        RUST_EVOLUTION["🔄 Изменения перечислений ломают компиляцию"]
+        RUST_REFACTOR["🛠️ Принудительный рефакторинг"]
         
         RUST_MATCH --> RUST_ERROR
         RUST_ERROR --> RUST_FIX
@@ -130,20 +130,20 @@ graph TD
 
 ***
 
-## Null Safety: `Nullable<T>` vs `Option<T>`
+## Null-безопасность: `Nullable<T>` против `Option<T>`
 
-### C# Null Handling Evolution
+### Эволюция работы с null в C#
 ```csharp
-// C# - Traditional null handling (error-prone)
+// C# — традиционная работа с null (подвержена ошибкам)
 public class User
 {
-    public string Name { get; set; }  // Can be null!
-    public string Email { get; set; } // Can be null!
+    public string Name { get; set; }  // Может быть null!
+    public string Email { get; set; } // Может быть null!
 }
 
 public string GetUserDisplayName(User user)
 {
-    if (user?.Name != null)  // Null conditional operator
+    if (user?.Name != null)  // Оператор null-условного доступа
     {
         return user.Name;
     }
@@ -152,14 +152,14 @@ public string GetUserDisplayName(User user)
 ```
 
 ```csharp
-// C# 8+ Nullable Reference Types
+// Nullable-ссылочные типы C# 8+
 public class User
 {
-    public string Name { get; set; }    // Non-nullable
-    public string? Email { get; set; }  // Explicitly nullable
+    public string Name { get; set; }    // Не допускает null
+    public string? Email { get; set; }  // Явно допускает null
 }
 
-// C# Nullable<T> for value types
+// Nullable<T> в C# для значимых типов
 int? maybeNumber = GetNumber();
 if (maybeNumber.HasValue)
 {
@@ -167,18 +167,18 @@ if (maybeNumber.HasValue)
 }
 ```
 
-### Rust `Option<T>` System
+### Система `Option<T>` в Rust
 ```rust
-// Rust - Explicit null handling with Option<T>
+// Rust — явная работа с null через Option<T>
 #[derive(Debug)]
 pub struct User {
-    name: String,           // Never null
-    email: Option<String>,  // Explicitly optional
+    name: String,           // Никогда не null
+    email: Option<String>,  // Явно необязательное
 }
 
 impl User {
     pub fn get_display_name(&self) -> &str {
-        &self.name  // No null check needed - guaranteed to exist
+        &self.name  // Проверка на null не нужна — значение гарантированно существует
     }
     
     pub fn get_email_or_default(&self) -> String {
@@ -189,41 +189,41 @@ impl User {
     }
 }
 
-// Pattern matching forces handling of None case
+// Сопоставление с образцом заставляет обработать случай None
 fn handle_optional_user(user: Option<User>) {
     match user {
         Some(u) => println!("User: {}", u.get_display_name()),
         None => println!("No user found"),
-        // Compiler error if None case is not handled!
+        // Ошибка компилятора, если случай None не обработан!
     }
 }
 ```
 
 ```mermaid
 graph TD
-    subgraph "C# Null Handling Evolution"
-        CS_NULL["Traditional: string name<br/>[ERROR] Can be null"]
-        CS_NULLABLE["Nullable<T>: int? value<br/>[OK] Explicit for value types"]
-        CS_NRT["Nullable Reference Types<br/>string? name<br/>[WARNING] Compile-time warnings only"]
+    subgraph "Эволюция работы с null в C#"
+        CS_NULL["Традиционно: string name<br/>[ERROR] Может быть null"]
+        CS_NULLABLE["Nullable<T>: int? value<br/>[OK] Явно для значимых типов"]
+        CS_NRT["Nullable-ссылочные типы<br/>string? name<br/>[WARNING] Только предупреждения компилятора"]
         
-        CS_RUNTIME["Runtime NullReferenceException<br/>[ERROR] Can still crash"]
+        CS_RUNTIME["Runtime NullReferenceException<br/>[ERROR] Всё ещё может упасть"]
         CS_NULL --> CS_RUNTIME
         CS_NRT -.-> CS_RUNTIME
         
-        CS_CHECKS["Manual null checks<br/>if (obj?.Property != null)"]
+        CS_CHECKS["Ручные проверки на null<br/>if (obj?.Property != null)"]
     end
     
-    subgraph "Rust Option<T> System"
+    subgraph "Система Option<T> в Rust"
         RUST_OPTION["Option<T><br/>Some(value) | None"]
-        RUST_FORCE["Compiler forces handling<br/>[OK] Cannot ignore None"]
-        RUST_MATCH["Pattern matching<br/>match option { ... }"]
-        RUST_METHODS["Rich API<br/>.map(), .unwrap_or(), .and_then()"]
+        RUST_FORCE["Компилятор заставляет обработать<br/>[OK] Нельзя проигнорировать None"]
+        RUST_MATCH["Сопоставление с образцом<br/>match option { ... }"]
+        RUST_METHODS["Богатый API<br/>.map(), .unwrap_or(), .and_then()"]
         
         RUST_OPTION --> RUST_FORCE
         RUST_FORCE --> RUST_MATCH
         RUST_FORCE --> RUST_METHODS
         
-        RUST_SAFE["Compile-time null safety<br/>[OK] No null pointer exceptions"]
+        RUST_SAFE["Null-безопасность на этапе компиляции<br/>[OK] Нет исключений null-указателя"]
         RUST_MATCH --> RUST_SAFE
         RUST_METHODS --> RUST_SAFE
     end
@@ -245,18 +245,18 @@ struct Point {
 
 fn describe_point(point: Point) -> String {
     match point {
-        Point { x: 0, y: 0 } => "origin".to_string(),
-        Point { x: 0, y } => format!("on y-axis at y={}", y),
-        Point { x, y: 0 } => format!("on x-axis at x={}", x),
-        Point { x, y } if x == y => format!("on diagonal at ({}, {})", x, y),
-        Point { x, y } => format!("point at ({}, {})", x, y),
+        Point { x: 0, y: 0 } => "начало координат".to_string(),
+        Point { x: 0, y } => format!("на оси Y при y={}", y),
+        Point { x, y: 0 } => format!("на оси X при x={}", x),
+        Point { x, y } if x == y => format!("на диагонали в ({}, {})", x, y),
+        Point { x, y } => format!("точка в ({}, {})", x, y),
     }
 }
 ```
 
-### Option and Result Types
+### Option и Result
 ```csharp
-// C# nullable reference types (C# 8+)
+// Nullable-ссылочные типы C# (C# 8+)
 public class PersonService
 {
     private Dictionary<int, string> people = new();
@@ -271,7 +271,7 @@ public class PersonService
         return FindPerson(id) ?? "Unknown";
     }
     
-    // Exception-based error handling
+    // Обработка ошибок через исключения
     public void SavePerson(int id, string name)
     {
         if (string.IsNullOrEmpty(name))
@@ -285,7 +285,7 @@ public class PersonService
 ```rust
 use std::collections::HashMap;
 
-// Rust uses Option<T> instead of null
+// Rust использует Option<T> вместо null
 struct PersonService {
     people: HashMap<i32, String>,
 }
@@ -297,12 +297,12 @@ impl PersonService {
         }
     }
     
-    // Returns Option<T> - no null!
+    // Возвращает Option<T> — никакого null!
     fn find_person(&self, id: i32) -> Option<&String> {
         self.people.get(&id)
     }
     
-    // Pattern matching on Option
+    // Сопоставление с образцом по Option
     fn get_person_or_default(&self, id: i32) -> String {
         match self.find_person(id) {
             Some(name) => name.clone(),
@@ -310,14 +310,14 @@ impl PersonService {
         }
     }
     
-    // Using Option methods (more functional style)
+    // Использование методов Option (более функциональный стиль)
     fn get_person_or_default_functional(&self, id: i32) -> String {
         self.find_person(id)
             .map(|name| name.clone())
             .unwrap_or_else(|| "Unknown".to_string())
     }
     
-    // Result<T, E> for error handling
+    // Result<T, E> для обработки ошибок
     fn save_person(&mut self, id: i32, name: String) -> Result<(), String> {
         if name.is_empty() {
             return Err("Name cannot be empty".to_string());
@@ -327,7 +327,7 @@ impl PersonService {
         Ok(())
     }
     
-    // Chaining operations
+    // Цепочка операций
     fn get_person_length(&self, id: i32) -> Option<usize> {
         self.find_person(id).map(|name| name.len())
     }
@@ -336,27 +336,27 @@ impl PersonService {
 fn main() {
     let mut service = PersonService::new();
     
-    // Handle Result
+    // Обработка Result
     match service.save_person(1, "Alice".to_string()) {
         Ok(()) => println!("Person saved successfully"),
         Err(error) => println!("Error: {}", error),
     }
     
-    // Handle Option
+    // Обработка Option
     match service.find_person(1) {
         Some(name) => println!("Found: {}", name),
         None => println!("Person not found"),
     }
     
-    // Functional style with Option
+    // Функциональный стиль с Option
     let name_length = service.get_person_length(1)
         .unwrap_or(0);
     println!("Name length: {}", name_length);
     
-    // Question mark operator for early returns
+    // Оператор вопросительного знака для раннего возврата
     fn try_operation(service: &mut PersonService) -> Result<String, String> {
-        service.save_person(2, "Bob".to_string())?; // Early return if error
-        let name = service.find_person(2).ok_or("Person not found")?; // Convert Option to Result
+        service.save_person(2, "Bob".to_string())?; // Ранний возврат при ошибке
+        let name = service.find_person(2).ok_or("Person not found")?; // Преобразуем Option в Result
         Ok(format!("Hello, {}", name))
     }
     
@@ -367,9 +367,9 @@ fn main() {
 }
 ```
 
-### Custom Error Types
+### Собственные типы ошибок
 ```rust
-// Define custom error enum
+// Определяем собственное перечисление ошибок
 #[derive(Debug)]
 enum PersonError {
     NotFound(i32),
@@ -389,14 +389,14 @@ impl std::fmt::Display for PersonError {
 
 impl std::error::Error for PersonError {}
 
-// Enhanced PersonService with custom errors
+// Расширенный PersonService с собственными ошибками
 impl PersonService {
     fn save_person_enhanced(&mut self, id: i32, name: String) -> Result<(), PersonError> {
         if name.is_empty() || name.len() > 50 {
             return Err(PersonError::InvalidName(name));
         }
         
-        // Simulate database operation that might fail
+        // Имитация операции с базой данных, которая может завершиться ошибкой
         if id < 0 {
             return Err(PersonError::DatabaseError("Negative IDs not allowed".to_string()));
         }
@@ -413,7 +413,7 @@ impl PersonService {
 fn demo_error_handling() {
     let mut service = PersonService::new();
     
-    // Handle different error types
+    // Обработка разных типов ошибок
     match service.save_person_enhanced(-1, "Invalid".to_string()) {
         Ok(()) => println!("Success"),
         Err(PersonError::NotFound(id)) => println!("Not found: {}", id),
@@ -425,12 +425,12 @@ fn demo_error_handling() {
 
 ---
 
-## Exercises
+## Упражнения
 
 <details>
-<summary><strong>🏋️ Exercise: Option Combinators</strong> (click to expand)</summary>
+<summary><strong>🏋️ Упражнение: комбинаторы Option</strong> (нажмите, чтобы раскрыть)</summary>
 
-Rewrite this deeply nested C# null-checking code using Rust `Option` combinators (`and_then`, `map`, `unwrap_or`):
+Перепишите этот глубоко вложенный C#-код с проверками на null, используя комбинаторы `Option` в Rust (`and_then`, `map`, `unwrap_or`):
 
 ```csharp
 string GetCityName(User? user)
@@ -443,16 +443,16 @@ string GetCityName(User? user)
 }
 ```
 
-Use these Rust types:
+Используйте такие типы Rust:
 ```rust
 struct User { address: Option<Address> }
 struct Address { city: Option<String> }
 ```
 
-Write it as a **single expression** with no `if let` or `match`.
+Запишите это как **одно выражение** без `if let` и `match`.
 
 <details>
-<summary>🔑 Solution</summary>
+<summary>🔑 Решение</summary>
 
 ```rust
 struct User { address: Option<Address> }
@@ -477,7 +477,7 @@ fn main() {
 }
 ```
 
-**Key insight**: `and_then` is Rust's `?.` operator for `Option`. Each step returns `Option`, and the chain short-circuits on `None` — exactly like C#'s null-conditional operator `?.`, but explicit and type-safe.
+**Ключевая мысль**: `and_then` — это аналог оператора `?.` из Rust для `Option`. Каждый шаг возвращает `Option`, а цепочка прерывается на `None` — ровно как оператор null-условного доступа `?.` в C#, но явно и с проверкой типов.
 
 </details>
 </details>

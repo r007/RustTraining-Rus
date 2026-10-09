@@ -1,29 +1,29 @@
-## Performance Comparison: Managed vs Native
+## Сравнение производительности: управляемый и нативный код
 
-> **What you'll learn:** Real-world performance differences between C# and Rust — startup time,
-> memory usage, throughput benchmarks, CPU-intensive workloads, and a decision tree
-> for when to migrate vs when to stay in C#.
+> **Что вы узнаете:** реальные различия в производительности между C# и Rust — время запуска, потребление памяти,
+> бенчмарки пропускной способности, задачи, интенсивные по CPU, а также дерево решений о том,
+> когда стоит мигрировать, а когда остаться на C#.
 >
-> **Difficulty:** 🟡 Intermediate
+> **Сложность:** 🟡 Средний
 
-### Real-World Performance Characteristics
+### Реальные характеристики производительности
 
-| **Aspect** | **C# (.NET)** | **Rust** | **Performance Impact** |
+| **Аспект** | **C# (.NET)** | **Rust** | **Влияние на производительность** |
 |------------|---------------|----------|------------------------|
-| **Startup Time** | 100-500ms (JIT); 5-30ms (.NET 8 AOT) | 1-10ms (native binary) | 🚀 **10-50x faster** (vs JIT) |
-| **Memory Usage** | +30-100% (GC overhead + metadata) | Baseline (minimal runtime) | 💾 **30-50% less RAM** |
-| **GC Pauses** | 1-100ms periodic pauses | Never (no GC) | ⚡ **Consistent latency** |
-| **CPU Usage** | +10-20% (GC + JIT overhead) | Baseline (direct execution) | 🔋 **10-20% better efficiency** |
-| **Binary Size** | 30-200MB (with runtime); 10-30MB (AOT trimmed) | 1-20MB (static binary) | 📦 **Smaller deployments** |
-| **Memory Safety** | Runtime checks | Compile-time proofs | 🛡️ **Zero overhead safety** |
-| **Concurrent Performance** | Good (with careful synchronization) | Excellent (fearless concurrency) | 🏃 **Superior scalability** |
+| **Время запуска** | 100–500 мс (JIT); 5–30 мс (.NET 8 AOT) | 1–10 мс (нативный бинарник) | 🚀 **В 10–50 раз быстрее** (относительно JIT) |
+| **Потребление памяти** | +30–100% (накладные расходы GC и метаданных) | Базовый уровень (минимальный рантайм) | 💾 **На 30–50% меньше RAM** |
+| **Паузы GC** | Периодические паузы 1–100 мс | Никогда (нет GC) | ⚡ **Стабильная задержка** |
+| **Загрузка CPU** | +10–20% (накладные расходы GC и JIT) | Базовый уровень (прямое исполнение) | 🔋 **На 10–20% эффективнее** |
+| **Размер бинарника** | 30–200 МБ (с рантаймом); 10–30 МБ (AOT с обрезкой) | 1–20 МБ (статический бинарник) | 📦 **Компактнее развёртывание** |
+| **Безопасность памяти** | Проверки во время выполнения | Доказательства на этапе компиляции | 🛡️ **Безопасность без накладных расходов** |
+| **Производительность при конкурентности** | Хорошая (при аккуратной синхронизации) | Отличная (конкурентность без страха) | 🏃 **Превосходная масштабируемость** |
 
-> **Note on .NET 8+ AOT**: Native AOT compilation closes the startup gap significantly (5-30ms). For throughput and memory, GC overhead and pauses remain. When evaluating a migration, benchmark your *specific workload* — headline numbers can be misleading.
+> **Примечание о .NET 8+ AOT**: нативная AOT-компиляция существенно сокращает разрыв во времени запуска (5–30 мс). По пропускной способности и памяти накладные расходы GC и паузы сохраняются. Оценивая миграцию, измеряйте производительность на *вашей конкретной нагрузке* — цифры из заголовков могут вводить в заблуждение.
 
-### Benchmark Examples
+### Примеры бенчмарков
 
 ```csharp
-// C# - JSON processing benchmark
+// C# — бенчмарк обработки JSON
 public class JsonProcessor
 {
     public async Task<List<User>> ProcessJsonFile(string path)
@@ -38,13 +38,13 @@ public class JsonProcessor
     }
 }
 
-// Typical performance: ~200ms for 100MB file
-// Memory usage: ~500MB peak (GC overhead)
-// Binary size: ~80MB (self-contained)
+// Типичная производительность: ~200 мс для файла 100 МБ
+// Пиковое потребление памяти: ~500 МБ (накладные расходы GC)
+// Размер бинарника: ~80 МБ (самодостаточный)
 ```
 
 ```rust
-// Rust - Equivalent JSON processing
+// Rust — эквивалентная обработка JSON
 use serde::{Deserialize, Serialize};
 use tokio::fs;
 
@@ -65,15 +65,15 @@ pub async fn process_json_file(path: &str) -> Result<Vec<User>, Box<dyn std::err
     Ok(users)
 }
 
-// Typical performance: ~120ms for same 100MB file
-// Memory usage: ~200MB peak (no GC overhead)
-// Binary size: ~8MB (static binary)
+// Типичная производительность: ~120 мс для того же файла 100 МБ
+// Пиковое потребление памяти: ~200 МБ (без накладных расходов GC)
+// Размер бинарника: ~8 МБ (статический бинарник)
 ```
 
-### CPU-Intensive Workloads
+### Задачи, интенсивные по CPU
 
 ```csharp
-// C# - Mathematical computation
+// C# — математические вычисления
 public class Mandelbrot
 {
     public static int[,] Generate(int width, int height, int maxIterations)
@@ -96,12 +96,12 @@ public class Mandelbrot
     }
 }
 
-// Performance: ~2.3 seconds (8-core machine)
-// Memory: ~500MB
+// Производительность: ~2,3 секунды (машина с 8 ядрами)
+// Память: ~500 МБ
 ```
 
 ```rust
-// Rust - Same computation with Rayon
+// Rust — то же вычисление с Rayon
 use rayon::prelude::*;
 use num_complex::Complex;
 
@@ -122,57 +122,57 @@ pub fn generate_mandelbrot(width: usize, height: usize, max_iterations: u32) -> 
         .collect()
 }
 
-// Performance: ~1.1 seconds (same 8-core machine)  
-// Memory: ~200MB
-// 2x faster with 60% less memory usage
+// Производительность: ~1,1 секунды (та же машина с 8 ядрами)
+// Память: ~200 МБ
+// В 2 раза быстрее при на 60% меньшем потреблении памяти
 ```
 
-### When to Choose Each Language
+### Когда выбирать каждый язык
 
-**Choose C# when:**
-- **Rapid development is crucial** - Rich tooling ecosystem
-- **Team expertise in .NET** - Existing knowledge and skills
-- **Enterprise integration** - Heavy use of Microsoft ecosystem
-- **Moderate performance requirements** - Performance is adequate
-- **Rich UI applications** - WPF, WinUI, Blazor applications
-- **Prototyping and MVPs** - Fast time to market
+**Выбирайте C#, когда:**
+- **Быстрая разработка критична** — богатая экосистема инструментов
+- **Экспертиза команды в .NET** — имеющиеся знания и навыки
+- **Интеграция с корпоративными системами** — активное использование экосистемы Microsoft
+- **Умеренные требования к производительности** — производительности достаточно
+- **Приложения с богатым UI** — WPF, WinUI, Blazor
+- **Прототипы и MVP** — быстрый выход на рынок
 
-**Choose Rust when:**
-- **Performance is critical** - CPU/memory-intensive applications
-- **Resource constraints matter** - Embedded, edge computing, serverless
-- **Long-running services** - Web servers, databases, system services
-- **System-level programming** - OS components, drivers, network tools
-- **High reliability requirements** - Financial systems, safety-critical applications
-- **Concurrent/parallel workloads** - High-throughput data processing
+**Выбирайте Rust, когда:**
+- **Производительность критична** — приложения, интенсивные по CPU и памяти
+- **Важны ограничения ресурсов** — встраиваемые системы, edge-вычисления, serverless
+- **Долгоживущие сервисы** — веб-серверы, базы данных, системные сервисы
+- **Системное программирование** — компоненты ОС, драйверы, сетевые утилиты
+- **Высокие требования к надёжности** — финансовые системы, системы критической безопасности
+- **Конкурентные и параллельные нагрузки** — обработка данных с высокой пропускной способностью
 
-### Migration Strategy Decision Tree
+### Дерево решений о стратегии миграции
 
 ```mermaid
 graph TD
-    START["Considering Rust?"]
-    PERFORMANCE["Is performance critical?"]
-    TEAM["Team has time to learn?"]
-    EXISTING["Large existing C# codebase?"]
-    NEW_PROJECT["New project or component?"]
+    START["Рассматриваете Rust?"]
+    PERFORMANCE["Производительность критична?"]
+    TEAM["У команды есть время на обучение?"]
+    EXISTING["Большая существующая кодовая база на C#?"]
+    NEW_PROJECT["Новый проект или компонент?"]
     
-    INCREMENTAL["Incremental adoption:<br/>• CLI tools first<br/>• Performance-critical components<br/>• New microservices"]
+    INCREMENTAL["Постепенное внедрение:<br/>• Сначала CLI-инструменты<br/>• Компоненты, критичные к производительности<br/>• Новые микросервисы"]
     
-    FULL_RUST["Full Rust adoption:<br/>• Greenfield projects<br/>• System-level services<br/>• High-performance APIs"]
+    FULL_RUST["Полный переход на Rust:<br/>• Новые проекты с нуля<br/>• Системные сервисы<br/>• Высокопроизводительные API"]
     
-    STAY_CSHARP["Stay with C#:<br/>• Optimize existing code<br/>• Use .NET AOT / performance features<br/>• Consider .NET Native"]
+    STAY_CSHARP["Остаться на C#:<br/>• Оптимизировать существующий код<br/>• Использовать возможности .NET AOT / производительности<br/>• Рассмотреть .NET Native"]
     
     START --> PERFORMANCE
-    PERFORMANCE -->|Yes| TEAM
-    PERFORMANCE -->|No| STAY_CSHARP
+    PERFORMANCE -->|Да| TEAM
+    PERFORMANCE -->|Нет| STAY_CSHARP
     
-    TEAM -->|Yes| EXISTING
-    TEAM -->|No| STAY_CSHARP
+    TEAM -->|Да| EXISTING
+    TEAM -->|Нет| STAY_CSHARP
     
-    EXISTING -->|Yes| NEW_PROJECT
-    EXISTING -->|No| FULL_RUST
+    EXISTING -->|Да| NEW_PROJECT
+    EXISTING -->|Нет| FULL_RUST
     
-    NEW_PROJECT -->|New| FULL_RUST
-    NEW_PROJECT -->|Existing| INCREMENTAL
+    NEW_PROJECT -->|Новый| FULL_RUST
+    NEW_PROJECT -->|Существующий| INCREMENTAL
     
     style FULL_RUST fill:#c8e6c9,color:#000
     style INCREMENTAL fill:#fff3e0,color:#000

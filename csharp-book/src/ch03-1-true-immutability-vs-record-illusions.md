@@ -1,43 +1,43 @@
-## True Immutability vs Record Illusions
+## Истинная неизменяемость против иллюзий record
 
-> **What you'll learn:** Why C# `record` types aren't truly immutable (mutable fields, reflection bypass),
-> how Rust enforces real immutability at compile time, and when to use interior mutability patterns.
+> **Что вы узнаете:** почему типы `record` в C# не являются по-настоящему неизменяемыми (изменяемые поля, обход через рефлексию),
+> как Rust обеспечивает настоящую неизменяемость на этапе компиляции и когда использовать паттерны внутренней изменяемости.
 >
-> **Difficulty:** 🟡 Intermediate
+> **Сложность:** 🟡 Средний
 
-### C# Records - Immutability Theater
+### Records в C# — театр неизменяемости
 ```csharp
-// C# records look immutable but have escape hatches
+// Records в C# выглядят неизменяемыми, но у них есть лазейки
 public record Person(string Name, int Age, List<string> Hobbies);
 
 var person = new Person("John", 30, new List<string> { "reading" });
 
-// These all "look" like they create new instances:
-var older = person with { Age = 31 };  // New record
-var renamed = person with { Name = "Jonathan" };  // New record
+// Все эти операции «выглядят» как создание новых экземпляров:
+var older = person with { Age = 31 };  // Новый record
+var renamed = person with { Name = "Jonathan" };  // Новый record
 
-// But the reference types are still mutable!
-person.Hobbies.Add("gaming");  // Mutates the original!
-Console.WriteLine(older.Hobbies.Count);  // 2 - older person affected!
-Console.WriteLine(renamed.Hobbies.Count); // 2 - renamed person also affected!
+// Но ссылочные типы всё ещё изменяемы!
+person.Hobbies.Add("gaming");  // Меняет исходный объект!
+Console.WriteLine(older.Hobbies.Count);  // 2 — older тоже затронут!
+Console.WriteLine(renamed.Hobbies.Count); // 2 — renamed тоже затронут!
 
-// Init-only properties can still be set via reflection
+// Свойства с init-доступом всё равно можно установить через рефлексию
 typeof(Person).GetProperty("Age")?.SetValue(person, 25);
 
-// Collection expressions help but don't solve the fundamental issue
+// Коллекционные выражения помогают, но не решают фундаментальную проблему
 public record BetterPerson(string Name, int Age, IReadOnlyList<string> Hobbies);
 
 var betterPerson = new BetterPerson("Jane", 25, new List<string> { "painting" });
-// Still mutable via casting: 
+// Всё равно изменяемо через приведение типов:
 ((List<string>)betterPerson.Hobbies).Add("hacking the system");
 
-// Even "immutable" collections aren't truly immutable
+// Даже «неизменяемые» коллекции не являются по-настоящему неизменяемыми
 using System.Collections.Immutable;
 public record SafePerson(string Name, int Age, ImmutableList<string> Hobbies);
-// This is better, but requires discipline and has performance overhead
+// Это лучше, но требует дисциплины и имеет накладные расходы на производительность
 ```
 
-### Rust - True Immutability by Default
+### Rust — настоящая неизменяемость по умолчанию
 ```rust
 #[derive(Debug, Clone)]
 struct Person {
@@ -52,34 +52,34 @@ let person = Person {
     hobbies: vec!["reading".to_string()],
 };
 
-// This simply won't compile:
-// person.age = 31;  // ERROR: cannot assign to immutable field
-// person.hobbies.push("gaming".to_string());  // ERROR: cannot borrow as mutable
+// Этот код просто не скомпилируется:
+// person.age = 31;  // ОШИБКА: нельзя присвоить значение неизменяемому полю
+// person.hobbies.push("gaming".to_string());  // ОШИБКА: нельзя заимствовать как изменяемое
 
-// To modify, you must explicitly opt-in with 'mut':
+// Для изменения нужно явно включить 'mut':
 let mut older_person = person.clone();
-older_person.age = 31;  // Now it's clear this is mutation
+older_person.age = 31;  // Теперь ясно, что это мутация
 
-// Or use functional update patterns:
+// Или используйте паттерн обновления через структурное выражение:
 let renamed = Person {
     name: "Jonathan".to_string(),
-    ..person  // Copies other fields (move semantics apply)
+    ..person  // Копирует остальные поля (применяется семантика перемещения)
 };
 
-// The original is guaranteed unchanged (until moved):
-println!("{:?}", person.hobbies);  // Always ["reading"] - immutable
+// Исходный объект гарантированно не меняется (пока не перемещён):
+println!("{:?}", person.hobbies);  // Всегда ["reading"] — неизменяемо
 
-// Structural sharing with efficient immutable data structures
+// Структурное разделение с эффективными неизменяемыми структурами данных
 use std::rc::Rc;
 
 #[derive(Debug, Clone)]
 struct EfficientPerson {
     name: String,
     age: u32,
-    hobbies: Rc<Vec<String>>,  // Shared, immutable reference
+    hobbies: Rc<Vec<String>>,  // Общая, неизменяемая ссылка
 }
 
-// Creating new versions shares data efficiently
+// Создание новых версий эффективно разделяет данные
 let person1 = EfficientPerson {
     name: "Alice".to_string(),
     age: 30,
@@ -89,20 +89,20 @@ let person1 = EfficientPerson {
 let person2 = EfficientPerson {
     name: "Bob".to_string(),
     age: 25,
-    hobbies: Rc::clone(&person1.hobbies),  // Shared reference, no deep copy
+    hobbies: Rc::clone(&person1.hobbies),  // Общая ссылка, без глубокого копирования
 };
 ```
 
 ```mermaid
 graph TD
-    subgraph "C# Records - Shallow Immutability"
+    subgraph "Records C# — поверхностная неизменяемость"
         CS_RECORD["record Person(...)"]
-        CS_WITH["with expressions"]
-        CS_SHALLOW["⚠️ Only top-level immutable"]
-        CS_REF_MUT["❌ Reference types still mutable"]
-        CS_REFLECTION["❌ Reflection can bypass"]
-        CS_RUNTIME["❌ Runtime surprises"]
-        CS_DISCIPLINE["😓 Requires team discipline"]
+        CS_WITH["выражения with"]
+        CS_SHALLOW["⚠️ Неизменяем только верхний уровень"]
+        CS_REF_MUT["❌ Ссылочные типы всё ещё изменяемы"]
+        CS_REFLECTION["❌ Рефлексия может обойти ограничения"]
+        CS_RUNTIME["❌ Сюрпризы во время выполнения"]
+        CS_DISCIPLINE["😓 Требуется дисциплина команды"]
         
         CS_RECORD --> CS_WITH
         CS_WITH --> CS_SHALLOW
@@ -112,14 +112,14 @@ graph TD
         CS_RUNTIME --> CS_DISCIPLINE
     end
     
-    subgraph "Rust - True Immutability"
+    subgraph "Rust — настоящая неизменяемость"
         RUST_STRUCT["struct Person { ... }"]
-        RUST_DEFAULT["✅ Immutable by default"]
-        RUST_COMPILE["✅ Compile-time enforcement"]
-        RUST_MUT["🔒 Explicit 'mut' required"]
-        RUST_MOVE["🔄 Move semantics"]
-        RUST_ZERO["⚡ Zero runtime overhead"]
-        RUST_SAFE["🛡️ Memory safe"]
+        RUST_DEFAULT["✅ Неизменяемо по умолчанию"]
+        RUST_COMPILE["✅ Принудительная проверка на этапе компиляции"]
+        RUST_MUT["🔒 Требуется явный 'mut'"]
+        RUST_MOVE["🔄 Семантика перемещения"]
+        RUST_ZERO["⚡ Нулевые накладные расходы рантайма"]
+        RUST_SAFE["🛡️ Безопасность памяти"]
         
         RUST_STRUCT --> RUST_DEFAULT
         RUST_DEFAULT --> RUST_COMPILE
@@ -139,27 +139,27 @@ graph TD
 
 ---
 
-## Exercises
+## Упражнения
 
 <details>
-<summary><strong>🏋️ Exercise: Prove the Immutability</strong> (click to expand)</summary>
+<summary><strong>🏋️ Упражнение: докажите неизменяемость</strong> (нажмите, чтобы раскрыть)</summary>
 
-A C# colleague claims their `record` is immutable. Translate this C# code to Rust and explain why Rust's version is truly immutable:
+Ваш коллега на C# утверждает, что его `record` неизменяем. Переведите этот код на Rust и объясните, почему версия на Rust действительно неизменяема:
 
 ```csharp
 public record Config(string Host, int Port, List<string> AllowedOrigins);
 
 var config = new Config("localhost", 8080, new List<string> { "example.com" });
-// "Immutable" record... but:
-config.AllowedOrigins.Add("evil.com"); // Compiles! List is mutable.
+// «Неизменяемый» record... но:
+config.AllowedOrigins.Add("evil.com"); // Компилируется! List изменяем.
 ```
 
-1. Create an equivalent Rust struct that is **truly** immutable
-2. Show that attempting to mutate `allowed_origins` is a **compile error**
-3. Write a function that creates a modified copy (new host) without mutation
+1. Создайте эквивалентную структуру на Rust, которая **действительно** неизменяема
+2. Покажите, что попытка изменить `allowed_origins` — это **ошибка компиляции**
+3. Напишите функцию, которая создаёт изменённую копию (с новым хостом) без мутации
 
 <details>
-<summary>🔑 Solution</summary>
+<summary>🔑 Решение</summary>
 
 ```rust
 #[derive(Debug, Clone)]
@@ -186,19 +186,18 @@ fn main() {
     };
 
     // config.allowed_origins.push("evil.com".into());
-    // ❌ ERROR: cannot borrow `config.allowed_origins` as mutable
+    // ❌ ОШИБКА: нельзя заимствовать `config.allowed_origins` как изменяемое
 
     let production = config.with_host("prod.example.com");
-    println!("Dev: {:?}", config);       // original unchanged
-    println!("Prod: {:?}", production);  // new copy with different host
+    println!("Dev: {:?}", config);       // исходный объект не изменился
+    println!("Prod: {:?}", production);  // новая копия с другим хостом
 }
 ```
 
-**Key insight**: In Rust, `let config = ...` (no `mut`) makes the *entire value tree* immutable — including nested `Vec`. C# records only make the *reference* immutable, not the contents.
+**Ключевая мысль**: в Rust `let config = ...` (без `mut`) делает *всё дерево значений* неизменяемым — включая вложенный `Vec`. Records в C# делают неизменяемой только *ссылку*, но не содержимое.
 
 </details>
 </details>
 
 ***
-
 

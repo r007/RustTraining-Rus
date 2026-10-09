@@ -1,11 +1,11 @@
-## Constructor Patterns
+## Паттерны конструкторов
 
-> **What you'll learn:** How to create Rust structs without traditional constructors — `new()` conventions,
-> the `Default` trait, factory methods, and the builder pattern for complex initialization.
+> **Что вы узнаете:** как создавать структуры Rust без традиционных конструкторов — соглашения `new()`,
+> трейт `Default`, фабричные методы и паттерн builder для сложной инициализации.
 >
-> **Difficulty:** 🟢 Beginner
+> **Сложность:** 🟢 Начальный
 
-### C# Constructor Patterns
+### Паттерны конструкторов в C#
 ```csharp
 public class Configuration
 {
@@ -13,7 +13,7 @@ public class Configuration
     public int MaxConnections { get; set; }
     public bool EnableLogging { get; set; }
     
-    // Default constructor
+    // Конструктор по умолчанию
     public Configuration()
     {
         DatabaseUrl = "localhost";
@@ -21,7 +21,7 @@ public class Configuration
         EnableLogging = false;
     }
     
-    // Parameterized constructor
+    // Конструктор с параметрами
     public Configuration(string databaseUrl, int maxConnections)
     {
         DatabaseUrl = databaseUrl;
@@ -29,7 +29,7 @@ public class Configuration
         EnableLogging = false;
     }
     
-    // Factory method
+    // Фабричный метод
     public static Configuration ForProduction()
     {
         return new Configuration("prod.db.server", 100)
@@ -40,7 +40,7 @@ public class Configuration
 }
 ```
 
-### Rust Constructor Patterns
+### Паттерны конструкторов в Rust
 ```rust
 #[derive(Debug)]
 pub struct Configuration {
@@ -50,7 +50,7 @@ pub struct Configuration {
 }
 
 impl Configuration {
-    // Default constructor
+    // Конструктор по умолчанию
     pub fn new() -> Configuration {
         Configuration {
             database_url: "localhost".to_string(),
@@ -59,7 +59,7 @@ impl Configuration {
         }
     }
     
-    // Parameterized constructor
+    // Конструктор с параметрами
     pub fn with_database(database_url: String, max_connections: u32) -> Configuration {
         Configuration {
             database_url,
@@ -68,7 +68,7 @@ impl Configuration {
         }
     }
     
-    // Factory method
+    // Фабричный метод
     pub fn for_production() -> Configuration {
         Configuration {
             database_url: "prod.db.server".to_string(),
@@ -77,10 +77,10 @@ impl Configuration {
         }
     }
     
-    // Builder pattern method
+    // Метод в стиле builder
     pub fn enable_logging(mut self) -> Configuration {
         self.enable_logging = true;
-        self  // Return self for chaining
+        self  // Возвращаем self для цепочки вызовов
     }
     
     pub fn max_connections(mut self, count: u32) -> Configuration {
@@ -89,7 +89,7 @@ impl Configuration {
     }
 }
 
-// Default trait implementation
+// Реализация трейта Default
 impl Default for Configuration {
     fn default() -> Self {
         Self::new()
@@ -97,26 +97,26 @@ impl Default for Configuration {
 }
 
 fn main() {
-    // Different construction patterns
+    // Разные способы создания
     let config1 = Configuration::new();
     let config2 = Configuration::with_database("localhost:5432".to_string(), 20);
     let config3 = Configuration::for_production();
     
-    // Builder pattern
+    // Паттерн builder
     let config4 = Configuration::new()
         .enable_logging()
         .max_connections(50);
     
-    // Using Default trait
+    // Использование трейта Default
     let config5 = Configuration::default();
     
     println!("{:?}", config4);
 }
 ```
 
-### Builder Pattern Implementation
+### Реализация паттерна Builder
 ```rust
-// More complex builder pattern
+// Более сложный паттерн builder
 #[derive(Debug)]
 pub struct DatabaseConfig {
     host: String,
@@ -211,19 +211,19 @@ fn main() {
 
 ---
 
-## Exercises
+## Упражнения
 
 <details>
-<summary><strong>🏋️ Exercise: Builder with Validation</strong> (click to expand)</summary>
+<summary><strong>🏋️ Упражнение: builder с валидацией</strong> (нажмите, чтобы раскрыть)</summary>
 
-Create an `EmailBuilder` that:
-1. Requires `to` and `subject` (builder won't compile without them — use a typestate or validate in `build()`)
-2. Has optional `body` and `cc` (Vec of addresses)
-3. `build()` returns `Result<Email, String>` — rejects empty `to` or `subject`
-4. Write tests proving invalid inputs are rejected
+Создайте `EmailBuilder`, который:
+1. Требует `to` и `subject` (builder не должен компилироваться без них — используйте typestate или проверяйте в `build()`)
+2. Имеет необязательные `body` и `cc` (Vec адресов)
+3. `build()` возвращает `Result<Email, String>` — отвергает пустые `to` или `subject`
+4. Напишите тесты, доказывающие, что некорректные входные данные отвергаются
 
 <details>
-<summary>🔑 Solution</summary>
+<summary>🔑 Решение</summary>
 
 ```rust
 #[derive(Debug)]

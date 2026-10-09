@@ -1,39 +1,38 @@
-## Best Practices for C# Developers
+## Лучшие практики для разработчиков C#
 
-> **What you'll learn:** Five critical mindset shifts (GC→ownership, exceptions→Results, inheritance→composition),
-> idiomatic project organization, error handling strategy, testing patterns, and the most common
-> mistakes C# developers make in Rust.
+> **Что вы узнаете:** пять ключевых сдвигов мышления (GC→владение, исключения→Result, наследование→композиция),
+> идиоматичную организацию проекта, стратегию обработки ошибок, паттерны тестирования и самые частые ошибки разработчиков C# в Rust.
 >
-> **Difficulty:** 🟡 Intermediate
+> **Сложность:** 🟡 Средний
 
-### 1. **Mindset Shifts**
-- **From GC to Ownership**: Think about who owns data and when it's freed
-- **From Exceptions to Results**: Make error handling explicit and visible
-- **From Inheritance to Composition**: Use traits to compose behavior
-- **From Null to Option**: Make absence of values explicit in the type system
+### 1. **Сдвиги мышления**
+- **От GC к владению**: думайте о том, кому принадлежат данные и когда их освобождают
+- **От исключений к Result**: делайте обработку ошибок явной и видимой
+- **От наследования к композиции**: используйте трейты для композиции поведения
+- **От null к Option**: делайте отсутствие значения явным в системе типов
 
-### 2. **Code Organization**
+### 2. **Организация кода**
 ```rust
-// Structure projects like C# solutions
+// Структурируем проекты, как решения (solutions) C#
 src/
-├── main.rs          // Program.cs equivalent
-├── lib.rs           // Library entry point
-├── models/          // Like Models/ folder in C#
+├── main.rs          // Аналог Program.cs
+├── lib.rs           // Точка входа библиотеки
+├── models/          // Аналог папки Models/ в C#
 │   ├── mod.rs
 │   ├── user.rs
 │   └── product.rs
-├── services/        // Like Services/ folder
+├── services/        // Аналог папки Services/
 │   ├── mod.rs
 │   ├── user_service.rs
 │   └── product_service.rs
-├── controllers/     // Like Controllers/ (for web apps)
-├── repositories/    // Like Repositories/
-└── utils/          // Like Utilities/
+├── controllers/     // Аналог Controllers/ (для веб-приложений)
+├── repositories/    // Аналог Repositories/
+└── utils/           // Аналог Utilities/
 ```
 
-### 3. **Error Handling Strategy**
+### 3. **Стратегия обработки ошибок**
 ```rust
-// Create a common Result type for your application
+// Создаём общий тип Result для приложения
 pub type AppResult<T> = Result<T, AppError>;
 
 #[derive(Error, Debug)]
@@ -51,21 +50,21 @@ pub enum AppError {
     Business { message: String },
 }
 
-// Use throughout your application
+// Используем во всём приложении
 pub async fn create_user(data: CreateUserRequest) -> AppResult<User> {
-    validate_user_data(&data)?;  // Returns AppError::Validation
-    let user = repository.create_user(data).await?;  // Returns AppError::Database
+    validate_user_data(&data)?;  // Возвращает AppError::Validation
+    let user = repository.create_user(data).await?;  // Возвращает AppError::Database
     Ok(user)
 }
 ```
 
-### 4. **Testing Patterns**
+### 4. **Паттерны тестирования**
 ```rust
-// Structure tests like C# unit tests
+// Структурируем тесты, как модульные тесты C#
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rstest::*;  // For parameterized tests like C# [Theory]
+    use rstest::*;  // Для параметризованных тестов, как [Theory] в C#
     
     #[test]
     fn test_basic_functionality() {
@@ -87,7 +86,7 @@ mod tests {
         assert_eq!(add(a, b), expected);
     }
     
-    #[tokio::test]  // For async tests
+    #[tokio::test]  // Для асинхронных тестов
     async fn test_async_functionality() {
         let result = async_function().await;
         assert!(result.is_ok());
@@ -95,13 +94,13 @@ mod tests {
 }
 ```
 
-### 5. **Common Mistakes to Avoid**
+### 5. **Частые ошибки, которых стоит избегать**
 ```rust
-// [ERROR] Don't try to implement inheritance
-// Instead of:
-// struct Manager : Employee  // This doesn't exist in Rust
+// [ERROR] Не пытайтесь реализовать наследование
+// Вместо:
+// struct Manager : Employee  // В Rust такого нет
 
-// [OK] Use composition with traits
+// [OK] Используйте композицию через трейты
 trait Employee {
     fn get_salary(&self) -> u32;
 }
@@ -110,10 +109,10 @@ trait Manager: Employee {
     fn get_team_size(&self) -> usize;
 }
 
-// [ERROR] Don't use unwrap() everywhere (like ignoring exceptions)
-let value = might_fail().unwrap();  // Can panic!
+// [ERROR] Не используйте unwrap() везде (это как игнорирование исключений)
+let value = might_fail().unwrap();  // Может вызвать панику!
 
-// [OK] Handle errors properly
+// [OK] Обрабатывайте ошибки правильно
 let value = match might_fail() {
     Ok(v) => v,
     Err(e) => {
@@ -122,109 +121,109 @@ let value = match might_fail() {
     }
 };
 
-// [ERROR] Don't clone everything (like copying objects unnecessarily)
-let data = expensive_data.clone();  // Expensive!
+// [ERROR] Не клонируйте всё подряд (как лишнее копирование объектов)
+let data = expensive_data.clone();  // Дорого!
 
-// [OK] Use borrowing when possible
-let data = &expensive_data;  // Just a reference
+// [OK] Используйте заимствование, когда возможно
+let data = &expensive_data;  // Всего лишь ссылка
 
-// [ERROR] Don't use RefCell everywhere (like making everything mutable)
+// [ERROR] Не используйте RefCell повсюду (как превращение всего в изменяемое)
 struct Data {
-    value: RefCell<i32>,  // Interior mutability - use sparingly
+    value: RefCell<i32>,  // Внутренняя изменяемость — используйте осторожно
 }
 
-// [OK] Prefer owned or borrowed data
+// [OK] Предпочитайте владеемые или заимствованные данные
 struct Data {
-    value: i32,  // Simple and clear
+    value: i32,  // Просто и понятно
 }
 ```
 
-This guide provides C# developers with a comprehensive understanding of how their existing knowledge translates to Rust, highlighting both the similarities and the fundamental differences in approach. The key is understanding that Rust's constraints (like ownership) are designed to prevent entire classes of bugs that are possible in C#, at the cost of some initial complexity.
+Это руководство даёт разработчикам C# цельное представление о том, как их существующие знания переносятся на Rust, подчёркивая как сходства, так и принципиальные различия в подходе. Ключевое — понимать, что ограничения Rust (например, владение) призваны предотвратить целые классы ошибок, возможных в C#, ценой некоторой первоначальной сложности.
 
 ---
 
-### 6. **Avoiding Excessive `clone()`** 🟡
+### 6. **Избегаем избыточного `clone()`** 🟡
 
-C# developers instinctively clone data because the GC handles the cost. In Rust, every `.clone()` is an explicit allocation. Most can be eliminated with borrowing.
+Разработчики C# инстинктивно клонируют данные, потому что стоимость берёт на себя GC. В Rust каждый `.clone()` — это явное выделение памяти. Большинство из них можно убрать с помощью заимствования.
 
 ```rust
-// [ERROR] C# habit: cloning strings to pass around
+// [ERROR] Привычка из C#: клонировать строки, чтобы передавать их дальше
 fn greet(name: String) {
     println!("Hello, {name}");
 }
 
 let user_name = String::from("Alice");
-greet(user_name.clone());  // unnecessary allocation
-greet(user_name.clone());  // and again
+greet(user_name.clone());  // ненужное выделение памяти
+greet(user_name.clone());  // и снова
 
-// [OK] Borrow instead — zero allocation
+// [OK] Заимствуйте вместо этого — без выделений памяти
 fn greet(name: &str) {
     println!("Hello, {name}");
 }
 
 let user_name = String::from("Alice");
-greet(&user_name);  // borrows
-greet(&user_name);  // borrows again — no cost
+greet(&user_name);  // заимствуем
+greet(&user_name);  // заимствуем снова — без затрат
 ```
 
-**When clone is appropriate:**
-- Moving data into a thread or `'static` closure (`Arc::clone` is cheap — it bumps a counter)
-- Caching: you genuinely need an independent copy
-- Prototyping: get it working, then remove clones later
+**Когда clone уместен:**
+- Перемещение данных в поток или в замыкание `'static` (`Arc::clone` дёшев — он лишь увеличивает счётчик)
+- Кэширование: вам действительно нужна независимая копия
+- Прототипирование: сначала заставьте работать, потом уберите лишние clone
 
-**Decision checklist:**
-1. Can you pass `&T` or `&str` instead? → Do that
-2. Does the callee need ownership? → Pass by move, not clone
-3. Is it shared across threads? → Use `Arc<T>` (clone is just a reference count bump)
-4. None of the above? → `clone()` is justified
+**Чек-лист решения:**
+1. Можно передать `&T` или `&str`? → Так и сделайте
+2. Вызываемой стороне нужно владение? → Передавайте перемещением, а не клоном
+3. Данные разделяются между потоками? → Используйте `Arc<T>` (clone — это лишь увеличение счётчика ссылок)
+4. Ничего из перечисленного? → `clone()` оправдан
 
 ---
 
-### 7. **Avoiding `unwrap()` in Production Code** 🟡
+### 7. **Избегаем `unwrap()` в продакшен-коде** 🟡
 
-C# developers who ignore exceptions write `.unwrap()` everywhere in Rust. Both are equally dangerous.
+Разработчики C#, которые игнорируют исключения, пишут `.unwrap()` везде в Rust. И то и другое одинаково опасно.
 
 ```rust
-// [ERROR] The "I'll fix this later" trap
+// [ERROR] Ловушка «потом поправлю»
 let config = std::fs::read_to_string("config.toml").unwrap();
 let port: u16 = config_value.parse().unwrap();
 let conn = db_pool.get().await.unwrap();
 
-// [OK] Propagate with ? in application code
+// [OK] Пробрасываем через ? в прикладном коде
 let config = std::fs::read_to_string("config.toml")?;
 let port: u16 = config_value.parse()?;
 let conn = db_pool.get().await?;
 
-// [OK] Use expect() only when failure is truly a bug
+// [OK] Используйте expect() только тогда, когда сбой — действительно ошибка в программе
 let home = std::env::var("HOME")
-    .expect("HOME environment variable must be set");  // documents the invariant
+    .expect("HOME environment variable must be set");  // фиксирует инвариант
 ```
 
-**Rule of thumb:**
-| Method | When to use |
+**Эмпирическое правило:**
+| Метод | Когда использовать |
 |--------|------------|
-| `?` | Application/library code — propagate to caller |
-| `expect("reason")` | Startup assertions, invariants that *must* hold |
-| `unwrap()` | Tests only, or after an `is_some()`/`is_ok()` check |
-| `unwrap_or(default)` | When you have a sensible fallback |
-| `unwrap_or_else(|| ...)` | When the fallback is expensive to compute |
+| `?` | Код приложения и библиотек — передать вызывающему коду |
+| `expect("reason")` | Проверки при запуске, инварианты, которые *обязаны* выполняться |
+| `unwrap()` | Только в тестах или после проверки `is_some()`/`is_ok()` |
+| `unwrap_or(default)` | Когда есть разумное значение по умолчанию |
+| `unwrap_or_else(|| ...)` | Когда значение по умолчанию дорого вычислять |
 
 ---
 
-### 8. **Fighting the Borrow Checker (and How to Stop)** 🟡
+### 8. **Борьба с проверщиком заимствований (и как перестать бороться)** 🟡
 
-Every C# developer hits a phase where the borrow checker rejects valid-seeming code. The fix is usually a structural change, not a workaround.
+Каждый разработчик C# проходит этап, когда проверщик заимствований отвергает код, который кажется правильным. Исправление обычно требует изменения структуры, а не обходного манёвра.
 
 ```rust
-// [ERROR] Trying to mutate while iterating (C# foreach + modify pattern)
+// [ERROR] Попытка изменять коллекцию во время перебора (паттерн foreach + изменение из C#)
 let mut items = vec![1, 2, 3, 4, 5];
 for item in &items {
     if *item > 3 {
-        items.push(*item * 2);  // ERROR: can't borrow items as mutable
+        items.push(*item * 2);  // ОШИБКА: нельзя заимствовать items как изменяемое
     }
 }
 
-// [OK] Collect first, then mutate
+// [OK] Сначала собираем, потом изменяем
 let extras: Vec<i32> = items.iter()
     .filter(|&&x| x > 3)
     .map(|&x| x * 2)
@@ -233,36 +232,36 @@ items.extend(extras);
 ```
 
 ```rust
-// [ERROR] Returning a reference to a local (C# returns references freely via GC)
+// [ERROR] Возврат ссылки на локальную переменную (в C# ссылки свободно возвращаются благодаря GC)
 fn get_greeting() -> &str {
     let s = String::from("hello");
-    &s  // ERROR: s is dropped at end of function
+    &s  // ОШИБКА: s уничтожается в конце функции
 }
 
-// [OK] Return owned data
+// [OK] Возвращаем владеемые данные
 fn get_greeting() -> String {
-    String::from("hello")  // caller owns it
+    String::from("hello")  // вызывающий код владеет ими
 }
 ```
 
-**Common patterns that resolve borrow checker conflicts:**
+**Распространённые паттерны, которые снимают конфликты с проверщиком заимствований:**
 
-| C# habit | Rust solution |
+| Привычка из C# | Решение в Rust |
 |----------|--------------|
-| Store references in structs | Use owned data, or add lifetime parameters |
-| Mutate shared state freely | Use `Arc<Mutex<T>>` or restructure to avoid sharing |
-| Return references to locals | Return owned values |
-| Modify collection while iterating | Collect changes, then apply |
-| Multiple mutable references | Split struct into independent parts |
+| Хранить ссылки в структурах | Использовать владеемые данные или добавить параметры времён жизни |
+| Свободно изменять разделяемое состояние | Использовать `Arc<Mutex<T>>` или перестроить код, чтобы не разделять данные |
+| Возвращать ссылки на локальные переменные | Возвращать владеемые значения |
+| Изменять коллекцию во время перебора | Сначала собрать изменения, потом применить |
+| Несколько изменяемых ссылок | Разбить структуру на независимые части |
 
 ---
 
-### 9. **Collapsing Assignment Pyramids** 🟢
+### 9. **Устраняем «пирамиды» присваиваний** 🟢
 
-C# developers write chains of `if (x != null) { if (x.Value > 0) { ... } }`. Rust's `match`, `if let`, and `?` flatten these.
+Разработчики C# пишут цепочки вида `if (x != null) { if (x.Value > 0) { ... } }`. Конструкции `match`, `if let` и `?` в Rust позволяют выровнять такой код.
 
 ```rust
-// [ERROR] Nested null-checking style from C#
+// [ERROR] Вложенный стиль проверок на null из C#
 fn process(input: Option<String>) -> Option<usize> {
     match input {
         Some(s) => {
@@ -285,7 +284,7 @@ fn process(input: Option<String>) -> Option<usize> {
     }
 }
 
-// [OK] Flatten with combinators
+// [OK] Выравниваем с помощью комбинаторов
 fn process(input: Option<String>) -> Option<usize> {
     input
         .filter(|s| !s.is_empty())
@@ -295,16 +294,13 @@ fn process(input: Option<String>) -> Option<usize> {
 }
 ```
 
-**Key combinators every C# developer should know:**
+**Ключевые комбинаторы, которые должен знать каждый разработчик C#:**
 
-| Combinator | What it does | C# equivalent |
+| Комбинатор | Что делает | Аналог в C# |
 |-----------|-------------|---------------|
-| `map` | Transform the inner value | `Select` / null-conditional `?.` |
-| `and_then` | Chain operations that return Option/Result | `SelectMany` / `?.Method()` |
-| `filter` | Keep value only if predicate passes | `Where` |
-| `unwrap_or` | Provide default | `?? defaultValue` |
-| `ok()` | Convert `Result` to `Option` (discard error) | — |
-| `transpose` | Flip `Option<Result>` to `Result<Option>` | — |
-
-
-
+| `map` | Преобразует внутреннее значение | `Select` / null-условный `?.` |
+| `and_then` | Связывает операции, возвращающие Option/Result | `SelectMany` / `?.Method()` |
+| `filter` | Оставляет значение, только если предикат истинен | `Where` |
+| `unwrap_or` | Задаёт значение по умолчанию | `?? defaultValue` |
+| `ok()` | Превращает `Result` в `Option` (отбрасывая ошибку) | — |
+| `transpose` | Меняет местами `Option<Result>` и `Result<Option>` | — |
