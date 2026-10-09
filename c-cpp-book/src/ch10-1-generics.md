@@ -1,12 +1,12 @@
-# Rust generics
+# Обобщения в Rust
 
-> **What you'll learn:** Generic type parameters, monomorphization (zero-cost generics), trait bounds, and how Rust generics compare to C++ templates — with better error messages and no SFINAE.
+> **Что вы узнаете:** обобщённые параметры типов, мономорфизацию (обобщения без накладных расходов), ограничения трейтами и то, как обобщения Rust соотносятся с шаблонами C++ — с более понятными сообщениями об ошибках и без SFINAE.
 
-- Generics allow the same algorithm or data structure to be reused across data types
-    - The generic parameter appears as an identifier within ```<>```, e.g.: ```<T>```. The parameter can have any legal identifier name, but is typically kept short for brevity
-    - The compiler performs monomorphization at compile time, i.e., it generates a new type for every variation of ```T``` that is encountered
+- Обобщения позволяют повторно использовать один и тот же алгоритм или структуру данных для разных типов данных
+    - Обобщённый параметр записывается как идентификатор в ```<>```, например: ```<T>```. Параметр может иметь любое допустимое имя, но обычно его делают коротким
+    - Компилятор выполняет мономорфизацию на этапе компиляции, то есть генерирует новый тип для каждого варианта ```T```, который встречается в коде
 ```rust
-// Returns a tuple of type <T> composed of left and right of type <T>
+// Возвращает кортеж типа <T>, составленный из left и right типа <T>
 fn pick<T>(x: u32, left: T, right: T) -> (T, T) {
    if x == 42 {
     (left, right) 
@@ -21,10 +21,10 @@ fn main() {
 }
 ```
 
-# Rust generics
-- Generics can also be applied to data types and associated methods. It is possible to specialize the implementation for a specific ```<T>``` (example: ```f32``` vs. ```u32```)
+# Обобщения в Rust: специализация
+- Обобщения можно применять и к типам данных, и к ассоциированным методам. Реализацию можно специализировать для конкретного ```<T>``` (например, ```f32``` и ```u32```)
 ```rust
-#[derive(Debug)] // We will discuss this later
+#[derive(Debug)] // Мы обсудим это позже
 struct Point<T> {
     x : T,
     y : T,
@@ -54,12 +54,12 @@ fn main() {
 }
 ```
 
-# Exercise: Generics
+# Упражнение: обобщения
 
-🟢 **Starter**
-- Modify the ```Point``` type to use two different types (```T``` and ```U```) for x and y
+🟢 **Начальный уровень**
+- Измените тип ```Point```, чтобы для x и y использовались два разных типа (```T``` и ```U```)
 
-<details><summary>Solution (click to expand)</summary>
+<details><summary>Решение (нажмите, чтобы развернуть)</summary>
 
 ```rust
 #[derive(Debug)]
@@ -82,7 +82,7 @@ fn main() {
     println!("{p2:?}");
     println!("{p3:?}");
 }
-// Output:
+// Вывод:
 // Point { x: 42, y: 3.14 }
 // Point { x: "hello", y: true }
 // Point { x: 1, y: 1000 }
@@ -90,9 +90,9 @@ fn main() {
 
 </details>
 
-### Combining Rust traits and generics
-- Traits can be used to place restrictions on generic types (constraints)
-- The constraint can be specified using a ```:``` after the generic type parameter, or using ```where```. The following defines a generic function ```get_area``` that takes any type ```T``` as long as it implements the ```ComputeArea``` ```trait```
+### Комбинирование трейтов и обобщений в Rust
+- Трейты можно использовать для наложения ограничений на обобщённые типы (constraints)
+- Ограничение задаётся через ```:``` после обобщённого параметра типа или через ```where```. Ниже определена обобщённая функция ```get_area```, которая принимает любой тип ```T```, если он реализует трейт ```ComputeArea```
 ```rust
     trait ComputeArea {
         fn area(&self) -> u64;
@@ -101,10 +101,10 @@ fn main() {
         t.area()
     }
 ```
-- [▶ Try it in the Rust Playground](https://play.rust-lang.org/)
+- [▶ Попробуйте в Rust Playground](https://play.rust-lang.org/)
 
-### Combining Rust traits and generics
-- It is possible to have multiple trait constraints
+### Комбинирование трейтов и обобщений в Rust: несколько ограничений
+- Можно задать несколько ограничений трейтами
 ```rust
 trait Fish {}
 trait Mammal {}
@@ -118,14 +118,14 @@ fn main() {
     let w = Whale {};
     only_fish_and_mammals(&w);
     let _s = Shark {};
-    // Won't compile
+    // Не скомпилируется
     only_fish_and_mammals(&_s);
 }
 ```
 
-### Rust traits constraints in data types
-- Trait constraints can be combined with generics in data types
-- In the following example, we define the ```PrintDescription``` ```trait``` and a generic ```struct``` ```Shape``` with a member constrained by the trait
+### Ограничения трейтов в типах данных
+- Ограничения трейтами можно комбинировать с обобщениями в типах данных
+- В следующем примере мы определяем трейт ```PrintDescription``` и обобщённую структуру ```Shape``` с полем, ограниченным этим трейтом
 ```rust
 trait PrintDescription {
     fn print_description(&self);
@@ -133,19 +133,19 @@ trait PrintDescription {
 struct Shape<S: PrintDescription> {
     shape: S,
 }
-// Generic Shape implementation for any type that implements PrintDescription
+// Обобщённая реализация Shape для любого типа, который реализует PrintDescription
 impl<S: PrintDescription> Shape<S> {
     fn print(&self) {
         self.shape.print_description();
     }
 }
 ```
-- [▶ Try it in the Rust Playground](https://play.rust-lang.org/)
+- [▶ Попробуйте в Rust Playground](https://play.rust-lang.org/)
 
-# Exercise: Trait constraints and generics
+# Упражнение: ограничения трейтов и обобщения
 
-🟡 **Intermediate**
-- Implement a ```struct``` with a generic member ```cipher``` that implements ```CipherText```
+🟡 **Средний уровень**
+- Реализуйте структуру с обобщённым полем ```cipher```, которое реализует ```CipherText```
 ```rust
 trait CipherText {
     fn encrypt(&self);
@@ -154,14 +154,14 @@ trait CipherText {
 //struct Cipher<>
 
 ```
-- Next, implement a method called ```encrypt``` on the ```struct``` ```impl``` that invokes ```encrypt``` on ```cipher```
+- Затем реализуйте метод ```encrypt``` для структуры ```impl```, который вызывает ```encrypt``` у ```cipher```
 ```rust
 // TO DO
 impl for Cipher<> {}
 ```
-- Next, implement ```CipherText``` on two structs called ```CipherOne``` and ```CipherTwo``` (just ```println()``` is fine). Create ```CipherOne``` and ```CipherTwo```, and use ```Cipher``` to invoke them
+- Далее реализуйте ```CipherText``` для двух структур, ```CipherOne``` и ```CipherTwo``` (достаточно ```println()```). Создайте ```CipherOne``` и ```CipherTwo``` и используйте ```Cipher``` для их вызова
 
-<details><summary>Solution (click to expand)</summary>
+<details><summary>Решение (нажмите, чтобы развернуть)</summary>
 
 ```rust
 trait CipherText {
@@ -199,31 +199,31 @@ fn main() {
     c1.encrypt();
     c2.encrypt();
 }
-// Output:
+// Вывод:
 // CipherOne encryption applied
 // CipherTwo encryption applied
 ```
 
 </details>
 
-### Rust type state pattern and generics
-- Rust types can be used to enforce state machine transitions at *compile* time
-    - Consider a ```Drone``` with say two states: ```Idle``` and ```Flying```. In the ```Idle``` state, the only permitted method is ```takeoff()```. In the ```Flying``` state, we permit ```land()```
+### Паттерн состояний (type state) и обобщения в Rust
+- Типы Rust можно использовать, чтобы обеспечить переходы конечного автомата на этапе *компиляции*
+    - Рассмотрим ```Drone``` с двумя состояниями: ```Idle``` и ```Flying```. В состоянии ```Idle``` единственный допустимый метод — ```takeoff()```. В состоянии ```Flying``` разрешён ```land()```
     
-- One approach is to model the state machine using something like the following
+- Один из подходов — смоделировать конечный автомат примерно так
 ```rust
 enum DroneState {
     Idle,
     Flying
 }
-struct Drone {x: u64, y: u64, z: u64, state: DroneState}  // x, y, z are coordinates
+struct Drone {x: u64, y: u64, z: u64, state: DroneState}  // x, y, z — координаты
 ```
-- This requires a lot of runtime checks to enforce the state machine semantics — [▶ try it](https://play.rust-lang.org/) to see why
+- Это требует множества проверок во время выполнения, чтобы обеспечить семантику конечного автомата — [▶ попробуйте](https://play.rust-lang.org/), чтобы увидеть почему
 
-### Rust type state pattern generics
-- Generics allows us to enforce the state machine at *compile time*. This requires using a special generic called ```PhantomData<T>```
-- The ```PhantomData<T>``` is a ```zero-sized``` marker data type. In this case, we use it to represent the ```Idle``` and ```Flying``` states, but it has ```zero``` runtime size
-- Notice that the ```takeoff``` and ```land``` methods take ```self``` as a parameter. This is referred to as ```consuming``` (contrast with ```&self``` which uses borrowing). Basically, once we call the ```takeoff()``` on ```Drone<Idle>```, we can only get back a ```Drone<Flying>``` and viceversa
+### Паттерн состояний на обобщениях
+- Обобщения позволяют обеспечить конечный автомат на этапе *компиляции*. Для этого нужен специальный обобщённый тип ```PhantomData<T>```
+- ```PhantomData<T>``` — это маркерный тип данных ```нулевого размера```. В данном случае мы используем его для представления состояний ```Idle``` и ```Flying```, но во время выполнения он занимает ```ноль``` байт
+- Обратите внимание, что методы ```takeoff``` и ```land``` принимают ```self``` как параметр. Это называется ```поглощением``` (в отличие от ```&self```, которое использует заимствование). По сути, после вызова ```takeoff()``` для ```Drone<Idle>``` мы можем получить только ```Drone<Flying>``` и наоборот
 ```rust
 struct Drone<T> {x: u64, y: u64, z: u64, state: PhantomData<T> }
 impl Drone<Idle> {
@@ -233,19 +233,19 @@ impl Drone<Flying> {
     fn land(self) -> Drone<Idle> { ...}
 }
 ```
-    - [▶ Try it in the Rust Playground](https://play.rust-lang.org/)
+    - [▶ Попробуйте в Rust Playground](https://play.rust-lang.org/)
 
-### Rust type state pattern generics
-- Key takeaways:
-    - States can be represented using structs (zero-size)
-    - We can combine the state ```T``` with ```PhantomData<T>``` (zero-size)
-    - Implementing the methods for a particular stage of the state machine is now just a matter of ```impl State<T>```
-    - Use a method that consumes ```self``` to transition from one state to another
-    - This gives us ```zero cost``` abstractions. The compiler can enforce the state machine at compile time and it's impossible to call methods unless the state is right
+### Паттерн состояний: ключевые выводы
+- Основные выводы:
+    - Состояния можно представить структурами (нулевого размера)
+    - Состояние ```T``` можно комбинировать с ```PhantomData<T>``` (нулевого размера)
+    - Реализация методов для конкретного этапа конечного автомата — это просто ```impl State<T>```
+    - Для перехода из одного состояния в другое используйте метод, который поглощает ```self```
+    - Это даёт абстракции ```без накладных расходов```. Компилятор может обеспечить конечный автомат на этапе компиляции, и невозможно вызвать методы, если состояние неподходящее
 
-### Rust builder pattern
-- The consume ```self``` can be useful for builder patterns
-- Consider a GPIO configuration with several dozen pins. The pins can be configured to high or low (default is low)
+### Паттерн-строитель в Rust
+- Поглощение ```self``` может быть полезным для паттерна-строителя
+- Рассмотрим конфигурацию GPIO с несколькими десятками выводов. Каждый вывод может быть установлен в высокий или низкий уровень (по умолчанию — низкий)
 ```rust
 #[derive(default)]
 enum PinState {
@@ -260,6 +260,5 @@ struct GPIOConfig {
     ... 
 }
 ```
-- The builder pattern can be used to construct a GPIO configuration by chaining — [▶ Try it](https://play.rust-lang.org/)
-
+- Паттерн-строитель можно использовать, чтобы собрать конфигурацию GPIO через цепочку вызовов — [▶ Попробуйте](https://play.rust-lang.org/)
 

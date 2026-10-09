@@ -1,48 +1,48 @@
-# Why C/C++ Developers Need Rust
+# Почему разработчикам C/C++ нужен Rust
 
-> **What you'll learn:**
-> - The full list of problems Rust eliminates — memory safety, undefined behavior, data races, and more
-> - Why `shared_ptr`, `unique_ptr`, and other C++ mitigations are bandaids, not solutions
-> - Concrete C and C++ vulnerability examples that are structurally impossible in safe Rust
+> **Что вы узнаете:**
+> - Полный список проблем, которые устраняет Rust: безопасность памяти, неопределённое поведение, гонки данных и многое другое
+> - Почему `shared_ptr`, `unique_ptr` и другие средства C++ — это пластыри, а не решения
+> - Конкретные примеры уязвимостей C и C++, которые в безопасном Rust структурно невозможны
 
-> **Want to skip straight to code?** Jump to [Show me some code](ch02-getting-started.md#enough-talk-already-show-me-some-code)
+> **Хотите сразу перейти к коду?** Перейдите к разделу [Покажите мне код](ch02-getting-started.md#хватит-разговоров-покажите-код)
 
-## What Rust Eliminates — The Complete List
+## Что Rust устраняет — полный список
 
-Before diving into examples, here's the executive summary. Safe Rust **structurally prevents** every issue in this list — not through discipline, tooling, or code review, but through the type system and compiler:
+Прежде чем переходить к примерам, вот краткое резюме. Безопасный Rust **структурно предотвращает** каждую проблему из этого списка — не дисциплиной, инструментами или код-ревью, а системой типов и компилятором:
 
-| **Eliminated Issue** | **C** | **C++** | **How Rust Prevents It** |
-|----------------------|:-----:|:-------:|--------------------------|
-| Buffer overflows / underflows | ✅ | ✅ | All arrays, slices, and strings carry bounds; indexing is checked at runtime |
-| Memory leaks (no GC needed) | ✅ | ✅ | `Drop` trait = RAII done right; automatic cleanup, no Rule of Five |
-| Dangling pointers | ✅ | ✅ | Lifetime system proves references outlive their referent at compile time |
-| Use-after-free | ✅ | ✅ | Ownership system makes this a compile error |
-| Use-after-move | — | ✅ | Moves are **destructive** — the original binding ceases to exist |
-| Uninitialized variables | ✅ | ✅ | All variables must be initialized before use; compiler enforces it |
-| Integer overflow / underflow UB | ✅ | ✅ | Debug builds panic on overflow; release builds wrap (defined behavior either way) |
-| NULL pointer dereferences / SEGVs | ✅ | ✅ | No null pointers; `Option<T>` forces explicit handling |
-| Data races | ✅ | ✅ | `Send`/`Sync` traits + borrow checker make data races a compile error |
-| Uncontrolled side-effects | ✅ | ✅ | Immutability by default; mutation requires explicit `mut` |
-| No inheritance (better maintainability) | — | ✅ | Traits + composition replace class hierarchies; promotes reuse without coupling |
-| No exceptions; predictable control flow | — | ✅ | Errors are values (`Result<T, E>`); impossible to ignore, no hidden `throw` paths |
-| Iterator invalidation | — | ✅ | Borrow checker forbids mutating a collection while iterating |
-| Reference cycles / leaked finalizers | — | ✅ | Ownership is tree-shaped; `Rc` cycles are opt-in and catchable with `Weak` |
-| No forgotten mutex unlocks | ✅ | ✅ | `Mutex<T>` wraps the data; lock guard is the only way to access it |
-| Undefined behavior (general) | ✅ | ✅ | Safe Rust has **zero** undefined behavior; `unsafe` blocks are explicit and auditable |
+| **Устранённая проблема** | **C** | **C++** | **Как Rust её предотвращает** |
+|--------------------------|:-----:|:-------:|-------------------------------|
+| Переполнения и недополнения буфера | ✅ | ✅ | У всех массивов, срезов и строк есть границы; индексация проверяется во время выполнения |
+| Утечки памяти (без сборщика мусора) | ✅ | ✅ | Трейт `Drop` = RAII, сделанный правильно; автоматическая очистка, правило пяти не нужно |
+| Висячие указатели | ✅ | ✅ | Система времён жизни доказывает, что ссылки переживают объект, на который ссылаются, на этапе компиляции |
+| Использование после освобождения | ✅ | ✅ | Система владения делает это ошибкой компиляции |
+| Использование после перемещения | — | ✅ | Перемещения **разрушающие** — исходная привязка перестаёт существовать |
+| Неинициализированные переменные | ✅ | ✅ | Все переменные должны быть инициализированы до использования; это обеспечивает компилятор |
+| Неопределённое поведение при переполнении целых | ✅ | ✅ | В отладочных сборках переполнение вызывает panic; в релизных — переполняется (в обоих случаях поведение определено) |
+| Разыменование NULL-указателей / SEGV | ✅ | ✅ | Нулевых указателей нет; `Option<T>` вынуждает явно обрабатывать отсутствие значения |
+| Гонки данных | ✅ | ✅ | Трейты `Send`/`Sync` и проверка заимствований делают гонки данных ошибкой компиляции |
+| Неконтролируемые побочные эффекты | ✅ | ✅ | Неизменяемость по умолчанию; для изменения нужен явный `mut` |
+| Отсутствие наследования (лучшая сопровождаемость) | — | ✅ | Трейты и композиция заменяют иерархии классов; способствуют повторному использованию без жёсткой связанности |
+| Отсутствие исключений; предсказуемый поток управления | — | ✅ | Ошибки — это значения (`Result<T, E>`); их невозможно проигнорировать, нет скрытых путей `throw` |
+| Инвалидация итераторов | — | ✅ | Проверка заимствований запрещает изменять коллекцию во время итерации по ней |
+| Циклы ссылок / утечки финализаторов | — | ✅ | Владение имеет древовидную структуру; циклы `Rc` — явный выбор, который можно обнаружить и разорвать с помощью `Weak` |
+| Забытые разблокировки мьютексов | ✅ | ✅ | `Mutex<T>` оборачивает данные; защитник блокировки — единственный способ доступа к ним |
+| Неопределённое поведение (вообще) | ✅ | ✅ | В безопасном Rust **нет** неопределённого поведения; блоки `unsafe` явные и поддаются аудиту |
 
-> **Bottom line:** These aren't aspirational goals enforced by coding standards. They are **compile-time guarantees**. If your code compiles, these bugs cannot exist.
+> **Главное:** это не желаемые цели, которые навязываются правилами кодирования. Это **гарантии на этапе компиляции**. Если ваш код компилируется, эти ошибки не могут существовать.
 
 ---
 
-## The Problems Shared by C and C++
+## Проблемы, общие для C и C++
 
-> **Want to skip the examples?** Jump to [How Rust Addresses All of This](#how-rust-addresses-all-of-this) or straight to [Show me some code](ch02-getting-started.md#enough-talk-already-show-me-some-code)
+> **Хотите пропустить примеры?** Перейдите к разделу [Как Rust решает всё это](#как-rust-решает-всё-это) или сразу к [Покажите мне код](ch02-getting-started.md#хватит-разговоров-покажите-код)
 
-Both languages share a core set of memory safety problems that are the root cause of over 70% of CVEs (Common Vulnerabilities and Exposures):
+Оба языка разделяют базовый набор проблем безопасности памяти, которые являются первопричиной более 70% CVE (Common Vulnerabilities and Exposures — общеизвестных уязвимостей и подверженностей):
 
-### Buffer overflows
+### Переполнения буфера
 
-C arrays, pointers, and strings have no intrinsic bounds. It is trivially easy to exceed them:
+Массивы, указатели и строки в C не имеют встроенных границ. Выйти за них очень легко:
 
 ```c
 #include <stdlib.h>
@@ -50,70 +50,70 @@ C arrays, pointers, and strings have no intrinsic bounds. It is trivially easy t
 
 void buffer_dangers() {
     char buffer[10];
-    strcpy(buffer, "This string is way too long!");  // Buffer overflow
+    strcpy(buffer, "This string is way too long!");  // Переполнение буфера
 
     int arr[5] = {1, 2, 3, 4, 5};
-    int *ptr = arr;           // Loses size information
-    ptr[10] = 42;             // No bounds check — undefined behavior
+    int *ptr = arr;           // Теряется информация о размере
+    ptr[10] = 42;             // Нет проверки границ — неопределённое поведение
 }
 ```
 
-In C++, `std::vector::operator[]` still performs no bounds checking. Only `.at()` does — and who catches the exception?
+В C++ `std::vector::operator[]` по-прежнему не проверяет границы. Проверяет только `.at()` — но кто поймает исключение?
 
-### Dangling pointers and use-after-free
+### Висячие указатели и использование после освобождения
 
 ```c
 int *bar() {
     int i = 42;
-    return &i;    // Returns address of stack variable — dangling!
+    return &i;    // Возвращается адрес переменной на стеке — висячий указатель!
 }
 
 void use_after_free() {
     char *p = (char *)malloc(20);
     free(p);
-    *p = '\0';   // Use after free — undefined behavior
+    *p = '\0';   // Использование после освобождения — неопределённое поведение
 }
 ```
 
-### Uninitialized variables and undefined behavior
+### Неинициализированные переменные и неопределённое поведение
 
-C and C++ both allow uninitialized variables. The resulting values are indeterminate, and reading them is undefined behavior:
+И C, и C++ допускают неинициализированные переменные. Их значения не определены, и чтение таких значений — неопределённое поведение:
 
 ```c
-int x;               // Uninitialized
-if (x > 0) { ... }  // UB — x could be anything
+int x;               // Не инициализирована
+if (x > 0) { ... }  // Неопределённое поведение — x может быть чем угодно
 ```
 
-Integer overflow is **defined** in C for unsigned types but **undefined** for signed types. In C++, signed overflow is also undefined behavior. Both compilers can and do exploit this for "optimizations" that break programs in surprising ways.
+Переполнение целых в C **определено** для беззнаковых типов, но **не определено** для знаковых. В C++ переполнение знакового типа тоже является неопределённым поведением. Оба компилятора могут и действительно используют это для «оптимизаций», которые ломают программы самым неожиданным образом.
 
-### NULL pointer dereferences
+### Разыменование NULL-указателей
 
 ```c
 int *ptr = NULL;
-*ptr = 42;           // SEGV — but the compiler won't stop you
+*ptr = 42;           // SEGV — но компилятор вас не остановит
 ```
 
-In C++, `std::optional<T>` helps but is verbose and often bypassed with `.value()` which throws.
+В C++ `std::optional<T>` помогает, но он громоздкий, и его часто обходят вызовом `.value()`, который выбрасывает исключение.
 
-### The visualization: shared problems
+### Визуализация: общие проблемы
 
 ```mermaid
 graph TD
-    ROOT["C/C++ Memory Safety Issues"] --> BUF["Buffer Overflows"]
-    ROOT --> DANGLE["Dangling Pointers"]
-    ROOT --> UAF["Use-After-Free"]
-    ROOT --> UNINIT["Uninitialized Variables"]
-    ROOT --> NULL["NULL Dereferences"]
-    ROOT --> UB["Undefined Behavior"]
-    ROOT --> RACE["Data Races"]
+    ROOT["Проблемы безопасности памяти в C/C++"] --> BUF["Переполнения буфера"]
+    ROOT --> DANGLE["Висячие указатели"]
+    ROOT --> UAF["Использование после освобождения"]
+    ROOT --> UNINIT["Неинициализированные переменные"]
+    ROOT --> NULL["Разыменование NULL"]
+    ROOT --> UB["Неопределённое поведение"]
+    ROOT --> RACE["Гонки данных"]
 
-    BUF --> BUF1["No bounds on arrays/pointers"]
-    DANGLE --> DANGLE1["Returning stack addresses"]
-    UAF --> UAF1["Reusing freed memory"]
-    UNINIT --> UNINIT1["Indeterminate values"]
-    NULL --> NULL1["No forced null checks"]
-    UB --> UB1["Signed overflow, aliasing"]
-    RACE --> RACE1["No compile-time safety"]
+    BUF --> BUF1["Нет границ у массивов/указателей"]
+    DANGLE --> DANGLE1["Возврат адресов со стека"]
+    UAF --> UAF1["Повторное использование освобождённой памяти"]
+    UNINIT --> UNINIT1["Неопределённые значения"]
+    NULL --> NULL1["Нет принудительной проверки на null"]
+    UB --> UB1["Переполнение знаковых, алиасинг"]
+    RACE --> RACE1["Нет безопасности на этапе компиляции"]
 
     style ROOT fill:#ff6b6b,color:#000
     style BUF fill:#ffa07a,color:#000
@@ -127,151 +127,151 @@ graph TD
 
 ---
 
-## C++ Adds More Problems on Top
+## C++ добавляет новые проблемы
 
-> **C audience**: You can [skip ahead to How Rust Addresses These Issues](#how-rust-addresses-all-of-this) if you don't use C++.
+> **Читатели, знакомые только с C**: можете [сразу перейти к разделу Как Rust решает эти проблемы](#как-rust-решает-всё-это), если не используете C++.
 >
-> **Want to skip straight to code?** Jump to [Show me some code](ch02-getting-started.md#enough-talk-already-show-me-some-code)
+> **Хотите сразу перейти к коду?** Перейдите к разделу [Покажите мне код](ch02-getting-started.md#хватит-разговоров-покажите-код)
 
-C++ introduced smart pointers, RAII, move semantics, and exceptions to address C's problems. These are **bandaids, not cures** — they shift the failure mode from "crash at runtime" to "subtler bug at runtime":
+C++ ввёл умные указатели, RAII, семантику перемещения и исключения, чтобы решить проблемы C. Это **пластыри, а не лекарства** — они переносят сбой из режима «падение во время выполнения» в режим «более тонкая ошибка во время выполнения»:
 
-### `unique_ptr` and `shared_ptr` — bandaids, not solutions
+### `unique_ptr` и `shared_ptr` — пластыри, а не решения
 
-C++ smart pointers are a significant improvement over raw `malloc`/`free`, but they don't solve the underlying problems:
+Умные указатели C++ — заметное улучшение по сравнению с сырыми `malloc`/`free`, но они не решают основных проблем:
 
-| C++ Mitigation | What It Fixes | What It **Doesn't** Fix |
-|----------------|---------------|------------------------|
-| `std::unique_ptr` | Prevents leaks via RAII | **Use-after-move** still compiles; leaves a zombie nullptr |
-| `std::shared_ptr` | Shared ownership | **Reference cycles** leak silently; `weak_ptr` discipline is manual |
-| `std::optional` | Replaces some null use | `.value()` **throws** if empty — hidden control flow |
-| `std::string_view` | Avoids copies | **Dangling** if the source string is freed — no lifetime checking |
-| Move semantics | Efficient transfers | Moved-from objects are in a **"valid but unspecified state"** — UB waiting to happen |
-| RAII | Automatic cleanup | Requires the **Rule of Five** to get right; one mistake breaks everything |
+| Средство C++ | Что исправляет | Что **не** исправляет |
+|--------------|----------------|------------------------|
+| `std::unique_ptr` | Предотвращает утечки через RAII | **Использование после перемещения** по-прежнему компилируется; остаётся «зомби»-nullptr |
+| `std::shared_ptr` | Совместное владение | **Циклы ссылок** незаметно приводят к утечкам; дисциплина `weak_ptr` — ручная |
+| `std::optional` | Заменяет часть использований null | `.value()` **выбрасывает исключение**, если значения нет — скрытый поток управления |
+| `std::string_view` | Избегает копирования | **Висячий**, если исходная строка освобождена — нет проверки времён жизни |
+| Семантика перемещения | Эффективная передача | Объекты после перемещения находятся в **«допустимом, но не определённом состоянии»** — неопределённое поведение, которое только ждёт своего часа |
+| RAII | Автоматическая очистка | Чтобы всё сделать правильно, нужно **правило пяти**; одна ошибка ломает всё |
 
 ```cpp
-// unique_ptr: use-after-move compiles cleanly
+// unique_ptr: использование после перемещения компилируется без проблем
 std::unique_ptr<int> ptr = std::make_unique<int>(42);
 std::unique_ptr<int> ptr2 = std::move(ptr);
-std::cout << *ptr;  // Compiles! Undefined behavior at runtime.
-                     // In Rust, this is a compile error: "value used after move"
+std::cout << *ptr;  // Компилируется! Неопределённое поведение во время выполнения.
+                     // В Rust это ошибка компиляции: "value used after move"
 ```
 
 ```cpp
-// shared_ptr: reference cycles leak silently
+// shared_ptr: циклы ссылок незаметно приводят к утечкам
 struct Node {
     std::shared_ptr<Node> next;
-    std::shared_ptr<Node> parent;  // Cycle! Destructor never called.
+    std::shared_ptr<Node> parent;  // Цикл! Деструктор никогда не вызывается.
 };
 auto a = std::make_shared<Node>();
 auto b = std::make_shared<Node>();
 a->next = b;
-b->parent = a;  // Memory leak — ref count never reaches 0
-                 // In Rust, Rc<T> + Weak<T> makes cycles explicit and breakable
+b->parent = a;  // Утечка памяти — счётчик ссылок никогда не станет 0
+                 // В Rust Rc<T> + Weak<T> делают циклы явными и разрываемыми
 ```
 
-### Use-after-move — the silent killer
+### Использование после перемещения — тихий убийца
 
-C++ `std::move` is not a move — it's a cast. The original object remains in a "valid but unspecified state". The compiler lets you keep using it:
+`std::move` в C++ — это не перемещение, а приведение типа. Исходный объект остаётся в «допустимом, но не определённом состоянии». Компилятор позволяет продолжать его использовать:
 
 ```cpp
 auto vec = std::make_unique<std::vector<int>>({1, 2, 3});
 auto vec2 = std::move(vec);
-vec->size();  // Compiles! But dereferencing nullptr — crash at runtime
+vec->size();  // Компилируется! Но разыменование nullptr — падение во время выполнения
 ```
 
-In Rust, moves are **destructive**. The original binding is gone:
+В Rust перемещения **разрушающие**. Исходной привязки больше нет:
 
 ```rust
 let vec = vec![1, 2, 3];
-let vec2 = vec;           // Move — vec is consumed
-// vec.len();             // Compile error: value used after move
+let vec2 = vec;           // Перемещение — vec поглощён
+// vec.len();             // Ошибка компиляции: значение использовано после перемещения
 ```
 
-### Iterator invalidation — real bugs from production C++
+### Инвалидация итераторов — настоящие ошибки из боевого C++
 
-These aren't contrived examples — they represent **real bug patterns** found in large C++ codebases:
+Это не надуманные примеры — они представляют собой **реальные шаблоны ошибок**, встречающиеся в больших кодовых базах на C++:
 
 ```cpp
-// BUG 1: erase without reassigning iterator (undefined behavior)
+// ОШИБКА 1: удаление без переприсваивания итератора (неопределённое поведение)
 while (it != pending_faults.end()) {
     if (*it != nullptr && (*it)->GetId() == fault->GetId()) {
-        pending_faults.erase(it);   // ← iterator invalidated!
-        removed_count++;            //   next loop uses dangling iterator
+        pending_faults.erase(it);   // ← итератор инвалидирован!
+        removed_count++;            //   следующая итерация использует висячий итератор
     } else {
         ++it;
     }
 }
-// Fix: it = pending_faults.erase(it);
+// Исправление: it = pending_faults.erase(it);
 ```
 
 ```cpp
-// BUG 2: index-based erase skips elements
+// ОШИБКА 2: удаление по индексу пропускает элементы
 for (auto i = 0; i < entries.size(); i++) {
     if (config_status == ConfigDisable::Status::Disabled) {
-        entries.erase(entries.begin() + i);  // ← shifts elements
-    }                                         //   i++ skips the shifted one
+        entries.erase(entries.begin() + i);  // ← сдвигает элементы
+    }                                         //   i++ пропускает сдвинутый элемент
 }
 ```
 
 ```cpp
-// BUG 3: one erase path correct, the other isn't
+// ОШИБКА 3: один путь удаления правильный, другой — нет
 while (it != incomplete_ids.end()) {
     if (current_action == nullptr) {
-        incomplete_ids.erase(it);  // ← BUG: iterator not reassigned
+        incomplete_ids.erase(it);  // ← ОШИБКА: итератор не переприсвоен
         continue;
     }
-    it = incomplete_ids.erase(it); // ← Correct path
+    it = incomplete_ids.erase(it); // ← Правильный путь
 }
 ```
 
-**These compile without any warning.** In Rust, the borrow checker makes all three a compile error — you cannot mutate a collection while iterating over it, period.
+**Все эти примеры компилируются без единого предупреждения.** В Rust проверка заимствований делает все три ошибки ошибками компиляции — вы не можете изменять коллекцию во время итерации по ней, точка.
 
-### Exception safety and the `dynamic_cast`/`new` pattern
+### Безопасность исключений и шаблон `dynamic_cast`/`new`
 
-Modern C++ codebases still lean heavily on patterns that have no compile-time safety:
+Современные кодовые базы на C++ по-прежнему опираются на шаблоны, у которых нет безопасности на этапе компиляции:
 
 ```cpp
-// Typical C++ factory pattern — every branch is a potential bug
+// Типичный фабричный шаблон C++ — каждая ветка является потенциальной ошибкой
 DriverBase* driver = nullptr;
 if (dynamic_cast<ModelA*>(device)) {
     driver = new DriverForModelA(framework);
 } else if (dynamic_cast<ModelB*>(device)) {
     driver = new DriverForModelB(framework);
 }
-// What if driver is still nullptr? What if new throws? Who owns driver?
+// Что, если driver всё ещё nullptr? Что, если new выбросит исключение? Кто владеет driver?
 ```
 
-In a typical 100K-line C++ codebase you might find hundreds of `dynamic_cast` calls (each a potential runtime failure), hundreds of raw `new` calls (each a potential leak), and hundreds of `virtual`/`override` methods (vtable overhead everywhere).
+В типичной кодовой базе на C++ на 100 тысяч строк можно найти сотни вызовов `dynamic_cast` (каждый — потенциальный сбой во время выполнения), сотни сырых вызовов `new` (каждый — потенциальная утечка) и сотни методов `virtual`/`override` (накладные расходы на таблицы виртуальных функций повсюду).
 
-### Dangling references and lambda captures
+### Висячие ссылки и захваты в лямбдах
 
 ```cpp
 int& get_reference() {
     int x = 42;
-    return x;  // Dangling reference — compiles, UB at runtime
+    return x;  // Висячая ссылка — компилируется, неопределённое поведение во время выполнения
 }
 
 auto make_closure() {
     int local = 42;
-    return [&local]() { return local; };  // Dangling capture!
+    return [&local]() { return local; };  // Висячий захват!
 }
 ```
 
-### The visualization: C++ additional problems
+### Визуализация: дополнительные проблемы C++
 
 ```mermaid
 graph TD
-    ROOT["C++ Additional Problems<br/>(on top of C issues)"] --> UAM["Use-After-Move"]
-    ROOT --> CYCLE["Reference Cycles"]
-    ROOT --> ITER["Iterator Invalidation"]
-    ROOT --> EXC["Exception Safety"]
-    ROOT --> TMPL["Template Error Messages"]
+    ROOT["Дополнительные проблемы C++<br/>(помимо проблем C)"] --> UAM["Использование после перемещения"]
+    ROOT --> CYCLE["Циклы ссылок"]
+    ROOT --> ITER["Инвалидация итераторов"]
+    ROOT --> EXC["Безопасность исключений"]
+    ROOT --> TMPL["Сообщения об ошибках шаблонов"]
 
-    UAM --> UAM1["std::move leaves zombie<br/>Compiles without warning"]
-    CYCLE --> CYCLE1["shared_ptr cycles leak<br/>Destructor never called"]
-    ITER --> ITER1["erase() invalidates iterators<br/>Real production bugs"]
-    EXC --> EXC1["Partial construction<br/>new without try/catch"]
-    TMPL --> TMPL1["30+ lines of nested<br/>template instantiation errors"]
+    UAM --> UAM1["std::move оставляет зомби<br/>Компилируется без предупреждений"]
+    CYCLE --> CYCLE1["Циклы shared_ptr приводят к утечкам<br/>Деструктор никогда не вызывается"]
+    ITER --> ITER1["erase() инвалидирует итераторы<br/>Реальные ошибки в продакшене"]
+    EXC --> EXC1["Частичное конструирование<br/>new без try/catch"]
+    TMPL --> TMPL1["30+ строк вложенных ошибок<br/>инстанцирования шаблонов"]
 
     style ROOT fill:#ff6b6b,color:#000
     style UAM fill:#ffa07a,color:#000
@@ -283,65 +283,65 @@ graph TD
 
 ---
 
-## How Rust Addresses All of This
+## Как Rust решает всё это
 
-Every problem listed above — from both C and C++ — is prevented by Rust's compile-time guarantees:
+Каждая проблема, перечисленная выше — и из C, и из C++, — предотвращается гарантиями Rust на этапе компиляции:
 
-| Problem | Rust's Solution |
-|---------|-----------------|
-| Buffer overflows | Slices carry length; indexing is bounds-checked |
-| Dangling pointers / use-after-free | Lifetime system proves references are valid at compile time |
-| Use-after-move | Moves are destructive — compiler refuses to let you touch the original |
-| Memory leaks | `Drop` trait = RAII without the Rule of Five; automatic, correct cleanup |
-| Reference cycles | Ownership is tree-shaped; `Rc` + `Weak` makes cycles explicit |
-| Iterator invalidation | Borrow checker forbids mutating a collection while borrowing it |
-| NULL pointers | No null. `Option<T>` forces explicit handling via pattern matching |
-| Data races | `Send`/`Sync` traits make data races a compile error |
-| Uninitialized variables | All variables must be initialized; compiler enforces it |
-| Integer UB | Debug panics on overflow; release wraps (both defined behavior) |
-| Exceptions | No exceptions; `Result<T, E>` is visible in type signatures, propagated with `?` |
-| Inheritance complexity | Traits + composition; no Diamond Problem, no vtable fragility |
-| Forgotten mutex unlocks | `Mutex<T>` wraps the data; lock guard is the only access path |
+| Проблема | Решение в Rust |
+|----------|----------------|
+| Переполнения буфера | Срезы хранят длину; индексация проверяется на границы |
+| Висячие указатели / использование после освобождения | Система времён жизни доказывает, что ссылки валидны, на этапе компиляции |
+| Использование после перемещения | Перемещения разрушающие — компилятор не позволит трогать исходное значение |
+| Утечки памяти | Трейт `Drop` = RAII без правила пяти; автоматическая и корректная очистка |
+| Циклы ссылок | Владение имеет древовидную структуру; `Rc` + `Weak` делают циклы явными |
+| Инвалидация итераторов | Проверка заимствований запрещает изменять коллекцию, пока она заимствована |
+| NULL-указатели | Нет null. `Option<T>` вынуждает явно обрабатывать значение через сопоставление с образцом |
+| Гонки данных | Трейты `Send`/`Sync` делают гонки данных ошибкой компиляции |
+| Неинициализированные переменные | Все переменные должны быть инициализированы; это проверяет компилятор |
+| Неопределённое поведение при переполнении | В отладке panic; в релизе переполнение (оба варианта определены) |
+| Исключения | Исключений нет; `Result<T, E>` виден в сигнатурах типов и распространяется с помощью `?` |
+| Сложность наследования | Трейты + композиция; нет проблемы ромба, нет хрупкости таблиц виртуальных функций |
+| Забытые разблокировки мьютексов | `Mutex<T>` оборачивает данные; защитник блокировки — единственный путь доступа |
 
 ```rust
 fn rust_prevents_everything() {
-    // ✅ No buffer overflow — bounds checked
+    // ✅ Нет переполнения буфера — границы проверяются
     let arr = [1, 2, 3, 4, 5];
-    // arr[10];  // panic at runtime, never UB
+    // arr[10];  // panic во время выполнения, никогда не UB
 
-    // ✅ No use-after-move — compile error
+    // ✅ Нет использования после перемещения — ошибка компиляции
     let data = vec![1, 2, 3];
     let moved = data;
     // data.len();  // error: value used after move
 
-    // ✅ No dangling pointer — lifetime error
+    // ✅ Нет висячих указателей — ошибка времени жизни
     // let r;
     // { let x = 5; r = &x; }  // error: x does not live long enough
 
-    // ✅ No null — Option forces handling
+    // ✅ Нет null — Option вынуждает обработку
     let maybe: Option<i32> = None;
-    // maybe.unwrap();  // panic, but you'd use match or if let instead
+    // maybe.unwrap();  // panic, но вместо этого вы бы использовали match или if let
 
-    // ✅ No data race — compile error
+    // ✅ Нет гонки данных — ошибка компиляции
     // let mut shared = vec![1, 2, 3];
     // std::thread::spawn(|| shared.push(4));  // error: closure may outlive
     // shared.push(5);                         //   borrowed value
 }
 ```
 
-### Rust's safety model — the full picture
+### Модель безопасности Rust — полная картина
 
 ```mermaid
 graph TD
-    RUST["Rust Safety Guarantees"] --> OWN["Ownership System"]
-    RUST --> BORROW["Borrow Checker"]
-    RUST --> TYPES["Type System"]
-    RUST --> TRAITS["Send/Sync Traits"]
+    RUST["Гарантии безопасности Rust"] --> OWN["Система владения"]
+    RUST --> BORROW["Проверка заимствований"]
+    RUST --> TYPES["Система типов"]
+    RUST --> TRAITS["Трейты Send/Sync"]
 
-    OWN --> OWN1["No use-after-free<br/>No use-after-move<br/>No double-free"]
-    BORROW --> BORROW1["No dangling references<br/>No iterator invalidation<br/>No data races through refs"]
-    TYPES --> TYPES1["No NULL (Option&lt;T&gt;)<br/>No exceptions (Result&lt;T,E&gt;)<br/>No uninitialized values"]
-    TRAITS --> TRAITS1["No data races<br/>Send = safe to transfer<br/>Sync = safe to share"]
+    OWN --> OWN1["Нет использования после освобождения<br/>Нет использования после перемещения<br/>Нет двойного освобождения"]
+    BORROW --> BORROW1["Нет висячих ссылок<br/>Нет инвалидации итераторов<br/>Нет гонок данных через ссылки"]
+    TYPES --> TYPES1["Нет NULL (Option&lt;T&gt;)<br/>Нет исключений (Result&lt;T,E&gt;)<br/>Нет неинициализированных значений"]
+    TRAITS --> TRAITS1["Нет гонок данных<br/>Send = безопасно передавать<br/>Sync = безопасно разделять"]
 
     style RUST fill:#51cf66,color:#000
     style OWN fill:#91e5a3,color:#000
@@ -350,20 +350,20 @@ graph TD
     style TRAITS fill:#91e5a3,color:#000
 ```
 
-## Quick Reference: C vs C++ vs Rust
+## Краткий справочник: C vs C++ vs Rust
 
-| **Concept** | **C** | **C++** | **Rust** | **Key Difference** |
-|-------------|-------|---------|----------|-------------------|
-| Memory management | `malloc()/free()` | `unique_ptr`, `shared_ptr` | `Box<T>`, `Rc<T>`, `Arc<T>` | Automatic, no cycles, no zombies |
-| Arrays | `int arr[10]` | `std::vector<T>`, `std::array<T>` | `Vec<T>`, `[T; N]` | Bounds checking by default |
-| Strings | `char*` with `\0` | `std::string`, `string_view` | `String`, `&str` | UTF-8 guaranteed, lifetime-checked |
-| References | `int*` (raw) | `T&`, `T&&` (move) | `&T`, `&mut T` | Lifetime + borrow checking |
-| Polymorphism | Function pointers | Virtual functions, inheritance | Traits, trait objects | Composition over inheritance |
-| Generics | Macros / `void*` | Templates | Generics + trait bounds | Clear error messages |
-| Error handling | Return codes, `errno` | Exceptions, `std::optional` | `Result<T, E>`, `Option<T>` | No hidden control flow |
-| NULL safety | `ptr == NULL` | `nullptr`, `std::optional<T>` | `Option<T>` | Forced null checking |
-| Thread safety | Manual (pthreads) | Manual (`std::mutex`, etc.) | Compile-time `Send`/`Sync` | Data races impossible |
-| Build system | Make, CMake | CMake, Make, etc. | Cargo | Integrated toolchain |
-| Undefined behavior | Rampant | Subtle (signed overflow, aliasing) | Zero in safe code | Safety guaranteed |
+| **Концепция** | **C** | **C++** | **Rust** | **Ключевое отличие** |
+|---------------|-------|---------|----------|---------------------|
+| Управление памятью | `malloc()/free()` | `unique_ptr`, `shared_ptr` | `Box<T>`, `Rc<T>`, `Arc<T>` | Автоматическое, без циклов и зомби |
+| Массивы | `int arr[10]` | `std::vector<T>`, `std::array<T>` | `Vec<T>`, `[T; N]` | Проверка границ по умолчанию |
+| Строки | `char*` с `\0` | `std::string`, `string_view` | `String`, `&str` | Гарантированный UTF-8, проверка времён жизни |
+| Ссылки | `int*` (сырые) | `T&`, `T&&` (перемещение) | `&T`, `&mut T` | Проверка времён жизни и заимствований |
+| Полиморфизм | Указатели на функции | Виртуальные функции, наследование | Трейты, трейт-объекты | Композиция вместо наследования |
+| Обобщения | Макросы / `void*` | Шаблоны | Обобщения + ограничения трейтами | Понятные сообщения об ошибках |
+| Обработка ошибок | Коды возврата, `errno` | Исключения, `std::optional` | `Result<T, E>`, `Option<T>` | Никакого скрытого потока управления |
+| Безопасность при null | `ptr == NULL` | `nullptr`, `std::optional<T>` | `Option<T>` | Принудительная проверка на null |
+| Потокобезопасность | Вручную (pthreads) | Вручную (`std::mutex` и др.) | `Send`/`Sync` на этапе компиляции | Гонки данных невозможны |
+| Система сборки | Make, CMake | CMake, Make и др. | Cargo | Интегрированный инструментарий |
+| Неопределённое поведение | Повсеместно | Тонкое (переполнение знаковых, алиасинг) | Нет в безопасном коде | Безопасность гарантирована |
 
 ***

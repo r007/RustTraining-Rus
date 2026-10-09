@@ -1,41 +1,41 @@
-# Built-in Rust types
+# Встроенные типы Rust
 
-> **What you'll learn:** Rust's fundamental types (`i32`, `u64`, `f64`, `bool`, `char`), type inference, explicit type annotations, and how they compare to C/C++ primitive types. No implicit conversions — Rust requires explicit casts.
+> **Что вы узнаете:** фундаментальные типы Rust (`i32`, `u64`, `f64`, `bool`, `char`), вывод типов, явные аннотации типов и то, как они соотносятся с примитивными типами C/C++. Неявных преобразований нет — Rust требует явных приведений.
 
-- Rust has type inference, but also allows explicit specification of the type 
+- В Rust есть вывод типов, но допускается и явное указание типа
 
-|  **Description**  |            **Type**            |          **Example**          |
+|  **Описание**  |            **Тип**            |          **Пример**          |
 |:-----------------:|:------------------------------:|:-----------------------------:|
-| Signed integers   | i8, i16, i32, i64, i128, isize | -1, 42, 1_00_000, 1_00_000i64 |
-| Unsigned integers | u8, u16, u32, u64, u128, usize | 0, 42, 42u32, 42u64           |
-| Floating point    | f32, f64                       | 0.0, 0.42                     |
+| Знаковые целые   | i8, i16, i32, i64, i128, isize | -1, 42, 1_00_000, 1_00_000i64 |
+| Беззнаковые целые | u8, u16, u32, u64, u128, usize | 0, 42, 42u32, 42u64           |
+| Числа с плавающей точкой | f32, f64                       | 0.0, 0.42                     |
 | Unicode           | char                           | 'a', '$'                      |
-| Boolean           | bool                           | true, false                   |
+| Логический        | bool                           | true, false                   |
 
-- Rust permits arbitrary use of ```_``` between numbers for ease of reading
+- Rust допускает произвольное использование ```_``` между цифрами для удобства чтения
 ----
-### Rust type specification and assignment
-- Rust uses the ```let``` keyword to assign values to variables. The type of the variable can be optionally specified after a ```:```
+### Указание типа и присваивание в Rust
+- Для присваивания значений переменным в Rust используется ключевое слово ```let```. Тип переменной можно необязательно указать после ```:```
 ```rust
 fn main() {
     let x : i32 = 42;
-    // These two assignments are logically equivalent
+    // Эти два присваивания логически эквивалентны
     let y : u32 = 42;
     let z = 42u32;
 }
 ``` 
-- Function parameters and return values (if any) require an explicit type. The following takes a u8 parameter and returns u32
+- Параметры функций и возвращаемые значения (если есть) требуют явного указания типа. Следующая функция принимает параметр u8 и возвращает u32
 ```rust
 fn foo(x : u8) -> u32
 {
     return x as u32 * x as u32;
 }
 ```
-- Unused variables are prefixed with ```_``` to avoid compiler warnings
+- Неиспользуемые переменные помечаются префиксом ```_```, чтобы не получать предупреждения компилятора
 ----
-# Rust type specification and inference
-- Rust can automatically infer the type of the variable based on the context. 
-- [▶ Try it in the Rust Playground](https://play.rust-lang.org/)
+# Указание типа и вывод типа в Rust
+- Rust может автоматически вывести тип переменной из контекста.
+- [▶ Попробуйте в Rust Playground](https://play.rust-lang.org/)
 ```rust
 fn secret_of_life_u32(x : u32) {
     println!("The u32 secret_of_life is {}", x);
@@ -46,32 +46,29 @@ fn secret_of_life_u8(x : u8) {
 }
 
 fn main() {
-    let a = 42; // The let keyword assigns a value; type of a is u32
-    let b = 42; // The let keyword assigns a value; inferred type of b is u8
+    let a = 42; // Ключевое слово let присваивает значение; тип a — u32
+    let b = 42; // Ключевое слово let присваивает значение; выведенный тип b — u8
     secret_of_life_u32(a);
     secret_of_life_u8(b);
 }
 ```
 
-# Rust variables and mutability
-- Rust variables are **immutable** by default unless the ```mut``` keyword is used to denote that a variable is mutable. For example, the following code will not compile unless the ```let a = 42``` is changed to ```let mut a = 42```
+# Переменные и изменяемость в Rust
+- Переменные в Rust по умолчанию **неизменяемые**, если не использовано ключевое слово ```mut```, которое обозначает изменяемость переменной. Например, следующий код не скомпилируется, пока ```let a = 42``` не будет заменено на ```let mut a = 42```
 ```rust
 fn main() {
-    let a = 42; // Must be changed to let mut a = 42 to permit the assignment below 
-    a = 43;  // Will not compile unless the above is changed
+    let a = 42; // Нужно заменить на let mut a = 42, чтобы разрешить присваивание ниже
+    a = 43;  // Не скомпилируется, пока выше не внесено изменение
 }
 ```
-- Rust permits the reuse of the variable names (shadowing)
+- Rust допускает повторное использование имён переменных (затенение, shadowing)
 ```rust
 fn main() {
     let a = 42;
     {
-        let a = 43; //OK: Different variable with the same name
+        let a = 43; //OK: Другая переменная с тем же именем
     }
-    // a = 43; // Not permitted
-    let a = 43; // Ok: New variable and assignment
+    // a = 43; // Не допускается
+    let a = 43; // Ок: новая переменная и присваивание
 }
 ```
-
-
-

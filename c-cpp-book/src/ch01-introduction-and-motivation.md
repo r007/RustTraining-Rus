@@ -1,87 +1,87 @@
-# Speaker intro and general approach
+# Представление преподавателя и общий подход
 
-> **What you'll learn:** Course structure, the interactive format, and how familiar C/C++ concepts map to Rust equivalents. This chapter sets expectations and gives you a roadmap for the rest of the book.
+> **Что вы узнаете:** структуру курса, интерактивный формат и то, как знакомые концепции C/C++ соответствуют своим аналогам в Rust. Эта глава задаёт ожидания и даёт дорожную карту для остальной книги.
 
-- Speaker intro
-    - Principal Firmware Architect in Microsoft SCHIE (Silicon and Cloud Hardware Infrastructure Engineering) team
-    - Industry veteran with expertise in security, systems programming (firmware, operating systems, hypervisors), CPU and platform architecture, and C++ systems
-    - Started programming in Rust in 2017 (@AWS EC2), and have been in love with the language ever since
-- This course is intended to be as interactive as possible
-    - Assumption: You know C, C++, or both
-    - Examples are deliberately designed to map familiar concepts to Rust equivalents
-    - **Please feel free to ask clarifying questions at any point of time**
-- Speaker is looking forward to continued engagement with teams
+- О преподавателе
+    - Principal Firmware Architect (ведущий архитектор прошивок) в команде SCHIE (Silicon and Cloud Hardware Infrastructure Engineering) в Microsoft
+    - Ветеран отрасли с опытом в безопасности, системном программировании (прошивки, операционные системы, гипервизоры), архитектуре процессоров и платформ, а также в системах на C++
+    - Начал программировать на Rust в 2017 году (@AWS EC2) и с тех пор влюблён в этот язык
+- Курс задуман как можно более интерактивный
+    - Предположение: вы знаете C, C++ или оба языка
+    - Примеры намеренно построены так, чтобы знакомые концепции сопоставлялись с аналогами в Rust
+    - **Задавайте уточняющие вопросы в любой момент**
+- Преподаватель рассчитывает на продолжение общения с командами
 
-# The case for Rust
-> **Want to skip straight to code?** Jump to [Show me some code](ch02-getting-started.md#enough-talk-already-show-me-some-code)
+# Аргументы в пользу Rust
+> **Хотите сразу перейти к коду?** Перейдите к разделу [Покажите мне код](ch02-getting-started.md#хватит-разговоров-покажите-код)
 
-Whether you're coming from C or C++, the core pain points are the same: memory safety bugs that compile cleanly but crash, corrupt, or leak at runtime.
+Независимо от того, приходите ли вы из C или C++, основные болевые точки одни и те же: ошибки безопасности памяти, которые компилируются без проблем, но приводят к падению, порче данных или утечкам во время выполнения.
 
-- Over **70% of CVEs** are caused by memory safety issues — buffer overflows, dangling pointers, use-after-free
-- C++ `shared_ptr`, `unique_ptr`, RAII, and move semantics are steps in the right direction, but they are **bandaids, not cures** — they leave use-after-move, reference cycles, iterator invalidation, and exception safety gaps wide open
-- Rust provides the performance you rely on from C/C++, but with **compile-time guarantees** for safety
+- Более **70% CVE** вызваны проблемами безопасности памяти — переполнениями буфера, висячими указателями, использованием после освобождения
+- Умные указатели C++ (`shared_ptr`, `unique_ptr`), RAII и семантика перемещения — шаги в правильном направлении, но это **пластыри, а не лекарство**: они оставляют открытыми использование после перемещения, циклы ссылок, инвалидацию итераторов и пробелы в безопасности исключений
+- Rust даёт ту же производительность, на которую вы опираетесь в C/C++, но с **гарантиями безопасности на этапе компиляции**
 
-> **📖 Deep dive:** See [Why C/C++ Developers Need Rust](ch01-1-why-c-cpp-developers-need-rust.md) for concrete vulnerability examples, the complete list of what Rust eliminates, and why C++ smart pointers aren't enough
+> **📖 Подробнее:** см. [Почему разработчикам C/C++ нужен Rust](ch01-1-why-c-cpp-developers-need-rust.md) — там конкретные примеры уязвимостей, полный список того, что устраняет Rust, и объяснение, почему умных указателей C++ недостаточно
 
 ----
 
-# How does Rust address these issues?
+# Как Rust решает эти проблемы?
 
-## Buffer overflows and bounds violations
-- All Rust arrays, slices, and strings have explicit bounds associated with them. The compiler inserts checks to ensure that any bounds violation results in a **runtime crash** (panic in Rust terms) — never undefined behavior
+## Переполнения буфера и выход за границы
+- У всех массивов, срезов и строк Rust явно заданы границы. Компилятор вставляет проверки, благодаря которым любой выход за границы приводит к **аварийному завершению во время выполнения** (panic в терминологии Rust), а не к неопределённому поведению
 
-## Dangling pointers and references
-- Rust introduces lifetimes and borrow checking to eliminate dangling references at **compile time**
-- No dangling pointers, no use-after-free — the compiler simply won't let you
+## Висячие указатели и ссылки
+- Rust вводит времена жизни и проверку заимствований, чтобы устранять висячие ссылки на **этапе компиляции**
+- Никаких висячих указателей, никакого использования после освобождения — компилятор просто не позволит это сделать
 
-## Use-after-move
-- Rust's ownership system makes moves **destructive** — once you move a value, the compiler **refuses** to let you use the original. No zombie objects, no "valid but unspecified state"
+## Использование после перемещения
+- Система владения в Rust делает перемещение **разрушающим**: после перемещения значения компилятор **не позволит** использовать исходную переменную. Никаких «зомби-объектов» и состояния «допустимо, но не определено»
 
-## Resource management
-- Rust's `Drop` trait is RAII done right — the compiler automatically frees resources when they go out of scope, and **prevents use-after-move** which C++ RAII cannot
-- No Rule of Five needed (no copy ctor, move ctor, copy assign, move assign, destructor to define)
+## Управление ресурсами
+- Трейт `Drop` в Rust — это RAII, реализованный правильно: компилятор автоматически освобождает ресурсы, когда они выходят из области видимости, и **предотвращает использование после перемещения**, чего RAII в C++ не может
+- Правило пяти не нужно (не требуется определять конструктор копирования, конструктор перемещения, оператор копирующего присваивания, оператор перемещающего присваивания и деструктор)
 
-## Error handling
-- Rust has no exceptions. All errors are values (`Result<T, E>`), making error handling explicit and visible in the type signature
+## Обработка ошибок
+- В Rust нет исключений. Все ошибки — это значения (`Result<T, E>`), поэтому обработка ошибок явная и видна в сигнатуре типа
 
-## Iterator invalidation
-- Rust's borrow checker **forbids modifying a collection while iterating over it**. You simply cannot write the bugs that plague C++ codebases:
+## Инвалидация итераторов
+- Проверка заимствований в Rust **запрещает изменять коллекцию во время итерации по ней**. Вы просто не можете написать те ошибки, которыми полны кодовые базы на C++:
 ```rust
-// Rust equivalent of erase-during-iteration: retain()
+// Аналог удаления во время итерации в Rust: retain()
 pending_faults.retain(|f| f.id != fault_to_remove.id);
 
-// Or: collect into a new Vec (functional style)
+// Или: собрать в новый Vec (функциональный стиль)
 let remaining: Vec<_> = pending_faults
     .into_iter()
     .filter(|f| f.id != fault_to_remove.id)
     .collect();
 ```
 
-## Data races
-- The type system prevents data races at **compile time** through the `Send` and `Sync` traits
+## Гонки данных
+- Система типов предотвращает гонки данных на **этапе компиляции** благодаря трейтам `Send` и `Sync`
 
-## Memory Safety Visualization
+## Визуализация безопасности памяти
 
-### Rust Ownership — Safe by Design
+### Владение в Rust — безопасность по замыслу
 
 ```rust
 fn safe_rust_ownership() {
-    // Move is destructive: original is gone
+    // Перемещение разрушающее: исходное значение больше недоступно
     let data = vec![1, 2, 3];
-    let data2 = data;           // Move happens
-    // data.len();              // Compile error: value used after move
+    let data2 = data;           // Происходит перемещение
+    // data.len();              // Ошибка компиляции: значение использовано после перемещения
     
-    // Borrowing: safe shared access
+    // Заимствование: безопасный совместный доступ
     let owned = String::from("Hello, World!");
-    let slice: &str = &owned;  // Borrow — no allocation
-    println!("{}", slice);     // Always safe
+    let slice: &str = &owned;  // Заимствование — без выделения памяти
+    println!("{}", slice);     // Всегда безопасно
     
-    // No dangling references possible
+    // Висячие ссылки невозможны
     /*
     let dangling_ref;
     {
         let temp = String::from("temporary");
-        dangling_ref = &temp;  // Compile error: temp doesn't live long enough
+        dangling_ref = &temp;  // Ошибка компиляции: temp не живёт достаточно долго
     }
     */
 }
@@ -89,22 +89,22 @@ fn safe_rust_ownership() {
 
 ```mermaid
 graph TD
-    A[Rust Ownership Safety] --> B[Destructive Moves]
-    A --> C[Automatic Memory Management]
-    A --> D[Compile-time Lifetime Checking]
-    A --> E[No Exceptions — Result Types]
+    A[Безопасность владения Rust] --> B[Разрушающие перемещения]
+    A --> C[Автоматическое управление памятью]
+    A --> D[Проверка времён жизни на этапе компиляции]
+    A --> E[Никаких исключений — типы Result]
     
-    B --> B1["Use-after-move is compile error"]
-    B --> B2["No zombie objects"]
+    B --> B1["Использование после перемещения — ошибка компиляции"]
+    B --> B2["Никаких зомби-объектов"]
     
-    C --> C1["Drop trait = RAII done right"]
-    C --> C2["No Rule of Five needed"]
+    C --> C1["Трейт Drop = RAII, сделанный правильно"]
+    C --> C2["Правило пяти не нужно"]
     
-    D --> D1["Borrow checker prevents dangling"]
-    D --> D2["References always valid"]
+    D --> D1["Проверка заимствований исключает висячие ссылки"]
+    D --> D2["Ссылки всегда валидны"]
     
-    E --> E1["Result<T,E> — errors in types"]
-    E --> E2["? operator for propagation"]
+    E --> E1["Result<T,E> — ошибки в типах"]
+    E --> E2["Оператор ? для распространения"]
     
     style A fill:#51cf66,color:#000
     style B fill:#91e5a3,color:#000
@@ -113,64 +113,64 @@ graph TD
     style E fill:#91e5a3,color:#000
 ```
 
-## Memory Layout: Rust References
+## Структура памяти: ссылки в Rust
 
 ```mermaid
 graph TD
-    RM1[Stack] --> RP1["&i32 ref"]
-    RM2[Stack/Heap] --> RV1["i32 value = 42"]
-    RP1 -.->|"Safe reference — Lifetime checked"| RV1
-    RM3[Borrow Checker] --> RC1["Prevents dangling refs at compile time"]
+    RM1[Стек] --> RP1["Ссылка &i32"]
+    RM2[Стек/Куча] --> RV1["Значение i32 = 42"]
+    RP1 -.->|"Безопасная ссылка — время жизни проверяется"| RV1
+    RM3[Проверка заимствований] --> RC1["Исключает висячие ссылки на этапе компиляции"]
     
     style RC1 fill:#51cf66,color:#000
     style RP1 fill:#91e5a3,color:#000
 ```
 
-### `Box<T>` Heap Allocation Visualization
+### Визуализация выделения памяти в `Box<T>`
 
 ```rust
 fn box_allocation_example() {
-    // Stack allocation
+    // Выделение на стеке
     let stack_value = 42;
     
-    // Heap allocation with Box
+    // Выделение в куче через Box
     let heap_value = Box::new(42);
     
-    // Moving ownership
+    // Передача владения
     let moved_box = heap_value;
-    // heap_value is no longer accessible
+    // heap_value больше недоступен
 }
 ```
 
 ```mermaid
 graph TD
-    subgraph "Stack Frame"
+    subgraph "Кадр стека"
         SV["stack_value: 42"]
         BP["heap_value: Box<i32>"]
         BP2["moved_box: Box<i32>"]
     end
     
-    subgraph "Heap"
+    subgraph "Куча"
         HV["42"]
     end
     
-    BP -->|"Owns"| HV
-    BP -.->|"Move ownership"| BP2
-    BP2 -->|"Now owns"| HV
+    BP -->|"Владеет"| HV
+    BP -.->|"Передача владения"| BP2
+    BP2 -->|"Теперь владеет"| HV
     
-    subgraph "After Move"
-        BP_X["heap_value: [WARNING] MOVED"]
+    subgraph "После перемещения"
+        BP_X["heap_value: [ВНИМАНИЕ] ПЕРЕМЕЩЕНО"]
         BP2_A["moved_box: Box<i32>"]
     end
     
-    BP2_A -->|"Owns"| HV
+    BP2_A -->|"Владеет"| HV
     
     style BP_X fill:#ff6b6b,color:#000
     style HV fill:#91e5a3,color:#000
     style BP2_A fill:#51cf66,color:#000
 ```
 
-## Slice Operations Visualization
+## Визуализация операций со срезами
 
 ```rust
 fn slice_operations() {
@@ -186,7 +186,7 @@ fn slice_operations() {
 ```mermaid
 graph TD
     V["Vec: [1, 2, 3, 4, 5, 6, 7, 8]"]
-    V --> FS["&data[..] → all elements"]
+    V --> FS["&data[..] → все элементы"]
     V --> PS["&data[2..6] → [3, 4, 5, 6]"]
     V --> SS["&data[..4] → [1, 2, 3, 4]"]
     V --> ES["&data[3..] → [4, 5, 6, 7, 8]"]
@@ -198,34 +198,34 @@ graph TD
     style ES fill:#91e5a3,color:#000
 ```
 
-# Other Rust USPs and features
-- No data races between threads (compile-time `Send`/`Sync` checking)
-- No use-after-move (unlike C++ `std::move` which leaves zombie objects)
-- No uninitialized variables
-    - All variables must be initialized before use
-- No trivial memory leaks
-    - `Drop` trait = RAII done right, no Rule of Five needed
-    - Compiler automatically releases memory when it goes out of scope
-- No forgotten locks on mutexes
-    - Lock guards are the *only* way to access the data (`Mutex<T>` wraps the data, not the access)
-- No exception handling complexity
-    - Errors are values (`Result<T, E>`), visible in function signatures, propagated with `?`
-- Excellent support for type inference, enums, pattern matching, zero cost abstractions
-- Built-in support for dependency management, building, testing, formatting, linting
-    - `cargo` replaces make/CMake + lint + test frameworks
+# Другие ключевые преимущества и возможности Rust
+- Никаких гонок данных между потоками (проверка `Send`/`Sync` на этапе компиляции)
+- Никакого использования после перемещения (в отличие от `std::move` в C++, который оставляет зомби-объекты)
+- Никаких неинициализированных переменных
+    - Все переменные должны быть инициализированы до использования
+- Никаких тривиальных утечек памяти
+    - Трейт `Drop` = RAII, сделанный правильно, правило пяти не нужно
+    - Компилятор автоматически освобождает память, когда она выходит из области видимости
+- Никаких забытых блокировок мьютексов
+    - Защитники блокировок — *единственный* способ доступа к данным (`Mutex<T>` оборачивает данные, а не доступ к ним)
+- Никакой сложности обработки исключений
+    - Ошибки — это значения (`Result<T, E>`), видны в сигнатурах функций и распространяются с помощью `?`
+- Отличная поддержка вывода типов, перечислений, сопоставления с образцом и абстракций с нулевой стоимостью
+- Встроенная поддержка управления зависимостями, сборки, тестирования, форматирования и линтинга
+    - `cargo` заменяет make/CMake и фреймворки для линтинга и тестирования
 
-# Quick Reference: Rust vs C/C++
+# Краткий справочник: Rust и C/C++
 
-| **Concept** | **C** | **C++** | **Rust** | **Key Difference** |
-|-------------|-------|---------|----------|-------------------|
-| Memory management | `malloc()/free()` | `unique_ptr`, `shared_ptr` | `Box<T>`, `Rc<T>`, `Arc<T>` | Automatic, no cycles |
-| Arrays | `int arr[10]` | `std::vector<T>`, `std::array<T>` | `Vec<T>`, `[T; N]` | Bounds checking by default |
-| Strings | `char*` with `\0` | `std::string`, `string_view` | `String`, `&str` | UTF-8 guaranteed, lifetime-checked |
-| References | `int* ptr` | `T&`, `T&&` (move) | `&T`, `&mut T` | Borrow checking, lifetimes |
-| Polymorphism | Function pointers | Virtual functions, inheritance | Traits, trait objects | Composition over inheritance |
-| Generic programming | Macros (`void*`) | Templates | Generics + trait bounds | Better error messages |
-| Error handling | Return codes, `errno` | Exceptions, `std::optional` | `Result<T, E>`, `Option<T>` | No hidden control flow |
-| NULL/null safety | `ptr == NULL` | `nullptr`, `std::optional<T>` | `Option<T>` | Forced null checking |
-| Thread safety | Manual (pthreads) | Manual synchronization | Compile-time guarantees | Data races impossible |
-| Build system | Make, CMake | CMake, Make, etc. | Cargo | Integrated toolchain |
-| Undefined behavior | Runtime crashes | Subtle UB (signed overflow, aliasing) | Compile-time errors | Safety guaranteed |
+| **Концепция** | **C** | **C++** | **Rust** | **Ключевое отличие** |
+|---------------|-------|---------|----------|---------------------|
+| Управление памятью | `malloc()/free()` | `unique_ptr`, `shared_ptr` | `Box<T>`, `Rc<T>`, `Arc<T>` | Автоматическое, без циклов |
+| Массивы | `int arr[10]` | `std::vector<T>`, `std::array<T>` | `Vec<T>`, `[T; N]` | Проверка границ по умолчанию |
+| Строки | `char*` с `\0` | `std::string`, `string_view` | `String`, `&str` | Гарантированный UTF-8, проверка времён жизни |
+| Ссылки | `int* ptr` | `T&`, `T&&` (перемещение) | `&T`, `&mut T` | Проверка заимствований, времена жизни |
+| Полиморфизм | Указатели на функции | Виртуальные функции, наследование | Трейты, трейт-объекты | Композиция вместо наследования |
+| Обобщённое программирование | Макросы (`void*`) | Шаблоны | Обобщения + ограничения трейтами | Понятные сообщения об ошибках |
+| Обработка ошибок | Коды возврата, `errno` | Исключения, `std::optional` | `Result<T, E>`, `Option<T>` | Никакого скрытого потока управления |
+| Безопасность при null | `ptr == NULL` | `nullptr`, `std::optional<T>` | `Option<T>` | Принудительная проверка на null |
+| Потокобезопасность | Вручную (pthreads) | Вручную (`std::mutex` и др.) | Гарантии на этапе компиляции | Гонки данных невозможны |
+| Система сборки | Make, CMake | CMake, Make и др. | Cargo | Встроенный инструментарий |
+| Неопределённое поведение | Ошибки во время выполнения | Тонкое (переполнение знаковых, алиасинг) | Ошибки на этапе компиляции | Безопасность гарантирована |

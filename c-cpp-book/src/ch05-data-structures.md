@@ -1,37 +1,37 @@
-### Rust array type
+### Массивы в Rust
 
-> **What you'll learn:** Rust's core data structures — arrays, tuples, slices, strings, structs, `Vec`, and `HashMap`. This is a dense chapter; focus on understanding `String` vs `&str` and how structs work. You'll revisit references and borrowing in depth in chapter 7.
+> **Что вы узнаете:** основные структуры данных Rust — массивы, кортежи, срезы, строки, структуры, `Vec` и `HashMap`. Глава плотная; сосредоточьтесь на понимании `String` и `&str` и на том, как работают структуры. Ссылки и заимствования вы разберёте подробно в главе 7.
 
-- Arrays contain a fixed number of elements of the same type
-    - Like all other Rust types, arrays are immutable by default (unless mut is used)
-    - Arrays are indexed using [] and are bounds checked. The len() method can be used to obtain the length of the array
+- Массивы содержат фиксированное количество элементов одного типа
+    - Как и все остальные типы Rust, массивы по умолчанию неизменяемые (если не используется mut)
+    - Доступ к элементам массива осуществляется через [] и проверяется на выход за границы. Длину массива можно получить методом len()
 ```rust
     fn get_index(y : usize) -> usize {
         y+1        
     }
     
     fn main() {
-        // Initializes an array of 3 elements and sets all to 42
+        // Инициализирует массив из 3 элементов и задаёт всем значение 42
         let a : [u8; 3] = [42; 3];
-        // Alternative syntax
+        // Альтернативный синтаксис
         // let a = [42u8, 42u8, 42u8];
         for x in a {
             println!("{x}");
         }
         let y = get_index(a.len());
-        // Commenting out the below will cause a panic
+        // Если раскомментировать строку ниже, произойдёт panic
         //println!("{}", a[y]);
     }
 ```
 
 ----
-### Rust array type continued
-- Arrays can be nested
-    - Rust has several built-in formatters for printing. In the below, the ```:?``` is the ```debug``` print formatter. The ```:#?``` formatter can be used for ```pretty print```. These formatters can be customized per type (more on this later) 
+### Массивы в Rust (продолжение)
+- Массивы можно вкладывать друг в друга
+    - В Rust есть несколько встроенных форматировщиков для вывода. В примере ниже ```:?``` — это форматировщик ```debug```. Форматировщик ```:#?``` используется для ```pretty print``` (красивого вывода). Эти форматировщики можно настроить для каждого типа (подробнее об этом позже)
 ```rust
     fn main() {
         let a = [
-            [40, 0], // Define a nested array
+            [40, 0], // Определяем вложенный массив
             [41, 0],
             [42, 1],
         ];
@@ -41,10 +41,10 @@
     }
 ```
 ----
-### Rust tuples
-- Tuples have a fixed size and can group arbitrary types into a single compound type
-    - The constituent types can be indexed by their relative location (.0, .1, .2, ...). An empty tuple, i.e., () is called the unit value and is the equivalent of a void return value
-    - Rust supports tuple destructuring to make it easy to bind variables to individual elements
+### Кортежи в Rust
+- Кортежи имеют фиксированный размер и могут объединять значения произвольных типов в один составной тип
+    - Элементы кортежа индексируются по их позиции (.0, .1, .2, ...). Пустой кортеж, то есть (), называется значением unit и соответствует возврату void
+    - Rust поддерживает деструктуризацию кортежей, что упрощает привязку переменных к отдельным элементам
 ```rust
 fn get_tuple() -> (u32, bool) {
     (42, true)        
@@ -55,57 +55,57 @@ fn main() {
    let u : (u32, bool) = (43, false);
    println!("{}, {}", t.0, t.1);
    println!("{}, {}", u.0, u.1);
-   let (num, flag) = get_tuple(); // Tuple destructuring
+   let (num, flag) = get_tuple(); // Деструктуризация кортежа
    println!("{num}, {flag}");
 }
 ```
 
-### Rust references
-- References in Rust are roughly equivalent to pointers in C with some key differences
-    - It is legal to have any number of read-only (immutable) references to a variable at any point of time. A reference cannot outlive the variable scope (this is a key concept called **lifetime**; discussed in detail later)
-    - Only a single writable (mutable) reference to a mutable variable is permitted and it must not overlap with any other reference.
+### Ссылки в Rust
+- Ссылки в Rust примерно соответствуют указателям в C, но с некоторыми ключевыми отличиями
+    - В любой момент времени допустимо иметь любое количество ссылок только для чтения (неизменяемых) на переменную. Ссылка не может пережить область видимости переменной (это ключевое понятие под названием **время жизни**, которое подробно рассматривается дальше)
+    - Для изменяемой переменной допускается только одна изменяемая ссылка для записи, и она не должна пересекаться ни с какими другими ссылками.
 ```rust
 fn main() {
     let mut a = 42;
     {
         let b = &a;
         let c = b;
-        println!("{} {}", *b, *c); // The compiler automatically dereferences *c
+        println!("{} {}", *b, *c); // Компилятор автоматически разыменовывает *c
         
         let d = &mut a;
         
         /*
-         * Uncommenting the line below would cause the
-         * program to not compile, because `b` is used
-         * while the mutable reference `d` is live in the current scope
+         * Если раскомментировать строку ниже, программа
+         * не скомпилируется, потому что `b` используется,
+         * пока изменяемая ссылка `d` активна в текущей области
          * 
-         * You cannot have a mutable and immutable reference in use in the same scope
-         * at the same time!
+         * Нельзя одновременно использовать изменяемую и неизменяемую ссылку
+         * в одной области видимости!
          */
         // println!("{}", *b);
     }
-    let d = &mut a; // Ok: b and c are not in scope
+    let d = &mut a; // Ок: b и c уже вне области видимости
     *d = 43;
 }
 ```
 
 ----
-# Rust slices
-- Rust references can be used to create subsets of arrays
-    - Unlike arrays, which have a static fixed length determined at compile time, slices can be of arbitrary size. Internally, slices are implemented as a "fat-pointer" that contains the length of the slice and a pointer to the starting element in the original array
+# Срезы в Rust
+- Ссылки в Rust можно использовать для создания подмножеств массивов
+    - В отличие от массивов, которые имеют статическую фиксированную длину, известную на этапе компиляции, срезы могут иметь произвольный размер. Внутри срез реализован как «толстый указатель» (fat pointer), который хранит длину среза и указатель на начальный элемент исходного массива
 ```rust
 fn main() {
     let a = [40, 41, 42, 43];
-    let b = &a[1..a.len()]; // A slice starting with the second element in the original
-    let c = &a[1..]; // Same as the above
-    let d = &a[..]; // Same as &a[0..] or &a[0..a.len()]
+    let b = &a[1..a.len()]; // Срез, начинающийся со второго элемента исходного массива
+    let c = &a[1..]; // То же, что и выше
+    let d = &a[..]; // То же, что &a[0..] или &a[0..a.len()]
     println!("{b:?} {c:?} {d:?}");
 }
 ```
 ----
-# Rust constants and statics
-- The ```const``` keyword can be used to define a constant value. Constant values are evaluated at **compile time** and are inlined into the program
-- The ```static``` keyword is used to define the equivalent of global variables in languages like C/C++ Static variables have an addressable memory location and are created once and last the entire lifetime of the program
+# Константы и статики в Rust
+- Ключевое слово ```const``` используется для определения константного значения. Константы вычисляются на **этапе компиляции** и встраиваются в программу
+- Ключевое слово ```static``` используется для определения аналога глобальных переменных из языков вроде C/C++. Статические переменные имеют адрес в памяти, создаются один раз и существуют на протяжении всего времени работы программы
 ```rust
 const SECRET_OF_LIFE: u32 = 42;
 static GLOBAL_VARIABLE : u32 = 2;
@@ -116,80 +116,80 @@ fn main() {
 ```
 
 ----
-# Rust strings: String vs &str
+# Строки в Rust: String и &str
 
-- Rust has **two** string types that serve different purposes
-    - `String` — owned, heap-allocated, growable (like C's `malloc`'d buffer, or C++'s `std::string`)
-    - `&str` — borrowed, lightweight reference (like C's `const char*` with length, or C++'s `std::string_view` — but `&str` is **lifetime-checked** so it can never dangle)
-    - Unlike C's null-terminated strings, Rust strings track their length and are guaranteed valid UTF-8
+- В Rust **два** строковых типа, которые служат разным целям
+    - `String` — владеющий, размещённый в куче, растущий (как буфер, выделенный через `malloc` в C, или `std::string` в C++)
+    - `&str` — заимствованная лёгкая ссылка (как `const char*` с длиной в C или `std::string_view` в C++; но `&str` **проверяется по времени жизни**, поэтому никогда не может стать висячим)
+    - В отличие от строк с нулевым символом в конце, как в C, строки Rust хранят свою длину и гарантированно являются корректным UTF-8
 
-> **For C++ developers:** `String` ≈ `std::string`, `&str` ≈ `std::string_view`. Unlike `std::string_view`, a `&str` is guaranteed valid for its entire lifetime by the borrow checker.
+> **Для программистов C++:** `String` ≈ `std::string`, `&str` ≈ `std::string_view`. В отличие от `std::string_view`, проверка заимствований гарантирует, что `&str` действителен на протяжении всего своего времени жизни.
 
-## String vs &str: Owned vs Borrowed
+## String и &str: владение и заимствование
 
-> **Production patterns**: See [JSON handling: nlohmann::json → serde](ch17-2-avoiding-unchecked-indexing.md#json-handling-nlohmannjson--serde) for how string handling works with serde in production code.
+> **Промышленные шаблоны**: о том, как работа со строками выглядит вместе с serde в продакшн-коде, см. [Обработка JSON: nlohmann::json → serde](ch17-2-avoiding-unchecked-indexing.md#обработка-json-nlohmannjson--serde).
 
-| **Aspect** | **C `char*`** | **C++ `std::string`** | **Rust `String`** | **Rust `&str`** |
+| **Аспект** | **C `char*`** | **C++ `std::string`** | **Rust `String`** | **Rust `&str`** |
 |------------|--------------|----------------------|-------------------|----------------|
-| **Memory** | Manual (`malloc`/`free`) | Heap-allocated, owns buffer | Heap-allocated, auto-freed | Borrowed reference (lifetime-checked) |
-| **Mutability** | Always mutable via pointer | Mutable | Mutable with `mut` | Always immutable |
-| **Size info** | None (relies on `'\0'`) | Tracks length and capacity | Tracks length and capacity | Tracks length (fat pointer) |
-| **Encoding** | Unspecified (usually ASCII) | Unspecified (usually ASCII) | Guaranteed valid UTF-8 | Guaranteed valid UTF-8 |
-| **Null terminator** | Required | Required (`c_str()`) | Not used | Not used |
+| **Память** | Вручную (`malloc`/`free`) | В куче, владеет буфером | В куче, освобождается автоматически | Заимствованная ссылка (проверяется по времени жизни) |
+| **Изменяемость** | Всегда изменяема через указатель | Изменяема | Изменяема при наличии `mut` | Всегда неизменяема |
+| **Информация о размере** | Отсутствует (полагается на `'\0'`) | Хранит длину и ёмкость | Хранит длину и ёмкость | Хранит длину (толстый указатель) |
+| **Кодировка** | Не определена (обычно ASCII) | Не определена (обычно ASCII) | Гарантированно корректный UTF-8 | Гарантированно корректный UTF-8 |
+| **Завершающий нуль** | Обязателен | Обязателен (`c_str()`) | Не используется | Не используется |
 
 ```rust
 fn main() {
-    // &str - string slice (borrowed, immutable, usually a string literal)
-    let greeting: &str = "Hello";  // Points to read-only memory
+    // &str — строковый срез (заимствованный, неизменяемый, обычно строковый литерал)
+    let greeting: &str = "Hello";  // Указывает на память только для чтения
 
-    // String - owned, heap-allocated, growable
-    let mut owned = String::from(greeting);  // Copies data to heap
-    owned.push_str(", World!");        // Grow the string
-    owned.push('!');                   // Append a single character
+    // String — владеющая, размещённая в куче, растущая строка
+    let mut owned = String::from(greeting);  // Копирует данные в кучу
+    owned.push_str(", World!");        // Увеличиваем строку
+    owned.push('!');                   // Добавляем один символ
 
-    // Converting between String and &str
-    let slice: &str = &owned;          // String -> &str (free, just a borrow)
-    let owned2: String = slice.to_string();  // &str -> String (allocates)
-    let owned3: String = String::from(slice); // Same as above
+    // Преобразования между String и &str
+    let slice: &str = &owned;          // String -> &str (бесплатно, это просто заимствование)
+    let owned2: String = slice.to_string();  // &str -> String (выделяет память)
+    let owned3: String = String::from(slice); // То же, что и выше
 
-    // String concatenation (note: + consumes the left operand)
+    // Конкатенация строк (обратите внимание: + поглощает левый операнд)
     let hello = String::from("Hello");
     let world = String::from(", World!");
-    let combined = hello + &world;  // hello is moved (consumed), world is borrowed
-    // println!("{hello}");  // Won't compile: hello was moved
+    let combined = hello + &world;  // hello перемещён (поглощён), world заимствован
+    // println!("{hello}");  // Не скомпилируется: hello был перемещён
 
-    // Use format! to avoid move issues
+    // Используйте format!, чтобы избежать проблем с перемещением
     let a = String::from("Hello");
     let b = String::from("World");
-    let combined = format!("{a}, {b}!");  // Neither a nor b is consumed
+    let combined = format!("{a}, {b}!");  // Ни a, ни b не поглощаются
 
     println!("{combined}");
 }
 ```
 
-## Why You Cannot Index Strings with `[]`
+## Почему нельзя индексировать строки через `[]`
 ```rust
 fn main() {
     let s = String::from("hello");
-    // let c = s[0];  // Won't compile! Rust strings are UTF-8, not byte arrays
+    // let c = s[0];  // Не скомпилируется! Строки Rust — это UTF-8, а не массивы байтов
 
-    // Safe alternatives:
+    // Безопасные альтернативы:
     let first_char = s.chars().next();           // Option<char>: Some('h')
-    let as_bytes = s.as_bytes();                 // &[u8]: raw UTF-8 bytes
-    let substring = &s[0..1];                    // &str: "h" (byte range, must be valid UTF-8 boundary)
+    let as_bytes = s.as_bytes();                 // &[u8]: сырые байты UTF-8
+    let substring = &s[0..1];                    // &str: "h" (диапазон байтов, должен попадать на границу UTF-8)
 
     println!("First char: {:?}", first_char);
     println!("Bytes: {:?}", &as_bytes[..5]);
 }
 ```
 
-## Exercise: String manipulation
+## Упражнение: работа со строками
 
-🟢 **Starter**
-- Write a function `fn count_words(text: &str) -> usize` that counts the number of whitespace-separated words in a string
-- Write a function `fn longest_word(text: &str) -> &str` that returns the longest word (hint: you'll need to think about lifetimes -- why does the return type need to be `&str` and not `String`?)
+🟢 **Начальный уровень**
+- Напишите функцию `fn count_words(text: &str) -> usize`, которая считает количество слов, разделённых пробельными символами, в строке
+- Напишите функцию `fn longest_word(text: &str) -> &str`, которая возвращает самое длинное слово (подсказка: придётся подумать о временах жизни — почему возвращаемый тип должен быть `&str`, а не `String`?)
 
-<details><summary>Solution (click to expand)</summary>
+<details><summary>Решение (нажмите, чтобы развернуть)</summary>
 
 ```rust
 fn count_words(text: &str) -> usize {
@@ -211,10 +211,10 @@ fn main() {
 
 </details>
 
-# Rust structs
-- The ```struct``` keyword declares a user-defined struct type
-    - ```struct``` members can either be named, or anonymous (tuple structs)
-- Unlike languages like C++, there's no notion of "data inheritance" in Rust
+# Структуры в Rust
+- Ключевое слово ```struct``` объявляет пользовательский тип структуры
+    - Члены ```struct``` могут быть именованными или безымянными (кортежные структуры)
+- В отличие от языков вроде C++, в Rust нет понятия «наследования данных»
 ```rust
 fn main() {
     struct MyStruct {
@@ -229,14 +229,14 @@ fn main() {
         num: x.num,
         is_secret_of_life: x.is_secret_of_life,
     };
-    let z = MyStruct { num: x.num, ..x }; // The .. means copy remaining
+    let z = MyStruct { num: x.num, ..x }; // Оператор .. означает: скопировать остальные поля
     println!("{} {} {}", x.num, y.is_secret_of_life, z.num);
 }
 ```
 
-# Rust tuple structs
-- Rust tuple structs are similar to tuples and individual fields don't have names
-    - Like tuples, individual elements are accessed using .0, .1, .2, .... A common use case for tuple structs is to wrap primitive types to create custom types. **This can be useful to avoid mixing differing values of the same type**
+# Кортежные структуры в Rust
+- Кортежные структуры в Rust похожи на кортежи, а их поля не имеют имён
+    - Как и в кортежах, к отдельным элементам обращаются через .0, .1, .2, .... Типичный случай использования кортежных структур — оборачивание примитивных типов для создания собственных типов. **Это может быть полезно, чтобы не перепутать значения одного и того же типа**
 ```rust
 struct WeightInGrams(u32);
 struct WeightInMilligrams(u32);
@@ -251,71 +251,71 @@ fn to_weight_in_milligrams(w : WeightInGrams) -> WeightInMilligrams  {
 fn main() {
     let x = to_weight_in_grams(42);
     let y = to_weight_in_milligrams(x);
-    // let z : WeightInGrams = x;  // Won't compile: x was moved into to_weight_in_milligrams()
-    // let a : WeightInGrams = y;   // Won't compile: type mismatch (WeightInMilligrams vs WeightInGrams)
+    // let z : WeightInGrams = x;  // Не скомпилируется: x был перемещён в to_weight_in_milligrams()
+    // let a : WeightInGrams = y;   // Не скомпилируется: несоответствие типов (WeightInMilligrams и WeightInGrams)
 }
 ```
 
 
-**Note**: The `#[derive(...)]` attribute automatically generates common trait implementations for structs and enums. You'll see this used throughout the course:
+**Примечание**: атрибут `#[derive(...)]` автоматически генерирует реализации распространённых трейтов для структур и перечислений. Вы будете встречать его на протяжении всего курса:
 ```rust
 #[derive(Debug, Clone, PartialEq)]
 struct Point { x: i32, y: i32 }
 
 fn main() {
     let p = Point { x: 1, y: 2 };
-    println!("{:?}", p);           // Debug: works because of #[derive(Debug)]
-    let p2 = p.clone();           // Clone: works because of #[derive(Clone)]
-    assert_eq!(p, p2);            // PartialEq: works because of #[derive(PartialEq)]
+    println!("{:?}", p);           // Debug: работает благодаря #[derive(Debug)]
+    let p2 = p.clone();           // Clone: работает благодаря #[derive(Clone)]
+    assert_eq!(p, p2);            // PartialEq: работает благодаря #[derive(PartialEq)]
 }
 ```
-We'll cover the trait system in depth later, but `#[derive(Debug)]` is so useful that you should add it to nearly every `struct` and `enum` you create.
+Трейтовую систему мы разберём подробно позже, но `#[derive(Debug)]` настолько полезен, что его стоит добавлять почти к каждой создаваемой вами `struct` и `enum`.
 
-# Rust Vec type
-- The ```Vec<T>``` type implements a dynamic heap allocated buffer (similar to manually managed `malloc`/`realloc` arrays in C, or C++'s `std::vector`)
-    - Unlike arrays with fixed size, `Vec` can grow and shrink at runtime
-    - `Vec` owns its data and automatically manages memory allocation/deallocation
-- Common operations: `push()`, `pop()`, `insert()`, `remove()`, `len()`, `capacity()`
+# Тип Vec в Rust
+- Тип ```Vec<T>``` реализует динамический буфер, размещённый в куче (похоже на вручную управляемые массивы через `malloc`/`realloc` в C или на `std::vector` в C++)
+    - В отличие от массивов фиксированного размера, `Vec` может расти и уменьшаться во время выполнения
+    - `Vec` владеет своими данными и автоматически управляет выделением и освобождением памяти
+- Распространённые операции: `push()`, `pop()`, `insert()`, `remove()`, `len()`, `capacity()`
 ```rust
 fn main() {
-    let mut v = Vec::new();    // Empty vector, type inferred from usage
-    v.push(42);                // Add element to end - Vec<i32>
+    let mut v = Vec::new();    // Пустой вектор, тип выводится из использования
+    v.push(42);                // Добавляем элемент в конец — Vec<i32>
     v.push(43);                
     
-    // Safe iteration (preferred)
-    for x in &v {              // Borrow elements, don't consume vector
+    // Безопасная итерация (предпочтительно)
+    for x in &v {              // Заимствуем элементы, не поглощая вектор
         println!("{x}");
     }
     
-    // Initialization shortcuts
-    let mut v2 = vec![1, 2, 3, 4, 5];           // Macro for initialization
-    let v3 = vec![0; 10];                       // 10 zeros
+    // Сокращённые способы инициализации
+    let mut v2 = vec![1, 2, 3, 4, 5];           // Макрос для инициализации
+    let v3 = vec![0; 10];                       // 10 нулей
     
-    // Safe access methods (preferred over indexing)
+    // Безопасные методы доступа (предпочтительнее индексации)
     match v2.get(0) {
         Some(first) => println!("First: {first}"),
         None => println!("Empty vector"),
     }
     
-    // Useful methods
+    // Полезные методы
     println!("Length: {}, Capacity: {}", v2.len(), v2.capacity());
-    if let Some(last) = v2.pop() {             // Remove and return last element
+    if let Some(last) = v2.pop() {             // Удаляем и возвращаем последний элемент
         println!("Popped: {last}");
     }
     
-    // Dangerous: direct indexing (can panic!)
-    // println!("{}", v2[100]);  // Would panic at runtime
+    // Опасно: прямая индексация (может вызвать panic!)
+    // println!("{}", v2[100]);  // Во время выполнения произойдёт panic
 }
 ```
-> **Production patterns**: See [Avoiding unchecked indexing](ch17-2-avoiding-unchecked-indexing.md#avoiding-unchecked-indexing) for safe `.get()` patterns from production Rust code.
+> **Промышленные шаблоны**: о безопасных шаблонах `.get()` из продакшн-кода на Rust см. [Избегание неконтролируемой индексации](ch17-2-avoiding-unchecked-indexing.md#избегание-неконтролируемой-индексации).
 
-# Rust HashMap type
-- ```HashMap``` implements generic ```key``` -> ```value``` lookups (a.k.a. ```dictionary``` or ```map```)
+# Тип HashMap в Rust
+- ```HashMap``` реализует поиск по обобщённому ```ключу``` -> ```значению``` (также известен как ```dictionary``` или ```map```)
 ```rust
 fn main() {
-    use std::collections::HashMap;  // Need explicit import, unlike Vec
-    let mut map = HashMap::new();       // Allocate an empty HashMap
-    map.insert(40, false);  // Type is inferred as int -> bool
+    use std::collections::HashMap;  // Нужен явный импорт, в отличие от Vec
+    let mut map = HashMap::new();       // Выделяем пустой HashMap
+    map.insert(40, false);  // Тип выводится как int -> bool
     map.insert(41, false);
     map.insert(42, true);
     for (key, value) in map {
@@ -327,17 +327,17 @@ fn main() {
     } else {
         println!("No mapping was found for 43");
     }
-    let x = map.get(&43).or(Some(&false));  // Default value if key isn't found
+    let x = map.get(&43).or(Some(&false));  // Значение по умолчанию, если ключ не найден
     println!("{x:?}"); 
 }
 ```
 
-# Exercise: Vec and HashMap
+# Упражнение: Vec и HashMap
 
-🟢 **Starter**
-- Create a ```HashMap<u32, bool>``` with a few entries (make sure that some values are ```true``` and others are ```false```). Loop over all elements in the hashmap and put the keys into one ```Vec``` and the values into another
+🟢 **Начальный уровень**
+- Создайте `HashMap<u32, bool>` с несколькими записями (убедитесь, что одни значения равны `true`, а другие — `false`). Переберите все элементы хеш-таблицы, поместив ключи в один `Vec`, а значения — в другой
 
-<details><summary>Solution (click to expand)</summary>
+<details><summary>Решение (нажмите, чтобы развернуть)</summary>
 
 ```rust
 use std::collections::HashMap;
@@ -353,7 +353,7 @@ fn main() {
     println!("Keys:   {keys:?}");
     println!("Values: {values:?}");
 
-    // Alternative: use iterators with unzip()
+    // Альтернатива: использовать итераторы с unzip()
     let (keys2, values2): (Vec<u32>, Vec<bool>) = map.into_iter().unzip();
     println!("Keys (unzip):   {keys2:?}");
     println!("Values (unzip): {values2:?}");
@@ -364,100 +364,100 @@ fn main() {
 
 ---
 
-## Deep Dive: C++ References vs Rust References
+## Углублённый разбор: ссылки C++ и ссылки Rust
 
-> **For C++ developers:** C++ programmers often assume Rust `&T` works like C++ `T&`. While superficially similar, there are fundamental differences that cause confusion. C developers can skip this section — Rust references are covered in [Ownership and Borrowing](ch07-ownership-and-borrowing.md).
+> **Для программистов C++:** программисты C++ часто предполагают, что `&T` в Rust работает так же, как `T&` в C++. Хотя внешне они похожи, есть принципиальные различия, которые порождают путаницу. Разработчики на C могут пропустить этот раздел — ссылки в Rust рассматриваются в главе [Владение и заимствование](ch07-ownership-and-borrowing.md).
 
-#### 1. No Rvalue References or Universal References
+#### 1. Нет rvalue-ссылок и универсальных ссылок
 
-In C++, `&&` has two meanings depending on context:
+В C++ `&&` имеет два значения в зависимости от контекста:
 
 ```cpp
-// C++: && means different things:
-int&& rref = 42;           // Rvalue reference — binds to temporaries
-void process(Widget&& w);   // Rvalue reference — caller must std::move
+// C++: && означает разные вещи:
+int&& rref = 42;           // Rvalue-ссылка — связывается с временными объектами
+void process(Widget&& w);   // Rvalue-ссылка — вызывающий код должен использовать std::move
 
-// Universal (forwarding) reference — deduced template context:
+// Универсальная (forwarding) ссылка — выводится в шаблонном контексте:
 template<typename T>
-void forward(T&& arg) {     // NOT an rvalue ref! Deduced as T& or T&&
-    inner(std::forward<T>(arg));  // Perfect forwarding
+void forward(T&& arg) {     // НЕ rvalue-ссылка! Выводится как T& или T&&
+    inner(std::forward<T>(arg));  // Идеальная передача
 }
 ```
 
-**In Rust: none of this exists.** `&&` is simply the logical AND operator.
+**В Rust ничего этого нет.** `&&` — это просто оператор логического И.
 
 ```rust
-// Rust: && is just boolean AND
+// Rust: && — это просто булево И
 let a = true && false; // false
 
-// Rust has NO rvalue references, no universal references, no perfect forwarding.
-// Instead:
-//   - Move is the default for non-Copy types (no std::move needed)
-//   - Generics + trait bounds replace universal references
-//   - No temporary-binding distinction — values are values
+// В Rust НЕТ rvalue-ссылок, универсальных ссылок и идеальной передачи.
+// Вместо этого:
+//   - Перемещение — поведение по умолчанию для типов, не реализующих Copy (std::move не нужен)
+//   - Обобщения + ограничения трейтами заменяют универсальные ссылки
+//   - Нет различия между временными и постоянными привязками — значения есть значения
 
-fn process(w: Widget) { }      // Takes ownership (like C++ value param + implicit move)
-fn process_ref(w: &Widget) { } // Borrows immutably (like C++ const T&)
-fn process_mut(w: &mut Widget) { } // Borrows mutably (like C++ T&, but exclusive)
+fn process(w: Widget) { }      // Принимает владение (как параметр-значение в C++ + неявное перемещение)
+fn process_ref(w: &Widget) { } // Заимствует неизменяемо (как const T& в C++)
+fn process_mut(w: &mut Widget) { } // Заимствует изменяемо (как T& в C++, но эксклюзивно)
 ```
 
-| C++ Concept | Rust Equivalent | Notes |
-|-------------|-----------------|-------|
-| `T&` (lvalue ref) | `&T` or `&mut T` | Rust splits into shared vs exclusive |
-| `T&&` (rvalue ref) | Just `T` | Take by value = take ownership |
-| `T&&` in template (universal ref) | `impl Trait` or `<T: Trait>` | Generics replace forwarding |
-| `std::move(x)` | `x` (just use it) | Move is the default |
-| `std::forward<T>(x)` | No equivalent needed | No universal references to forward |
+| Концепция C++ | Эквивалент в Rust | Примечания |
+|---------------|-------------------|------------|
+| `T&` (ссылка на lvalue) | `&T` или `&mut T` | Rust разделяет на общие и эксклюзивные |
+| `T&&` (rvalue-ссылка) | Просто `T` | Передача по значению = передача владения |
+| `T&&` в шаблоне (универсальная ссылка) | `impl Trait` или `<T: Trait>` | Обобщения заменяют передачу |
+| `std::move(x)` | `x` (просто используйте) | Перемещение — поведение по умолчанию |
+| `std::forward<T>(x)` | Эквивалент не нужен | Нет универсальных ссылок, которые нужно передавать дальше |
 
-#### 2. Moves Are Bitwise — No Move Constructors
+#### 2. Перемещения — побитовые, конструкторов перемещения нет
 
-In C++, moving is a *user-defined operation* (move constructor / move assignment). In Rust, moving is always a **bitwise memcpy** of the value, and the source is invalidated:
+В C++ перемещение — это *пользовательская операция* (конструктор перемещения / оператор присваивания перемещением). В Rust перемещение всегда является **побитовым memcpy** значения, а исходный объект становится недействительным:
 
 ```rust
-// Rust move = memcpy the bytes, mark source as invalid
+// Перемещение в Rust = memcpy байтов, исходное значение помечается как недействительное
 let s1 = String::from("hello");
-let s2 = s1; // Bytes of s1 are copied to s2's stack slot
-              // s1 is now invalid — compiler enforces this
-// println!("{s1}"); // ❌ Compile error: value used after move
+let s2 = s1; // Байты s1 копируются в слот стека s2
+              // s1 теперь недействителен — компилятор это обеспечивает
+// println!("{s1}"); // ❌ Ошибка компиляции: значение использовано после перемещения
 ```
 
 ```cpp
-// C++ move = call the move constructor (user-defined!)
+// Перемещение в C++ = вызов конструктора перемещения (пользовательского!)
 std::string s1 = "hello";
-std::string s2 = std::move(s1); // Calls string's move ctor
-// s1 is now a "valid but unspecified state" zombie
-std::cout << s1; // Compiles! Prints... something (empty string, usually)
+std::string s2 = std::move(s1); // Вызывается конструктор перемещения string
+// s1 теперь «зомби» в состоянии «допустимо, но не определено»
+std::cout << s1; // Компилируется! Выводит... что-то (обычно пустую строку)
 ```
 
-**Consequences**:
-- Rust has no Rule of Five (no copy ctor, move ctor, copy=, move=, destructor to define)
-- No moved-from "zombie" state — the compiler simply prevents access
-- No `noexcept` considerations for moves — bitwise copy can't throw
+**Следствия**:
+- В Rust нет правила пяти (не нужно определять конструктор копирования, конструктор перемещения, оператор копирующего присваивания, оператор перемещающего присваивания и деструктор)
+- Нет состояния «зомби» после перемещения — компилятор просто запрещает доступ
+- Нет вопросов `noexcept` для перемещений — побитовое копирование не может выбросить исключение
 
-#### 3. Auto-Deref: The Compiler Sees Through Indirection
+#### 3. Автоматическое разыменование: компилятор видит сквозь косвенность
 
-Rust automatically dereferences through multiple layers of pointers/wrappers via the `Deref` trait. This has no C++ equivalent:
+Rust автоматически разыменовывает через несколько слоёв указателей и оберток с помощью трейта `Deref`. В C++ аналога нет:
 
 ```rust
 use std::sync::{Arc, Mutex};
 
-// Nested wrapping: Arc<Mutex<Vec<String>>>
+// Вложенные обёртки: Arc<Mutex<Vec<String>>>
 let data = Arc::new(Mutex::new(vec!["hello".to_string()]));
 
-// In C++, you'd need explicit unlocking and manual dereferencing at each layer.
-// In Rust, the compiler auto-derefs through Arc → Mutex → MutexGuard → Vec:
-let guard = data.lock().unwrap(); // Arc auto-derefs to Mutex
+// В C++ пришлось бы явно разблокировать и вручную разыменовывать на каждом уровне.
+// В Rust компилятор автоматически разыменовывает через Arc → Mutex → MutexGuard → Vec:
+let guard = data.lock().unwrap(); // Arc автоматически разыменовывается в Mutex
 let first: &str = &guard[0];      // MutexGuard→Vec (Deref), Vec[0] (Index),
-                                   // &String→&str (Deref coercion)
+                                   // &String→&str (приведение через Deref)
 println!("First: {first}");
 
-// Method calls also auto-deref:
+// Вызовы методов тоже автоматически разыменовываются:
 let boxed_string = Box::new(String::from("hello"));
-println!("Length: {}", boxed_string.len());  // Box→String, then String::len()
-// No need for (*boxed_string).len() or boxed_string->len()
+println!("Length: {}", boxed_string.len());  // Box→String, затем String::len()
+// Не нужно (*boxed_string).len() или boxed_string->len()
 ```
 
-**Deref coercion** also applies to function arguments — the compiler inserts dereferences to make types match:
+**Приведение через Deref** работает и для аргументов функций — компилятор вставляет разыменования, чтобы типы совпали:
 
 ```rust
 fn greet(name: &str) {
@@ -469,67 +469,67 @@ fn main() {
     let boxed = Box::new(String::from("Bob"));
     let arced = std::sync::Arc::new(String::from("Carol"));
 
-    greet(&owned);  // &String → &str  (1 deref coercion)
-    greet(&boxed);  // &Box<String> → &String → &str  (2 deref coercions)
-    greet(&arced);  // &Arc<String> → &String → &str  (2 deref coercions)
-    greet("Dave");  // &str already — no coercion needed
+    greet(&owned);  // &String → &str  (1 приведение через Deref)
+    greet(&boxed);  // &Box<String> → &String → &str  (2 приведения через Deref)
+    greet(&arced);  // &Arc<String> → &String → &str  (2 приведения через Deref)
+    greet("Dave");  // Уже &str — приведение не нужно
 }
-// In C++ you'd need .c_str() or explicit conversions for each case.
+// В C++ для каждого случая потребовались бы .c_str() или явные преобразования.
 ```
 
-**The Deref chain**: When you call `x.method()`, Rust's method resolution
-tries the receiver type `T`, then `&T`, then `&mut T`. If no match, it
-dereferences via the `Deref` trait and repeats with the target type.
-This continues through multiple layers — which is why `Box<Vec<T>>`
-"just works" like a `Vec<T>`. Deref *coercion* (for function arguments)
-is a separate but related mechanism that automatically converts `&Box<String>`
-to `&str` by chaining `Deref` impls.
+**Цепочка Deref**: когда вы вызываете `x.method()`, разрешение метода в Rust
+сначала пробует тип получателя `T`, затем `&T`, затем `&mut T`. Если совпадения
+нет, выполняется разыменование через трейт `Deref`, и процесс повторяется для целевого типа.
+Это продолжается через несколько слоёв — поэтому `Box<Vec<T>>`
+«просто работает» как `Vec<T>`. Приведение через Deref (для аргументов функций)
+— отдельный, но связанный механизм, который автоматически превращает `&Box<String>`
+в `&str`, цепочкой реализаций `Deref`.
 
-#### 4. No Null References, No Optional References
+#### 4. Нет нулевых ссылок и нет «опциональных» ссылок
 
 ```cpp
-// C++: references can't be null, but pointers can, and the distinction is blurry
-Widget& ref = *ptr;  // If ptr is null → UB
-Widget* opt = nullptr;  // "optional" reference via pointer
+// C++: ссылки не могут быть нулевыми, но указатели могут, и грань между ними размыта
+Widget& ref = *ptr;  // Если ptr нулевой → UB
+Widget* opt = nullptr;  // «Опциональная» ссылка через указатель
 ```
 
 ```rust
-// Rust: references are ALWAYS valid — guaranteed by the borrow checker
-// No way to create a null or dangling reference in safe code
-let r: &i32 = &42; // Always valid
+// Rust: ссылки ВСЕГДА валидны — гарантируется проверкой заимствований
+// В безопасном коде нельзя создать нулевую или висячую ссылку
+let r: &i32 = &42; // Всегда валидна
 
-// "Optional reference" is explicit:
-let opt: Option<&Widget> = None; // Clear intent, no null pointer
+// «Опциональная ссылка» задаётся явно:
+let opt: Option<&Widget> = None; // Намерение очевидно, нулевого указателя нет
 if let Some(w) = opt {
-    w.do_something(); // Only reachable when present
+    w.do_something(); // Достижимо только при наличии значения
 }
 ```
 
-#### 5. References Cannot Be Reseated
+#### 5. Ссылки нельзя переназначить
 
 ```cpp
-// C++: a reference is an alias — it can't be rebound
+// C++: ссылка — это псевдоним, её нельзя перепривязать
 int a = 1, b = 2;
 int& r = a;
-r = b;  // This ASSIGNS b's value to a — it does NOT rebind r!
-// a is now 2, r still refers to a
+r = b;  // Это ПРИСВАИВАЕТ значение b переменной a — НЕ перепривязывает r!
+// Теперь a равно 2, r по-прежнему ссылается на a
 ```
 
 ```rust
-// Rust: let bindings can shadow, but references follow different rules
+// Rust: привязки let могут затенять друг друга, но у ссылок свои правила
 let a = 1;
 let b = 2;
 let r = &a;
-// r = &b;   // ❌ Cannot assign to immutable variable
-let r = &b;  // ✅ But you can SHADOW r with a new binding
-             // The old binding is gone, not reseated
+// r = &b;   // ❌ Нельзя присвоить неизменяемой переменной
+let r = &b;  // ✅ Но можно ЗАТЕНИТЬ r новой привязкой
+             // Старая привязка исчезает, а не перепривязывается
 
-// With mut:
+// С mut:
 let mut r = &a;
-r = &b;      // ✅ r now points to b — this IS rebinding (not assignment through)
+r = &b;      // ✅ Теперь r указывает на b — это перепривязка (а не присваивание через ссылку)
 ```
 
-> **Mental model**: In C++, a reference is a permanent alias for one object.
-> In Rust, a reference is a value (a pointer with lifetime guarantees) that
-> follows normal variable binding rules — immutable by default, rebindable
-> only if declared `mut`.
+> **Ментальная модель**: в C++ ссылка — это постоянный псевдоним для одного объекта.
+> В Rust ссылка — это значение (указатель с гарантиями времени жизни), которое
+> подчиняется обычным правилам привязки переменных: неизменяемая по умолчанию,
+> перепривязываемая только если объявлена с `mut`.
