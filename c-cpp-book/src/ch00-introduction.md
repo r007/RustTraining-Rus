@@ -1,216 +1,216 @@
-# Rust Bootstrap Course for C/C++ Programmers
+# Курс Rust для программистов на C/C++
 
-## Course Overview
-- Course overview
-    - The case for Rust (from both C and C++ perspectives)
-    - Local installation
-    - Types, functions, control flow, pattern matching
-    - Modules, cargo
-    - Traits, generics
-    - Collections, error handling
-    - Closures, memory management, lifetimes, smart pointers
-    - Concurrency
-    - Unsafe Rust, including Foreign Function Interface (FFI)
-    - `no_std` and embedded Rust essentials for firmware teams
-    - Case studies: real-world C++ to Rust translation patterns
-- We'll not cover `async` Rust in this course — see the companion [Async Rust Training](../async-book/) for a full treatment of futures, executors, `Pin`, tokio, and production async patterns
+## Обзор курса
+- Обзор курса
+    - Аргументы в пользу Rust (с точки зрения и C, и C++)
+    - Локальная установка
+    - Типы, функции, управление потоком выполнения, сопоставление с образцом
+    - Модули, cargo
+    - Трейты, обобщения
+    - Коллекции, обработка ошибок
+    - Замыкания, управление памятью, времена жизни, умные указатели
+    - Конкурентность
+    - Небезопасный Rust, включая Foreign Function Interface (FFI)
+    - `no_std` и основы встраиваемого Rust для команд, разрабатывающих прошивки
+    - Примеры из практики: типовые шаблоны перевода реального кода C++ на Rust
+- Асинхронный Rust в этом курсе не рассматривается — см. сопутствующий [курс по Async Rust](../async-book/), где подробно разобраны футуры, исполнители, `Pin`, tokio и промышленные асинхронные шаблоны
 
-
----
-
-# Self-Study Guide
-
-This material works both as an instructor-led course and for self-study. If you're working through it on your own, here's how to get the most out of it:
-
-**Pacing recommendations:**
-
-| Chapters | Topic | Suggested Time | Checkpoint |
-|----------|-------|---------------|------------|
-| 1–4 | Setup, types, control flow | 1 day | You can write a CLI temperature converter |
-| 5–7 | Data structures, ownership | 1–2 days | You can explain *why* `let s2 = s1` invalidates `s1` |
-| 8–9 | Modules, error handling | 1 day | You can create a multi-file project that propagates errors with `?` |
-| 10–12 | Traits, generics, closures | 1–2 days | You can write a generic function with trait bounds |
-| 13–14 | Concurrency, unsafe/FFI | 1 day | You can write a thread-safe counter with `Arc<Mutex<T>>` |
-| 15–16 | Deep dives | At your own pace | Reference material — read when relevant |
-| 17–19 | Best practices & reference | At your own pace | Consult as you write real code |
-
-**How to use the exercises:**
-- Every chapter has hands-on exercises marked with difficulty: 🟢 Starter, 🟡 Intermediate, 🔴 Challenge
-- **Always try the exercise before expanding the solution.** Struggling with the borrow checker is part of learning — the compiler's error messages are your teacher
-- If you're stuck for more than 15 minutes, expand the solution, study it, then close it and try again from scratch
-- The [Rust Playground](https://play.rust-lang.org/) lets you run code without a local install
-
-**When you hit a wall:**
-- Read the compiler error message carefully — Rust's errors are exceptionally helpful
-- Re-read the relevant section; concepts like ownership (ch7) often click on the second pass
-- The [Rust standard library docs](https://doc.rust-lang.org/std/) are excellent — search for any type or method
-- For async patterns, see the companion [Async Rust Training](../async-book/)
 
 ---
 
-# Table of Contents
+# Руководство для самостоятельного изучения
 
-## Part I — Foundations
+Материал подходит как для курса с преподавателем, так и для самостоятельного изучения. Если вы работаете с ним самостоятельно, вот как получить от него максимум пользы:
 
-### 1. Introduction and Motivation
-- [Speaker intro and general approach](ch01-introduction-and-motivation.md#speaker-intro-and-general-approach)
-- [The case for Rust](ch01-introduction-and-motivation.md#the-case-for-rust)
-- [How does Rust address these issues?](ch01-introduction-and-motivation.md#how-does-rust-address-these-issues)
-- [Other Rust USPs and features](ch01-introduction-and-motivation.md#other-rust-usps-and-features)
-- [Quick Reference: Rust vs C/C++](ch01-introduction-and-motivation.md#quick-reference-rust-vs-cc)
-- [Why C/C++ Developers Need Rust](ch01-1-why-c-cpp-developers-need-rust.md)
-  - [What Rust Eliminates — The Complete List](ch01-1-why-c-cpp-developers-need-rust.md#what-rust-eliminates--the-complete-list)
-  - [The Problems Shared by C and C++](ch01-1-why-c-cpp-developers-need-rust.md#the-problems-shared-by-c-and-c)
-  - [C++ Adds More Problems on Top](ch01-1-why-c-cpp-developers-need-rust.md#c-adds-more-problems-on-top)
-  - [How Rust Addresses All of This](ch01-1-why-c-cpp-developers-need-rust.md#how-rust-addresses-all-of-this)
+**Рекомендации по темпу:**
 
-### 2. Getting Started
-- [Enough talk already: Show me some code](ch02-getting-started.md#enough-talk-already-show-me-some-code)
-- [Rust Local installation](ch02-getting-started.md#rust-local-installation)
-- [Rust packages (crates)](ch02-getting-started.md#rust-packages-crates)
-- [Example: cargo and crates](ch02-getting-started.md#example-cargo-and-crates)
+| Главы | Тема | Примерное время | Контрольная точка |
+|-------|------|-----------------|-------------------|
+| 1–4 | Настройка, типы, управление потоком выполнения | 1 день | Вы можете написать CLI-конвертер температур |
+| 5–7 | Структуры данных, владение | 1–2 дня | Вы можете объяснить, *почему* `let s2 = s1` делает `s1` недействительной |
+| 8–9 | Модули, обработка ошибок | 1 день | Вы можете создать многофайловый проект, который передаёт ошибки дальше с помощью `?` |
+| 10–12 | Трейты, обобщения, замыкания | 1–2 дня | Вы можете написать обобщённую функцию с ограничениями трейтами |
+| 13–14 | Конкурентность, unsafe/FFI | 1 день | Вы можете написать потокобезопасный счётчик с `Arc<Mutex<T>>` |
+| 15–16 | Углублённые темы | В своём темпе | Справочный материал — читайте, когда это актуально |
+| 17–19 | Лучшие практики и справочник | В своём темпе | Обращайтесь к нему, когда пишете реальный код |
 
-### 3. Basic Types and Variables
-- [Built-in Rust types](ch03-built-in-types.md#built-in-rust-types)
-- [Rust type specification and assignment](ch03-built-in-types.md#rust-type-specification-and-assignment)
-- [Rust type specification and inference](ch03-built-in-types.md#rust-type-specification-and-inference)
-- [Rust variables and mutability](ch03-built-in-types.md#rust-variables-and-mutability)
+**Как работать с упражнениями:**
+- В каждой главе есть практические упражнения с указанием сложности: 🟢 Начальный, 🟡 Средний, 🔴 Сложный
+- **Всегда сначала попробуйте решить упражнение и только потом раскрывайте решение.** Борьба с проверкой заимствований — часть обучения, а сообщения компилятора — ваш учитель
+- Если вы застряли больше чем на 15 минут, раскройте решение, изучите его, затем закройте и попробуйте снова с нуля
+- [Rust Playground](https://play.rust-lang.org/) позволяет запускать код без локальной установки
 
-### 4. Control Flow
-- [Rust if keyword](ch04-control-flow.md#rust-if-keyword)
-- [Rust loops using while and for](ch04-control-flow.md#rust-loops-using-while-and-for)
-- [Rust loops using loop](ch04-control-flow.md#rust-loops-using-loop)
-- [Rust expression blocks](ch04-control-flow.md#rust-expression-blocks)
+**Если вы упёрлись в стену:**
+- Внимательно читайте сообщение компилятора: ошибки Rust исключительно полезны
+- Перечитайте нужный раздел. Концепции вроде владения (гл. 7) часто становятся понятны при втором прочтении
+- [Документация стандартной библиотеки Rust](https://doc.rust-lang.org/std/) отличная: ищите любой тип или метод
+- Более глубокие асинхронные шаблоны описаны в сопутствующем курсе [Async Rust](../async-book/)
 
-### 5. Data Structures and Collections
-- [Rust array type](ch05-data-structures.md#rust-array-type)
-- [Rust tuples](ch05-data-structures.md#rust-tuples)
-- [Rust references](ch05-data-structures.md#rust-references)
-- [C++ References vs Rust References — Key Differences](ch05-data-structures.md#c-references-vs-rust-references--key-differences)
-- [Rust slices](ch05-data-structures.md#rust-slices)
-- [Rust constants and statics](ch05-data-structures.md#rust-constants-and-statics)
-- [Rust strings: String vs &str](ch05-data-structures.md#rust-strings-string-vs-str)
-- [Rust structs](ch05-data-structures.md#rust-structs)
-- [Rust Vec\<T\>](ch05-data-structures.md#rust-vec-type)
-- [Rust HashMap](ch05-data-structures.md#rust-hashmap-type)
-- [Exercise: Vec and HashMap](ch05-data-structures.md#exercise-vec-and-hashmap)
+---
 
-### 6. Pattern Matching and Enums
-- [Rust enum types](ch06-enums-and-pattern-matching.md#rust-enum-types)
-- [Rust match statement](ch06-enums-and-pattern-matching.md#rust-match-statement)
-- [Exercise: Implement add and subtract using match and enum](ch06-enums-and-pattern-matching.md#exercise-implement-add-and-subtract-using-match-and-enum)
+# Содержание
 
-### 7. Ownership and Memory Management
-- [Rust memory management](ch07-ownership-and-borrowing.md#rust-memory-management)
-- [Rust ownership, borrowing and lifetimes](ch07-ownership-and-borrowing.md#rust-ownership-borrowing-and-lifetimes)
-- [Rust move semantics](ch07-ownership-and-borrowing.md#rust-move-semantics)
-- [Rust Clone](ch07-ownership-and-borrowing.md#rust-clone)
-- [Rust Copy trait](ch07-ownership-and-borrowing.md#rust-copy-trait)
-- [Rust Drop trait](ch07-ownership-and-borrowing.md#rust-drop-trait)
-- [Exercise: Move, Copy and Drop](ch07-ownership-and-borrowing.md#exercise-move-copy-and-drop)
-- [Rust lifetime and borrowing](ch07-1-lifetimes-and-borrowing-deep-dive.md#rust-lifetime-and-borrowing)
-- [Rust lifetime annotations](ch07-1-lifetimes-and-borrowing-deep-dive.md#rust-lifetime-annotations)
-- [Exercise: Slice storage with lifetimes](ch07-1-lifetimes-and-borrowing-deep-dive.md#exercise-slice-storage-with-lifetimes)
-- [Lifetime Elision Rules Deep Dive](ch07-1-lifetimes-and-borrowing-deep-dive.md#lifetime-elision-rules-deep-dive)
-- [Rust Box\<T\>](ch07-2-smart-pointers-and-interior-mutability.md#rust-boxt)
-- [Interior Mutability: Cell\<T\> and RefCell\<T\>](ch07-2-smart-pointers-and-interior-mutability.md#interior-mutability-cellt-and-refcellt)
-- [Shared Ownership: Rc\<T\>](ch07-2-smart-pointers-and-interior-mutability.md#shared-ownership-rct)
-- [Exercise: Shared ownership and interior mutability](ch07-2-smart-pointers-and-interior-mutability.md#exercise-shared-ownership-and-interior-mutability)
+## Часть I — Основы
 
-### 8. Modules and Crates
-- [Rust crates and modules](ch08-crates-and-modules.md#rust-crates-and-modules)
-- [Exercise: Modules and functions](ch08-crates-and-modules.md#exercise-modules-and-functions)
-- [Workspaces and crates (packages)](ch08-crates-and-modules.md#workspaces-and-crates-packages)
-- [Exercise: Using workspaces and package dependencies](ch08-crates-and-modules.md#exercise-using-workspaces-and-package-dependencies)
-- [Using community crates from crates.io](ch08-crates-and-modules.md#using-community-crates-from-cratesio)
-- [Crates dependencies and SemVer](ch08-crates-and-modules.md#crates-dependencies-and-semver)
-- [Exercise: Using the rand crate](ch08-crates-and-modules.md#exercise-using-the-rand-crate)
-- [Cargo.toml and Cargo.lock](ch08-crates-and-modules.md#cargotoml-and-cargolock)
-- [Cargo test feature](ch08-crates-and-modules.md#cargo-test-feature)
-- [Other Cargo features](ch08-crates-and-modules.md#other-cargo-features)
-- [Testing Patterns](ch08-1-testing-patterns.md)
+### 1. Представление и общий подход
+- [Представление преподавателя и общий подход](ch01-introduction-and-motivation.md#представление-преподавателя-и-общий-подход)
+- [Аргументы в пользу Rust](ch01-introduction-and-motivation.md#аргументы-в-пользу-rust)
+- [Как Rust решает эти проблемы?](ch01-introduction-and-motivation.md#как-rust-решает-эти-проблемы)
+- [Другие ключевые преимущества и возможности Rust](ch01-introduction-and-motivation.md#другие-ключевые-преимущества-и-возможности-rust)
+- [Краткий справочник: Rust и C/C++](ch01-introduction-and-motivation.md#краткий-справочник-rust-и-cc)
+- [Почему разработчикам C/C++ нужен Rust](ch01-1-why-c-cpp-developers-need-rust.md)
+  - [Что Rust устраняет — полный список](ch01-1-why-c-cpp-developers-need-rust.md#что-rust-устраняет--полный-список)
+  - [Проблемы, общие для C и C++](ch01-1-why-c-cpp-developers-need-rust.md#проблемы-общие-для-c-и-c)
+  - [C++ добавляет новые проблемы](ch01-1-why-c-cpp-developers-need-rust.md#c-добавляет-новые-проблемы)
+  - [Как Rust решает всё это](ch01-1-why-c-cpp-developers-need-rust.md#как-rust-решает-всё-это)
 
-### 9. Error Handling
-- [Connecting enums to Option and Result](ch09-error-handling.md#connecting-enums-to-option-and-result)
-- [Rust Option type](ch09-error-handling.md#rust-option-type)
-- [Rust Result type](ch09-error-handling.md#rust-result-type)
-- [Exercise: log() function implementation with Option](ch09-error-handling.md#exercise-log-function-implementation-with-option)
-- [Rust error handling](ch09-error-handling.md#rust-error-handling)
-- [Exercise: error handling](ch09-error-handling.md#exercise-error-handling)
-- [Error Handling Best Practices](ch09-1-error-handling-best-practices.md)
+### 2. Начало работы
+- [Хватит разговоров: покажите код](ch02-getting-started.md#хватит-разговоров-покажите-код)
+- [Локальная установка Rust](ch02-getting-started.md#локальная-установка-rust)
+- [Пакеты Rust (крейты)](ch02-getting-started.md#пакеты-rust-крейты)
+- [Пример: cargo и крейты](ch02-getting-started.md#пример-cargo-и-крейты)
 
-### 10. Traits and Generics
-- [Rust traits](ch10-traits.md#rust-traits)
-- [C++ Operator Overloading → Rust std::ops Traits](ch10-traits.md#c-operator-overloading--rust-stdops-traits)
-- [Exercise: Logger trait implementation](ch10-traits.md#exercise-logger-trait-implementation)
-- [When to use enum vs dyn Trait](ch10-traits.md#when-to-use-enum-vs-dyn-trait)
-- [Exercise: Think Before You Translate](ch10-traits.md#exercise-think-before-you-translate)
-- [Rust generics](ch10-1-generics.md#rust-generics)
-- [Exercise: Generics](ch10-1-generics.md#exercise-generics)
-- [Combining Rust traits and generics](ch10-1-generics.md#combining-rust-traits-and-generics)
-- [Rust traits constraints in data types](ch10-1-generics.md#rust-traits-constraints-in-data-types)
-- [Exercise: Trait constraints and generics](ch10-1-generics.md#exercise-traits-constraints-and-generics)
-- [Rust type state pattern and generics](ch10-1-generics.md#rust-type-state-pattern-and-generics)
-- [Rust builder pattern](ch10-1-generics.md#rust-builder-pattern)
+### 3. Встроенные типы и переменные
+- [Встроенные типы Rust](ch03-built-in-types.md#встроенные-типы-rust)
+- [Указание типа и присваивание в Rust](ch03-built-in-types.md#указание-типа-и-присваивание-в-rust)
+- [Указание типа и вывод типа в Rust](ch03-built-in-types.md#указание-типа-и-вывод-типа-в-rust)
+- [Переменные и изменяемость в Rust](ch03-built-in-types.md#переменные-и-изменяемость-в-rust)
 
-### 11. Type System Advanced Features
-- [Rust From and Into traits](ch11-from-and-into-traits.md#rust-from-and-into-traits)
-- [Exercise: From and Into](ch11-from-and-into-traits.md#exercise-from-and-into)
-- [Rust Default trait](ch11-from-and-into-traits.md#rust-default-trait)
-- [Other Rust type conversions](ch11-from-and-into-traits.md#other-rust-type-conversions)
+### 4. Управление потоком выполнения
+- [Ключевое слово if в Rust](ch04-control-flow.md#ключевое-слово-if-в-rust)
+- [Циклы while и for в Rust](ch04-control-flow.md#циклы-while-и-for-в-rust)
+- [Циклы loop в Rust](ch04-control-flow.md#циклы-loop-в-rust)
+- [Блоки-выражения в Rust](ch04-control-flow.md#блоки-выражения-в-rust)
 
-### 12. Functional Programming
-- [Rust closures](ch12-closures.md#rust-closures)
-- [Exercise: Closures and capturing](ch12-closures.md#exercise-closures-and-capturing)
-- [Rust iterators](ch12-closures.md#rust-iterators)
-- [Exercise: Rust iterators](ch12-closures.md#exercise-rust-iterators)
-- [Iterator Power Tools Reference](ch12-1-iterator-power-tools.md#iterator-power-tools-reference)
+### 5. Структуры данных и коллекции
+- [Массивы в Rust](ch05-data-structures.md#массивы-в-rust)
+- [Кортежи в Rust](ch05-data-structures.md#кортежи-в-rust)
+- [Ссылки в Rust](ch05-data-structures.md#ссылки-в-rust)
+- [Ссылки C++ и ссылки Rust — ключевые различия](ch05-data-structures.md#углублённый-разбор-ссылки-c-и-ссылки-rust)
+- [Срезы в Rust](ch05-data-structures.md#срезы-в-rust)
+- [Константы и статики в Rust](ch05-data-structures.md#константы-и-статики-в-rust)
+- [Строки в Rust: String и &str](ch05-data-structures.md#строки-в-rust-string-и-str)
+- [Структуры в Rust](ch05-data-structures.md#структуры-в-rust)
+- [Тип Vec\<T\> в Rust](ch05-data-structures.md#тип-vec-в-rust)
+- [Тип HashMap в Rust](ch05-data-structures.md#тип-hashmap-в-rust)
+- [Упражнение: Vec и HashMap](ch05-data-structures.md#упражнение-vec-и-hashmap)
 
-### 13. Concurrency
-- [Rust concurrency](ch13-concurrency.md#rust-concurrency)
-- [Why Rust prevents data races: Send and Sync](ch13-concurrency.md#why-rust-prevents-data-races-send-and-sync)
-- [Exercise: Multi-threaded word count](ch13-concurrency.md#exercise-multi-threaded-word-count)
+### 6. Сопоставление с образцом и перечисления
+- [Перечисления в Rust](ch06-enums-and-pattern-matching.md#перечисления-в-rust)
+- [Оператор match в Rust](ch06-enums-and-pattern-matching.md#оператор-match-в-rust)
+- [Упражнение: сложение и вычитание с помощью match и enum](ch06-enums-and-pattern-matching.md#упражнение-сложение-и-вычитание-с-помощью-match-и-enum)
 
-### 14. Unsafe Rust and FFI
-- [Unsafe Rust](ch14-unsafe-rust-and-ffi.md#unsafe-rust)
-- [Simple FFI example](ch14-unsafe-rust-and-ffi.md#simple-ffi-example-rust-library-function-consumed-by-c)
-- [Complex FFI example](ch14-unsafe-rust-and-ffi.md#complex-ffi-example)
-- [Ensuring correctness of unsafe code](ch14-unsafe-rust-and-ffi.md#ensuring-correctness-of-unsafe-code)
-- [Exercise: Writing a safe FFI wrapper](ch14-unsafe-rust-and-ffi.md#exercise-writing-a-safe-ffi-wrapper)
+### 7. Владение и управление памятью
+- [Управление памятью в Rust](ch07-ownership-and-borrowing.md#управление-памятью-в-rust)
+- [Владение, заимствование и времена жизни в Rust](ch07-ownership-and-borrowing.md#владение-заимствование-и-времена-жизни-в-rust)
+- [Семантика перемещения в Rust](ch07-ownership-and-borrowing.md#семантика-перемещения-в-rust)
+- [Clone в Rust](ch07-ownership-and-borrowing.md#clone-в-rust)
+- [Трейт Copy в Rust](ch07-ownership-and-borrowing.md#трейт-copy-в-rust)
+- [Трейт Drop в Rust](ch07-ownership-and-borrowing.md#трейт-drop-в-rust)
+- [Упражнение: перемещение, копирование и Drop](ch07-ownership-and-borrowing.md#упражнение-перемещение-копирование-и-drop)
+- [Времена жизни и заимствование в Rust](ch07-1-lifetimes-and-borrowing-deep-dive.md#времена-жизни-и-заимствование-в-rust)
+- [Аннотации времён жизни в Rust](ch07-1-lifetimes-and-borrowing-deep-dive.md#аннотации-времён-жизни-в-rust)
+- [Упражнение: хранение срезов с временами жизни](ch07-1-lifetimes-and-borrowing-deep-dive.md#упражнение-хранение-срезов-с-временами-жизни)
+- [Углублённый разбор правил элизии времён жизни](ch07-1-lifetimes-and-borrowing-deep-dive.md#углублённый-разбор-правил-элизии-времён-жизни)
+- [Box\<T\> в Rust](ch07-2-smart-pointers-and-interior-mutability.md#boxt-в-rust)
+- [Внутренняя изменяемость: Cell\<T\> и RefCell\<T\>](ch07-2-smart-pointers-and-interior-mutability.md#внутренняя-изменяемость-cellt-и-refcellt)
+- [Совместное владение: Rc\<T\>](ch07-2-smart-pointers-and-interior-mutability.md#совместное-владение-rct)
+- [Упражнение: совместное владение и внутренняя изменяемость](ch07-2-smart-pointers-and-interior-mutability.md#упражнение-совместное-владение-и-внутренняя-изменяемость)
 
-## Part II — Deep Dives
+### 8. Модули и крейты
+- [Крейты и модули в Rust](ch08-crates-and-modules.md#крейты-и-модули-в-rust)
+- [Упражнение: модули и функции](ch08-crates-and-modules.md#упражнение-модули-и-функции)
+- [Рабочие пространства и крейты (пакеты)](ch08-crates-and-modules.md#рабочие-пространства-и-крейты-пакеты)
+- [Упражнение: использование рабочих пространств и зависимостей пакетов](ch08-crates-and-modules.md#упражнение-использование-рабочих-пространств-и-зависимостей-пакетов)
+- [Использование крейтов сообщества из crates.io](ch08-crates-and-modules.md#использование-крейтов-сообщества-из-cratesio)
+- [Зависимости крейтов и SemVer](ch08-crates-and-modules.md#зависимости-крейтов-и-semver)
+- [Упражнение: использование крейта rand](ch08-crates-and-modules.md#упражнение-использование-крейта-rand)
+- [Cargo.toml и Cargo.lock](ch08-crates-and-modules.md#cargotoml-и-cargolock)
+- [Функция cargo test](ch08-crates-and-modules.md#функция-cargo-test)
+- [Другие возможности Cargo](ch08-crates-and-modules.md#другие-возможности-cargo)
+- [Паттерны тестирования](ch08-1-testing-patterns.md)
 
-### 15. no_std — Rust for Bare Metal
-- [What is no_std?](ch15-no_std-rust-without-the-standard-library.md#what-is-no_std)
-- [When to use no_std vs std](ch15-no_std-rust-without-the-standard-library.md#when-to-use-no_std-vs-std)
-- [Exercise: no_std ring buffer](ch15-no_std-rust-without-the-standard-library.md#exercise-no_std-ring-buffer)
-- [Embedded Deep Dive](ch15-1-embedded-deep-dive.md)
+### 9. Обработка ошибок
+- [Связываем перечисления с Option и Result](ch09-error-handling.md#связываем-перечисления-с-option-и-result)
+- [Тип Option в Rust](ch09-error-handling.md#тип-option-в-rust)
+- [Тип Result в Rust](ch09-error-handling.md#тип-result-в-rust)
+- [Упражнение: реализация функции log() с Option](ch09-error-handling.md#упражнение-реализация-функции-log-с-option)
+- [Обработка ошибок в Rust](ch09-error-handling.md#обработка-ошибок-в-rust)
+- [Упражнение: обработка ошибок](ch09-error-handling.md#упражнение-обработка-ошибок)
+- [Лучшие практики обработки ошибок](ch09-1-error-handling-best-practices.md)
 
-### 16. Case Studies: Real-World C++ to Rust Translation
-- [Case Study 1: Inheritance hierarchy → Enum dispatch](ch16-case-studies.md#case-study-1-inheritance-hierarchy--enum-dispatch)
-- [Case Study 2: shared_ptr tree → Arena/index pattern](ch16-case-studies.md#case-study-2-shared_ptr-tree--arenaindex-pattern)
-- [Case Study 3: Framework communication → Lifetime borrowing](ch16-1-case-study-lifetime-borrowing.md#case-study-3-framework-communication--lifetime-borrowing)
-- [Case Study 4: God object → Composable state](ch16-1-case-study-lifetime-borrowing.md#case-study-4-god-object--composable-state)
-- [Case Study 5: Trait objects — when they ARE right](ch16-1-case-study-lifetime-borrowing.md#case-study-5-trait-objects--when-they-are-right)
+### 10. Трейты и обобщения
+- [Трейты в Rust](ch10-traits.md#трейты-в-rust)
+- [Перегрузка операторов в C++ → трейты std::ops в Rust](ch10-traits.md#перегрузка-операторов-в-c--трейты-stdops-в-rust)
+- [Упражнение: реализация трейта Logger](ch10-traits.md#упражнение-реализация-трейта-logger)
+- [Когда использовать enum и dyn Trait](ch10-traits.md#выбор-между-impl-trait-dyn-trait-и-перечислениями)
+- [Упражнение: подумайте, прежде чем переводить](ch16-cases-3-5-lifetime-borrowing.md#упражнение-подумайте-прежде-чем-переводить)
+- [Обобщения в Rust](ch10-1-generics.md#обобщения-в-rust)
+- [Упражнение: обобщения](ch10-1-generics.md#упражнение-обобщения)
+- [Комбинирование трейтов и обобщений в Rust](ch10-1-generics.md#комбинирование-трейтов-и-обобщений-в-rust)
+- [Ограничения трейтов в типах данных](ch10-1-generics.md#ограничения-трейтов-в-типах-данных)
+- [Упражнение: ограничения трейтов и обобщения](ch10-1-generics.md#упражнение-ограничения-трейтов-и-обобщения)
+- [Паттерн состояний (type state) и обобщения в Rust](ch10-1-generics.md#паттерн-состояний-type-state-и-обобщения-в-rust)
+- [Паттерн-строитель в Rust](ch10-1-generics.md#паттерн-строитель-в-rust)
 
-## Part III — Best Practices & Reference
+### 11. Расширенные возможности системы типов
+- [Трейты From и Into в Rust](ch11-from-and-into-traits.md#трейты-from-и-into-в-rust)
+- [Упражнение: From и Into](ch11-from-and-into-traits.md#упражнение-from-и-into)
+- [Трейт Default в Rust](ch11-from-and-into-traits.md#трейт-default-в-rust)
+- [Другие преобразования типов в Rust](ch11-from-and-into-traits.md#другие-преобразования-типов-в-rust)
 
-### 17. Best Practices
-- [Rust Best Practices Summary](ch17-best-practices.md#rust-best-practices-summary)
-- [Avoiding excessive clone()](ch17-1-avoiding-excessive-clone.md#avoiding-excessive-clone)
-- [Avoiding unchecked indexing](ch17-2-avoiding-unchecked-indexing.md#avoiding-unchecked-indexing)
-- [Collapsing assignment pyramids](ch17-3-collapsing-assignment-pyramids.md#collapsing-assignment-pyramids)
-- [Capstone Exercise: Diagnostic Event Pipeline](ch17-3-collapsing-assignment-pyramids.md#capstone-exercise-diagnostic-event-pipeline)
-- [Logging and Tracing Ecosystem](ch17-4-logging-and-tracing-ecosystem.md#logging-and-tracing-ecosystem)
+### 12. Функциональное программирование
+- [Замыкания в Rust](ch12-closures.md#замыкания-в-rust)
+- [Упражнение: замыкания и захват переменных](ch12-closures.md#упражнение-замыкания-и-захват-переменных)
+- [Итераторы в Rust](ch12-closures.md#итераторы-в-rust)
+- [Упражнение: итераторы в Rust](ch12-closures.md#упражнение-итераторы-в-rust)
+- [Справочник по инструментам для работы с итераторами](ch12-1-iterator-power-tools.md#справочник-по-инструментам-для-работы-с-итераторами)
 
-### 18. C++ → Rust Semantic Deep Dives
-- [Casting, Preprocessor, Modules, volatile, static, constexpr, SFINAE, and more](ch18-cpp-rust-semantic-deep-dives.md)
+### 13. Конкурентность
+- [Конкурентность в Rust](ch13-concurrency.md#конкурентность-в-rust)
+- [Почему Rust предотвращает гонки данных: Send и Sync](ch13-concurrency.md#почему-rust-предотвращает-гонки-данных-send-и-sync)
+- [Упражнение: подсчёт слов в многопоточном режиме](ch13-concurrency.md#упражнение-подсчёт-слов-в-многопоточном-режиме)
 
-### 19. Rust Macros
-- [Declarative macros (`macro_rules!`)](ch19-macros.md#declarative-macros-with-macro_rules)
-- [Common standard library macros](ch19-macros.md#common-standard-library-macros)
-- [Derive macros](ch19-macros.md#derive-macros)
-- [Attribute macros](ch19-macros.md#attribute-macros)
-- [Procedural macros](ch19-macros.md#procedural-macros-conceptual-overview)
-- [When to use what: macros vs functions vs generics](ch19-macros.md#when-to-use-what-macros-vs-functions-vs-generics)
-- [Exercises](ch19-macros.md#exercises)
+### 14. Небезопасный Rust и FFI
+- [Небезопасный Rust (unsafe)](ch14-unsafe-rust-and-ffi.md#небезопасный-rust-unsafe)
+- [Простой пример FFI (функция Rust, вызываемая из C)](ch14-unsafe-rust-and-ffi.md#простой-пример-ffi-функция-rust-вызываемая-из-c)
+- [Сложный пример FFI](ch14-unsafe-rust-and-ffi.md#сложный-пример-ffi)
+- [Обеспечение корректности unsafe-кода](ch14-unsafe-rust-and-ffi.md#обеспечение-корректности-unsafe-кода)
+- [Упражнение: написание безопасной обёртки FFI](ch14-unsafe-rust-and-ffi.md#упражнение-написание-безопасной-обёртки-ffi)
+
+## Часть II — Углублённые темы
+
+### 15. no_std — Rust для bare metal
+- [Что такое no_std?](ch15-no_std-rust-without-the-standard-library.md#что-такое-no_std)
+- [Когда использовать no_std, а когда std](ch15-no_std-rust-without-the-standard-library.md#когда-использовать-no_std-а-когда-std)
+- [Упражнение: кольцевой буфер no_std](ch15-no_std-rust-without-the-standard-library.md#упражнение-кольцевой-буфер-no_std)
+- [Углублённо о встраиваемых системах](ch15-1-embedded-deep-dive.md)
+
+### 16. Примеры из практики: перевод реального кода C++ на Rust
+- [Кейс 1: иерархия наследования → диспетчеризация через перечисления](ch16-case-studies.md#кейс-1-иерархия-наследования--диспетчеризация-через-перечисления)
+- [Кейс 2: дерево на shared_ptr → паттерн арены и индексов](ch16-case-studies.md#кейс-2-дерево-на-shared_ptr--паттерн-арены-и-индексов)
+- [Кейс 3: коммуникация с фреймворком → заимствование по времени жизни](ch16-cases-3-5-lifetime-borrowing.md#кейс-3-коммуникация-с-фреймворком--заимствование-по-времени-жизни)
+- [Кейс 4: «божественный объект» → компонуемое состояние](ch16-cases-3-5-lifetime-borrowing.md#кейс-4-божественный-объект--компонуемое-состояние)
+- [Кейс 5: трейт-объекты — когда они действительно уместны](ch16-cases-3-5-lifetime-borrowing.md#кейс-5-трейт-объекты--когда-они-действительно-уместны)
+
+## Часть III — Лучшие практики и справочник
+
+### 17. Лучшие практики
+- [Сводка лучших практик Rust](ch17-best-practices.md#сводка-лучших-практик-rust)
+- [Избегание избыточного clone()](ch17-1-avoiding-excessive-clone.md#избегание-избыточного-clone)
+- [Избегание неконтролируемой индексации](ch17-2-avoiding-unchecked-indexing.md#избегание-неконтролируемой-индексации)
+- [Схлопывание пирамид присваиваний](ch17-3-collapsing-assignment-pyramids.md#схлопывание-пирамид-присваиваний-с-помощью-замыканий)
+- [Итоговое упражнение: конвейер диагностических событий](ch17-3-collapsing-assignment-pyramids.md#итоговое-упражнение-конвейер-диагностических-событий)
+- [Экосистема логирования и трассировки](ch17-4-logging-and-tracing-ecosystem.md#экосистема-логирования-и-трассировки-syslogprintf--log--tracing)
+
+### 18. Семантические различия C++ → Rust
+- [Приведения, препроцессор, модули, volatile, static, constexpr, SFINAE и многое другое](ch18-cpp-rust-semantic-deep-dives.md)
+
+### 19. Макросы Rust
+- [Декларативные макросы (`macro_rules!`)](ch19-macros.md#декларативные-макросы-с-macro_rules)
+- [Распространённые макросы стандартной библиотеки](ch19-macros.md#распространённые-макросы-стандартной-библиотеки)
+- [Макросы derive](ch19-macros.md#макросы-derive)
+- [Макросы-атрибуты](ch19-macros.md#макросы-атрибуты)
+- [Процедурные макросы](ch19-macros.md#процедурные-макросы-концептуальный-обзор)
+- [Когда что использовать: макросы, функции или обобщения](ch19-macros.md#когда-что-использовать-макросы-функции-или-обобщения)
+- [Упражнения](ch19-macros.md#упражнения)

@@ -1,38 +1,38 @@
-# Rust Best Practices Summary
+# Сводка лучших практик Rust
 
-> **What you'll learn:** Practical guidelines for writing idiomatic Rust — code organization, naming conventions, error handling patterns, and documentation. A quick-reference chapter you'll return to often.
+> **Что вы узнаете:** практические рекомендации по написанию идиоматичного Rust — организация кода, соглашения об именовании, паттерны обработки ошибок и документирование. Краткая справочная глава, к которой вы будете возвращаться часто.
 
-## Code Organization
-- **Prefer small functions**: Easy to test and reason about
-- **Use descriptive names**: `calculate_total_price()` vs `calc()`
-- **Group related functionality**: Use modules and separate files
-- **Write documentation**: Use `///` for public APIs
+## Организация кода
+- **Предпочитайте небольшие функции**: их легко тестировать и понимать
+- **Используйте описательные имена**: `calculate_total_price()` вместо `calc()`
+- **Группируйте связанную функциональность**: используйте модули и отдельные файлы
+- **Пишите документацию**: используйте `///` для публичных API
 
-## Error Handling
-- **Avoid `unwrap()` unless infallible**: Only use when you're 100% certain it won't panic
+## Обработка ошибок
+- **Избегайте `unwrap()`, если операция не может завершиться неудачей**: используйте его, только когда на 100% уверены, что panic не будет
 ```rust
-// Bad: Can panic
+// Плохо: может вызвать panic
 let value = some_option.unwrap();
 
-// Good: Handle the None case
+// Хорошо: обрабатываем случай None
 let value = some_option.unwrap_or(default_value);
 let value = some_option.unwrap_or_else(|| expensive_computation());
-let value = some_option.unwrap_or_default(); // Uses Default trait
+let value = some_option.unwrap_or_default(); // Использует трейт Default
 
-// For Result<T, E>
+// Для Result<T, E>
 let value = some_result.unwrap_or(fallback_value);
 let value = some_result.unwrap_or_else(|err| {
     eprintln!("Error occurred: {err}");
     default_value
 });
 ```
-- **Use `expect()` with descriptive messages**: When unwrap is justified, explain why
+- **Используйте `expect()` с понятными сообщениями**: если unwrap оправдан, объясните почему
 ```rust
 let config = std::env::var("CONFIG_PATH")
     .expect("CONFIG_PATH environment variable must be set");
 ```
-- **Return `Result<T, E>` for fallible operations**: Let callers decide how to handle errors
-- **Use `thiserror` for custom error types**: More ergonomic than manual implementations
+- **Возвращайте `Result<T, E>` из операций, которые могут завершиться ошибкой**: пусть вызывающий код решает, как обрабатывать ошибки
+- **Используйте `thiserror` для собственных типов ошибок**: это удобнее ручной реализации
 ```rust
 use thiserror::Error;
 
@@ -48,153 +48,149 @@ pub enum MyError {
     OutOfRange { value: i32 },
 }
 ```
-- **Chain errors with `?` operator**: Propagate errors up the call stack
-- **Prefer `thiserror` over `anyhow`**: Our team convention is to define explicit error
-  enums with `#[derive(thiserror::Error)]` so callers can match on specific variants.
-  `anyhow::Error` is convenient for quick prototyping but erases the error type, making
-  it harder for callers to handle specific failures. Use `thiserror` for library and
-  production code; reserve `anyhow` for throwaway scripts or top-level binaries where
-  you only need to print the error.
-- **When `unwrap()` is acceptable**:
-  - **Unit tests**: `assert_eq!(result.unwrap(), expected)`
-  - **Prototyping**: Quick and dirty code that you'll replace
-  - **Infallible operations**: When you can prove it won't fail
+- **Цепочка ошибок через оператор `?`**: передавайте ошибки вверх по стеку вызовов
+- **Предпочитайте `thiserror` перед `anyhow`**: соглашение нашей команды — определять явные перечисления ошибок через `#[derive(thiserror::Error)]`, чтобы вызывающий код мог сопоставлять конкретные варианты.
+  `anyhow::Error` удобен для быстрых прототипов, но стирает тип ошибки, из-за чего вызывающему коду сложнее обрабатывать конкретные сбои. Используйте `thiserror` для библиотечного и продакшн-кода; `anyhow` оставьте для одноразовых скриптов или бинарников верхнего уровня, где нужно только вывести ошибку.
+- **Когда `unwrap()` допустим**:
+  - **Модульные тесты**: `assert_eq!(result.unwrap(), expected)`
+  - **Прототипирование**: быстрый и грязный код, который вы потом замените
+  - **Операции, которые не могут завершиться ошибкой**: когда вы можете доказать, что сбоя не будет
 ```rust
 let numbers = vec![1, 2, 3];
-let first = numbers.get(0).unwrap(); // Safe: we just created the vec with elements
+let first = numbers.get(0).unwrap(); // Безопасно: мы только что создали вектор с элементами
 
-// Better: Use expect() with explanation
+// Лучше: используем expect() с объяснением
 let first = numbers.get(0).expect("numbers vec is non-empty by construction");
 ```
-- **Fail fast**: Check preconditions early and return errors immediately
+- **Быстро падайте (fail fast)**: проверяйте предусловия в начале и сразу возвращайте ошибки
 
-## Memory Management
-- **Prefer borrowing over cloning**: Use `&T` instead of cloning when possible
-- **Use `Rc<T>` sparingly**: Only when you need shared ownership
-- **Limit lifetimes**: Use scopes `{}` to control when values are dropped
-- **Avoid `RefCell<T>` in public APIs**: Keep interior mutability internal
+## Управление памятью
+- **Предпочитайте заимствование клонированию**: используйте `&T` вместо клонирования, когда это возможно
+- **Используйте `Rc<T>` умеренно**: только когда нужно совместное владение
+- **Ограничивайте времена жизни**: используйте области видимости `{}`, чтобы контролировать, когда значения уничтожаются
+- **Избегайте `RefCell<T>` в публичных API**: внутреннюю изменяемость держите внутри
 
-## Performance
-- **Profile before optimizing**: Use `cargo bench` and profiling tools
-- **Prefer iterators over loops**: More readable and often faster
-- **Use `&str` over `String`**: When you don't need ownership
-- **Consider `Box<T>` for large stack objects**: Move them to heap if needed
+## Производительность
+- **Профилируйте перед оптимизацией**: используйте `cargo bench` и инструменты профилирования
+- **Предпочитайте итераторы циклам**: они читаемее и часто быстрее
+- **Используйте `&str` вместо `String`**: когда не нужно владение
+- **Рассмотрите `Box<T>` для больших объектов на стеке**: при необходимости переносите их в кучу
 
-## Essential Traits to Implement
+## Трейты, которые стоит реализовать
 
-### Core Traits Every Type Should Consider
+### Базовые трейты, о которых стоит подумать для каждого типа
 
-When creating custom types, consider implementing these fundamental traits to make your types feel native to Rust:
+Создавая собственные типы, рассмотрите реализацию этих базовых трейтов, чтобы ваши типы ощущались в Rust «родными»:
 
-#### **Debug and Display**
+#### **Debug и Display**
 ```rust
 use std::fmt;
 
-#[derive(Debug)]  // Automatic implementation for debugging
+#[derive(Debug)]  // Автоматическая реализация для отладки
 struct Person {
     name: String,
     age: u32,
 }
 
-// Manual Display implementation for user-facing output
+// Ручная реализация Display для вывода, который видит пользователь
 impl fmt::Display for Person {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{} (age {})", self.name, self.age)
     }
 }
 
-// Usage:
+// Использование:
 let person = Person { name: "Alice".to_string(), age: 30 };
 println!("{:?}", person);  // Debug: Person { name: "Alice", age: 30 }
 println!("{}", person);    // Display: Alice (age 30)
 ```
 
-#### **Clone and Copy**
+#### **Clone и Copy**
 ```rust
-// Copy: Implicit duplication for small, simple types
+// Copy: неявное дублирование для малых простых типов
 #[derive(Debug, Clone, Copy)]
 struct Point {
     x: i32,
     y: i32,
 }
 
-// Clone: Explicit duplication for complex types
+// Clone: явное дублирование для сложных типов
 #[derive(Debug, Clone)]
 struct Person {
-    name: String,  // String doesn't implement Copy
+    name: String,  // String не реализует Copy
     age: u32,
 }
 
 let p1 = Point { x: 1, y: 2 };
-let p2 = p1;  // Copy (implicit)
+let p2 = p1;  // Copy (неявно)
 
 let person1 = Person { name: "Bob".to_string(), age: 25 };
-let person2 = person1.clone();  // Clone (explicit)
+let person2 = person1.clone();  // Clone (явно)
 ```
 
-#### **PartialEq and Eq**
+#### **PartialEq и Eq**
 ```rust
 #[derive(Debug, PartialEq, Eq)]
 struct UserId(u64);
 
 #[derive(Debug, PartialEq)]
 struct Temperature {
-    celsius: f64,  // f64 doesn't implement Eq (due to NaN)
+    celsius: f64,  // f64 не реализует Eq (из-за NaN)
 }
 
 let id1 = UserId(123);
 let id2 = UserId(123);
-assert_eq!(id1, id2);  // Works because of PartialEq
+assert_eq!(id1, id2);  // Работает благодаря PartialEq
 
 let temp1 = Temperature { celsius: 20.0 };
 let temp2 = Temperature { celsius: 20.0 };
-assert_eq!(temp1, temp2);  // Works with PartialEq
+assert_eq!(temp1, temp2);  // Работает с PartialEq
 ```
 
-#### **PartialOrd and Ord**
+#### **PartialOrd и Ord**
 ```rust
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 struct Priority(u8);
 
 let high = Priority(1);
 let low = Priority(10);
-assert!(high < low);  // Lower numbers = higher priority
+assert!(high < low);  // Меньшие числа = выше приоритет
 
-// Use in collections
+// Использование в коллекциях
 let mut priorities = vec![Priority(5), Priority(1), Priority(8)];
-priorities.sort();  // Works because Priority implements Ord
+priorities.sort();  // Работает, потому что Priority реализует Ord
 ```
 
 #### **Default**
 ```rust
 #[derive(Debug, Default)]
 struct Config {
-    debug: bool,           // false (default)
-    max_connections: u32,  // 0 (default)
-    timeout: Option<u64>,  // None (default)
+    debug: bool,           // false (по умолчанию)
+    max_connections: u32,  // 0 (по умолчанию)
+    timeout: Option<u64>,  // None (по умолчанию)
 }
 
-// Custom Default implementation
+// Собственная реализация Default
 impl Default for Config {
     fn default() -> Self {
         Config {
             debug: false,
-            max_connections: 100,  // Custom default
-            timeout: Some(30),     // Custom default
+            max_connections: 100,  // Собственное значение по умолчанию
+            timeout: Some(30),     // Собственное значение по умолчанию
         }
     }
 }
 
 let config = Config::default();
-let config = Config { debug: true, ..Default::default() };  // Partial override
+let config = Config { debug: true, ..Default::default() };  // Частичное переопределение
 ```
 
-#### **From and Into**
+#### **From и Into**
 ```rust
 struct UserId(u64);
 struct UserName(String);
 
-// Implement From, and Into comes for free
+// Реализуем From, а Into получаем бесплатно
 impl From<u64> for UserId {
     fn from(id: u64) -> Self {
         UserId(id)
@@ -213,14 +209,14 @@ impl From<&str> for UserName {
     }
 }
 
-// Usage:
-let user_id: UserId = 123u64.into();         // Using Into
-let user_id = UserId::from(123u64);          // Using From
+// Использование:
+let user_id: UserId = 123u64.into();         // Через Into
+let user_id = UserId::from(123u64);          // Через From
 let username = UserName::from("alice");      // &str -> UserName
-let username: UserName = "bob".into();       // Using Into
+let username: UserName = "bob".into();       // Через Into
 ```
 
-#### **TryFrom and TryInto**
+#### **TryFrom и TryInto**
 ```rust
 use std::convert::TryFrom;
 
@@ -241,12 +237,12 @@ impl TryFrom<i32> for PositiveNumber {
     }
 }
 
-// Usage:
+// Использование:
 let positive = PositiveNumber::try_from(42)?;     // Ok(PositiveNumber(42))
 let error = PositiveNumber::try_from(-5);         // Err(NegativeNumberError)
 ```
 
-#### **Serde (for serialization)**
+#### **Serde (для сериализации)**
 ```rust
 use serde::{Deserialize, Serialize};
 
@@ -257,7 +253,7 @@ struct User {
     email: String,
 }
 
-// Automatic JSON serialization/deserialization
+// Автоматическая сериализация и десериализация в JSON
 let user = User {
     id: 1,
     name: "Alice".to_string(),
@@ -268,57 +264,56 @@ let json = serde_json::to_string(&user)?;
 let deserialized: User = serde_json::from_str(&json)?;
 ```
 
-### Trait Implementation Checklist
+### Чек-лист реализации трейтов
 
-For any new type, consider this checklist:
+Для любого нового типа рассмотрите этот чек-лист:
 
 ```rust
 #[derive(
-    Debug,          // [OK] Always implement for debugging
-    Clone,          // [OK] If the type should be duplicatable
-    PartialEq,      // [OK] If the type should be comparable
-    Eq,             // [OK] If comparison is reflexive/transitive
-    PartialOrd,     // [OK] If the type has ordering
-    Ord,            // [OK] If ordering is total
-    Hash,           // [OK] If type will be used as HashMap key
-    Default,        // [OK] If there's a sensible default value
+    Debug,          // [OK] Всегда реализуйте для отладки
+    Clone,          // [OK] Если тип должен можно было дублировать
+    PartialEq,      // [OK] Если тип должен можно было сравнивать
+    Eq,             // [OK] Если сравнение рефлексивно и транзитивно
+    PartialOrd,     // [OK] Если у типа есть порядок
+    Ord,            // [OK] Если порядок полный
+    Hash,           // [OK] Если тип будет ключом HashMap
+    Default,        // [OK] Если есть разумное значение по умолчанию
 )]
 struct MyType {
-    // fields...
+    // поля...
 }
 
-// Manual implementations to consider:
-impl Display for MyType { /* user-facing representation */ }
-impl From<OtherType> for MyType { /* convenient conversion */ }
-impl TryFrom<FallibleType> for MyType { /* fallible conversion */ }
+// Ручные реализации, которые стоит рассмотреть:
+impl Display for MyType { /* представление для пользователя */ }
+impl From<OtherType> for MyType { /* удобное преобразование */ }
+impl TryFrom<FallibleType> for MyType { /* преобразование, которое может завершиться ошибкой */ }
 ```
 
-### When NOT to Implement Traits
+### Когда НЕ реализовывать трейты
 
-- **Don't implement Copy for types with heap data**: `String`, `Vec`, `HashMap` etc.
-- **Don't implement Eq if values can be NaN**: Types containing `f32`/`f64`
-- **Don't implement Default if there's no sensible default**: File handles, network connections
-- **Don't implement Clone if cloning is expensive**: Large data structures (consider `Rc<T>` instead)
+- **Не реализуйте Copy для типов с данными в куче**: `String`, `Vec`, `HashMap` и т. д.
+- **Не реализуйте Eq, если значения могут быть NaN**: типы, содержащие `f32`/`f64`
+- **Не реализуйте Default, если нет разумного значения по умолчанию**: файловые дескрипторы, сетевые соединения
+- **Не реализуйте Clone, если клонирование дорогое**: большие структуры данных (вместо этого рассмотрите `Rc<T>`)
 
-### Summary: Trait Benefits
+### Итоги: преимущества трейтов
 
-| Trait | Benefit | When to Use |
-|-------|---------|-------------|
-| `Debug` | `println!("{:?}", value)` | Always (except rare cases) |
-| `Display` | `println!("{}", value)` | User-facing types |
-| `Clone` | `value.clone()` | When explicit duplication makes sense |
-| `Copy` | Implicit duplication | Small, simple types |
-| `PartialEq` | `==` and `!=` operators | Most types |
-| `Eq` | Reflexive equality | When equality is mathematically sound |
-| `PartialOrd` | `<`, `>`, `<=`, `>=` | Types with natural ordering |
-| `Ord` | `sort()`, `BinaryHeap` | When ordering is total |
-| `Hash` | `HashMap` keys | Types used as map keys |
-| `Default` | `Default::default()` | Types with obvious defaults |
-| `From/Into` | Convenient conversions | Common type conversions |
-| `TryFrom/TryInto` | Fallible conversions | Conversions that can fail |
-
-----
+| Трейт | Преимущество | Когда использовать |
+|-------|-----------|-------------|
+| `Debug` | `println!("{:?}", value)` | Всегда (кроме редких случаев) |
+| `Display` | `println!("{}", value)` | Типы для пользователя |
+| `Clone` | `value.clone()` | Когда явное дублирование имеет смысл |
+| `Copy` | Неявное дублирование | Малые простые типы |
+| `PartialEq` | Операторы `==` и `!=` | Большинство типов |
+| `Eq` | Рефлексивное равенство | Когда равенство математически корректно |
+| `PartialOrd` | `<`, `>`, `<=`, `>=` | Типы с естественным порядком |
+| `Ord` | `sort()`, `BinaryHeap` | Когда порядок полный |
+| `Hash` | Ключи `HashMap` | Типы, используемые как ключи словаря |
+| `Default` | `Default::default()` | Типы с очевидными значениями по умолчанию |
+| `From/Into` | Удобные преобразования | Частые преобразования типов |
+| `TryFrom/TryInto` | Преобразования с возможной ошибкой | Преобразования, которые могут завершиться неудачей |
 
 ----
 
+----
 

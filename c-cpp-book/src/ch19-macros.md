@@ -1,32 +1,32 @@
-## Rust Macros: From Preprocessor to Metaprogramming
+## Макросы Rust: от препроцессора к метапрограммированию
 
-> **What you'll learn:** How Rust macros work, when to use them instead of functions or generics, and how they replace the C/C++ preprocessor. By the end of this chapter you can write your own `macro_rules!` macros and understand what `#[derive(Debug)]` does under the hood.
+> **Что вы узнаете:** как работают макросы Rust, когда использовать их вместо функций или обобщений и как они заменяют препроцессор C/C++. К концу главы вы сможете писать собственные макросы `macro_rules!` и понимать, что скрывается за `#[derive(Debug)]`.
 
-Macros are one of the first things you encounter in Rust (`println!("hello")` on line one) but one of the last things most courses explain. This chapter fixes that.
+Макросы — одна из первых вещей, с которой вы сталкиваетесь в Rust (`println!("hello")` в первой же строке), но одна из последних, что объясняют большинство курсов. Эта глава восполняет этот пробел.
 
-### Why Macros Exist
+### Зачем нужны макросы
 
-Functions and generics handle most code reuse in Rust. Macros fill the gaps where the type system can't reach:
+Функции и обобщения покрывают большую часть повторного использования кода в Rust. Макросы закрывают пробелы, до которых не дотягивается система типов:
 
-| Need | Function/Generic? | Macro? | Why |
+| Потребность | Функция/обобщение? | Макрос? | Почему |
 |------|-------------------|--------|-----|
-| Compute a value | ✅ `fn max<T: Ord>(a: T, b: T) -> T` | — | Type system handles it |
-| Accept variable number of arguments | ❌ Rust has no variadic functions | ✅ `println!("{} {}", a, b)` | Macros accept any number of tokens |
-| Generate repetitive `impl` blocks | ❌ No way with generics alone | ✅ `macro_rules!` | Macros generate code at compile time |
-| Run code at compile time | ❌ `const fn` is limited | ✅ Procedural macros | Full Rust code runs at compile time |
-| Conditionally include code | ❌ | ✅ `#[cfg(...)]` | Attribute macros control compilation |
+| Вычислить значение | ✅ `fn max<T: Ord>(a: T, b: T) -> T` | — | Это делает система типов |
+| Принимать переменное число аргументов | ❌ В Rust нет вариативных функций | ✅ `println!("{} {}", a, b)` | Макросы принимают любое число токенов |
+| Генерировать однотипные блоки `impl` | ❌ Одними обобщениями не получится | ✅ `macro_rules!` | Макросы генерируют код на этапе компиляции |
+| Выполнять код на этапе компиляции | ❌ `const fn` ограничен | ✅ Процедурные макросы | Полноценный код Rust выполняется на этапе компиляции |
+| Условно включать код | ❌ | ✅ `#[cfg(...)]` | Макросы-атрибуты управляют компиляцией |
 
-If you're coming from C/C++, think of macros as the *only correct replacement for the preprocessor* — except they operate on the syntax tree instead of raw text, so they're hygienic (no accidental name collisions) and type-aware.
+Если вы пришли из C/C++, думайте о макросах как о *единственной правильной замене препроцессора* — с той разницей, что они работают с синтаксическим деревом, а не с сырым текстом, поэтому они гигиеничны (нет случайных коллизий имён) и учитывают типы.
 
-> **For C developers:** Rust macros replace `#define` entirely. There is no textual preprocessor. See [ch18](ch18-cpp-rust-semantic-deep-dives.md) for the full preprocessor → Rust mapping.
+> **Для разработчиков на C:** макросы Rust полностью заменяют `#define`. Текстового препроцессора нет. Полное соответствие препроцессора и Rust см. в [ch18](ch18-cpp-rust-semantic-deep-dives.md).
 
 ---
 
-## Declarative Macros with `macro_rules!`
+## Декларативные макросы с `macro_rules!`
 
-Declarative macros (also called "macros by example") are Rust's most common macro form. They use pattern matching on syntax, similar to `match` on values.
+Декларативные макросы (также называемые «макросами по примеру») — самая распространённая форма макросов в Rust. Они используют сопоставление с образцом по синтаксису, похожее на `match` по значениям.
 
-### Basic syntax
+### Базовый синтаксис
 
 ```rust
 macro_rules! say_hello {
@@ -36,23 +36,23 @@ macro_rules! say_hello {
 }
 
 fn main() {
-    say_hello!();  // Expands to: println!("Hello!");
+    say_hello!();  // Раскрывается в: println!("Hello!");
 }
 ```
 
-The `!` after the name is what tells you (and the compiler) this is a macro invocation.
+`!` после имени — это то, что сообщает (и вам, и компилятору), что это вызов макроса.
 
-### Pattern matching with arguments
+### Сопоставление с образцом по аргументам
 
-Macros match on *token trees* using fragment specifiers:
+Макросы сопоставляют *деревья токенов* с помощью спецификаторов фрагментов:
 
 ```rust
 macro_rules! greet {
-    // Pattern 1: no arguments
+    // Образец 1: без аргументов
     () => {
         println!("Hello, world!");
     };
-    // Pattern 2: one expression argument
+    // Образец 2: один аргумент-выражение
     ($name:expr) => {
         println!("Hello, {}!", $name);
     };
@@ -64,31 +64,31 @@ fn main() {
 }
 ```
 
-#### Fragment specifiers reference
+#### Справочник спецификаторов фрагментов
 
-| Specifier | Matches | Example |
+| Спецификатор | Соответствует | Пример |
 |-----------|---------|---------|
-| `$x:expr` | Any expression | `42`, `a + b`, `foo()` |
-| `$x:ty` | A type | `i32`, `Vec<String>`, `&str` |
-| `$x:ident` | An identifier | `foo`, `my_var` |
-| `$x:pat` | A pattern | `Some(x)`, `_`, `(a, b)` |
-| `$x:stmt` | A statement | `let x = 5;` |
-| `$x:block` | A block | `{ println!("hi"); 42 }` |
-| `$x:literal` | A literal | `42`, `"hello"`, `true` |
-| `$x:tt` | A single token tree | Anything — the wildcard |
-| `$x:item` | An item (fn, struct, impl, etc.) | `fn foo() {}` |
+| `$x:expr` | Любому выражению | `42`, `a + b`, `foo()` |
+| `$x:ty` | Типу | `i32`, `Vec<String>`, `&str` |
+| `$x:ident` | Идентификатору | `foo`, `my_var` |
+| `$x:pat` | Образцу | `Some(x)`, `_`, `(a, b)` |
+| `$x:stmt` | Оператору | `let x = 5;` |
+| `$x:block` | Блоку | `{ println!("hi"); 42 }` |
+| `$x:literal` | Литералу | `42`, `"hello"`, `true` |
+| `$x:tt` | Одному дереву токенов | Что угодно — универсальный шаблон |
+| `$x:item` | Элементу (fn, struct, impl и т. д.) | `fn foo() {}` |
 
-### Repetition — the killer feature
+### Повторение — ключевая возможность
 
-C/C++ macros can't loop. Rust macros can repeat patterns:
+Макросы C/C++ не умеют циклов. Макросы Rust умеют повторять образцы:
 
 ```rust
 macro_rules! make_vec {
-    // Match zero or more comma-separated expressions
+    // Сопоставляем ноль или более выражений, разделённых запятыми
     ( $( $element:expr ),* ) => {
         {
             let mut v = Vec::new();
-            $( v.push($element); )*  // Repeat for each matched element
+            $( v.push($element); )*  // Повторяем для каждого сопоставленного элемента
             v
         }
     };
@@ -100,9 +100,9 @@ fn main() {
 }
 ```
 
-The `$( ... ),*` syntax means "match zero or more of this pattern, separated by commas." The `$( ... )*` in the expansion repeats the body once for each match.
+Синтаксис `$( ... ),*` означает «сопоставить ноль или более таких образцов, разделённых запятыми». Конструкция `$( ... )*` в раскрытии повторяет тело один раз для каждого совпадения.
 
-> **This is exactly how `vec![]` is implemented in the standard library.** The actual source is:
+> **Именно так реализован `vec![]` в стандартной библиотеке.** Реальный исходный код:
 > ```rust
 > macro_rules! vec {
 >     () => { Vec::new() };
@@ -110,19 +110,19 @@ The `$( ... ),*` syntax means "match zero or more of this pattern, separated by 
 >     ($($x:expr),+ $(,)?) => { <[_]>::into_vec(Box::new([$($x),+])) };
 > }
 > ```
-> The `$(,)?` at the end allows an optional trailing comma.
+> Конструкция `$(,)?` в конце разрешает необязательную завершающую запятую.
 
-#### Repetition operators
+#### Операторы повторения
 
-| Operator | Meaning | Example |
-|----------|---------|---------|
-| `$( ... )*` | Zero or more | `vec![]`, `vec![1]`, `vec![1, 2, 3]` |
-| `$( ... )+` | One or more | At least one element required |
-| `$( ... )?` | Zero or one | Optional element |
+| Оператор | Значение | Пример |
+|----------|---------|--------|
+| `$( ... )*` | Ноль или более | `vec![]`, `vec![1]`, `vec![1, 2, 3]` |
+| `$( ... )+` | Один или более | Требуется хотя бы один элемент |
+| `$( ... )?` | Ноль или один | Необязательный элемент |
 
-### Practical example: a `hashmap!` constructor
+### Практический пример: конструктор `hashmap!`
 
-The standard library has `vec![]` but no `hashmap!{}`. Let's build one:
+В стандартной библиотеке есть `vec![]`, но нет `hashmap!{}`. Давайте создадим его:
 
 ```rust
 macro_rules! hashmap {
@@ -139,15 +139,15 @@ fn main() {
     let scores = hashmap! {
         "Alice" => 95,
         "Bob" => 87,
-        "Carol" => 92,  // trailing comma OK thanks to $(,)?
+        "Carol" => 92,  // Завершающая запятая допустима благодаря $(,)?
     };
     println!("{scores:?}");
 }
 ```
 
-### Practical example: diagnostic check macro
+### Практический пример: макрос проверки диагностики
 
-A pattern common in embedded/diagnostic code — check a condition and return an error:
+Шаблон, распространённый во встраиваемом и диагностическом коде, — проверить условие и вернуть ошибку:
 
 ```rust
 use thiserror::Error;
@@ -175,114 +175,114 @@ fn run_diagnostics(temp: f64, voltage: f64) -> Result<(), DiagError> {
 }
 ```
 
-> **C/C++ comparison:**
+> **Сравнение с C/C++:**
 > ```c
-> // C preprocessor — textual substitution, no type safety, no hygiene
+> // Препроцессор C — текстовая подстановка, без проверки типов, без гигиены
 > #define DIAG_CHECK(cond, msg) \
 >     do { if (!(cond)) { log_error(msg); return -1; } } while(0)
 > ```
-> The Rust version returns a proper `Result` type, has no double-evaluation risk, and the compiler checks that `$cond` is actually a `bool` expression.
+> Версия на Rust возвращает корректный тип `Result`, не рискует двойным вычислением, а компилятор проверяет, что `$cond` действительно является выражением типа `bool`.
 
-### Hygiene: why Rust macros are safe
+### Гигиена: почему макросы Rust безопасны
 
-C/C++ macro bugs often come from name collisions:
+Ошибки макросов C/C++ часто возникают из-за коллизий имён:
 
 ```c
-// C: dangerous — `x` could shadow the caller's `x`
+// C: опасно — `x` может затенить `x` вызывающего кода
 #define SQUARE(x) ((x) * (x))
 int x = 5;
-int result = SQUARE(x++);  // UB: x incremented twice!
+int result = SQUARE(x++);  // Неопределённое поведение: x инкрементируется дважды!
 ```
 
-Rust macros are **hygienic** — variables created inside a macro don't leak out:
+Макросы Rust **гигиеничны** — переменные, созданные внутри макроса, не утекают наружу:
 
 ```rust
 macro_rules! make_x {
     () => {
-        let x = 42;  // This `x` is scoped to the macro expansion
+        let x = 42;  // Этот `x` ограничен раскрытием макроса
     };
 }
 
 fn main() {
     let x = 10;
     make_x!();
-    println!("{x}");  // Prints 10, not 42 — hygiene prevents collision
+    println!("{x}");  // Выводит 10, а не 42 — гигиена предотвращает коллизию
 }
 ```
 
-The macro's `x` and the caller's `x` are treated as different variables by the compiler, even though they have the same name. **This is impossible with the C preprocessor.**
+Компилятор считает `x` макроса и `x` вызывающего кода разными переменными, даже несмотря на одинаковые имена. **С препроцессором C это невозможно.**
 
 ---
 
-## Common Standard Library Macros
+## Распространённые макросы стандартной библиотеки
 
-You've been using these since chapter 1 — here's what they actually do:
+Вы используете их с первой главы — вот что они делают на самом деле:
 
-| Macro | What it does | Expands to (simplified) |
+| Макрос | Что делает | Раскрывается в (упрощённо) |
 |-------|-------------|------------------------|
-| `println!("{}", x)` | Format and print to stdout + newline | `std::io::_print(format_args!(...))` |
-| `eprintln!("{}", x)` | Print to stderr + newline | Same but to stderr |
-| `format!("{}", x)` | Format into a `String` | Allocates and returns a `String` |
-| `vec![1, 2, 3]` | Create a `Vec` with elements | `Vec::from([1, 2, 3])` (approximately) |
-| `todo!()` | Mark unfinished code | `panic!("not yet implemented")` |
-| `unimplemented!()` | Mark deliberately unimplemented code | `panic!("not implemented")` |
-| `unreachable!()` | Mark code the compiler can't prove unreachable | `panic!("unreachable")` |
-| `assert!(cond)` | Panic if condition is false | `if !cond { panic!(...) }` |
-| `assert_eq!(a, b)` | Panic if values aren't equal | Shows both values on failure |
-| `dbg!(expr)` | Print expression + value to stderr, return value | `eprintln!("[file:line] expr = {:#?}", &expr); expr` |
-| `include_str!("file.txt")` | Embed file contents as `&str` at compile time | Reads file during compilation |
-| `include_bytes!("data.bin")` | Embed file contents as `&[u8]` at compile time | Reads file during compilation |
-| `cfg!(condition)` | Compile-time condition as a `bool` | `true` or `false` based on target |
-| `env!("VAR")` | Read environment variable at compile time | Fails compilation if not set |
-| `concat!("a", "b")` | Concatenate literals at compile time | `"ab"` |
+| `println!("{}", x)` | Форматирует и выводит в stdout с переводом строки | `std::io::_print(format_args!(...))` |
+| `eprintln!("{}", x)` | Выводит в stderr с переводом строки | То же, но в stderr |
+| `format!("{}", x)` | Форматирует в `String` | Выделяет память и возвращает `String` |
+| `vec![1, 2, 3]` | Создаёт `Vec` с элементами | `Vec::from([1, 2, 3])` (примерно) |
+| `todo!()` | Отмечает незавершённый код | `panic!("not yet implemented")` |
+| `unimplemented!()` | Отмечает намеренно не реализованный код | `panic!("not implemented")` |
+| `unreachable!()` | Отмечает код, недостижимость которого компилятор не может доказать | `panic!("unreachable")` |
+| `assert!(cond)` | Вызывает panic, если условие ложно | `if !cond { panic!(...) }` |
+| `assert_eq!(a, b)` | Вызывает panic, если значения не равны | При ошибке показывает оба значения |
+| `dbg!(expr)` | Выводит выражение и его значение в stderr, возвращает значение | `eprintln!("[file:line] expr = {:#?}", &expr); expr` |
+| `include_str!("file.txt")` | Встраивает содержимое файла как `&str` на этапе компиляции | Читает файл во время компиляции |
+| `include_bytes!("data.bin")` | Встраивает содержимое файла как `&[u8]` на этапе компиляции | Читает файл во время компиляции |
+| `cfg!(condition)` | Условие времени компиляции как `bool` | `true` или `false` в зависимости от цели |
+| `env!("VAR")` | Читает переменную окружения на этапе компиляции | Компиляция завершается ошибкой, если её нет |
+| `concat!("a", "b")` | Объединяет литералы на этапе компиляции | `"ab"` |
 
-### `dbg!` — the debugging macro you'll use daily
+### `dbg!` — макрос для отладки, которым вы будете пользоваться каждый день
 
 ```rust
 fn factorial(n: u32) -> u32 {
-    if dbg!(n <= 1) {     // Prints: [src/main.rs:2] n <= 1 = false
-        dbg!(1)           // Prints: [src/main.rs:3] 1 = 1
+    if dbg!(n <= 1) {     // Выводит: [src/main.rs:2] n <= 1 = false
+        dbg!(1)           // Выводит: [src/main.rs:3] 1 = 1
     } else {
-        dbg!(n * factorial(n - 1))  // Prints intermediate values
+        dbg!(n * factorial(n - 1))  // Выводит промежуточные значения
     }
 }
 
 fn main() {
-    dbg!(factorial(4));   // Prints all recursive calls with file:line
+    dbg!(factorial(4));   // Выводит все рекурсивные вызовы с файлом и строкой
 }
 ```
 
-`dbg!` returns the value it wraps, so you can insert it anywhere without changing program behavior. It prints to stderr (not stdout), so it doesn't interfere with program output. **Remove all `dbg!` calls before committing code.**
+`dbg!` возвращает значение, которое оборачивает, поэтому его можно вставить куда угодно, не меняя поведение программы. Он выводит в stderr (а не в stdout), поэтому не мешает выводу программы. **Перед коммитом удаляйте все вызовы `dbg!`.**
 
-### Format string syntax
+### Синтаксис строк формата
 
-Since `println!`, `format!`, `eprintln!`, and `write!` all use the same format machinery, here's the quick reference:
+Поскольку `println!`, `format!`, `eprintln!` и `write!` используют один и тот же механизм форматирования, вот краткий справочник:
 
 ```rust
 let name = "sensor";
 let value = 3.14159;
 let count = 42;
 
-println!("{name}");                    // Variable by name (Rust 1.58+)
-println!("{}", name);                  // Positional
-println!("{value:.2}");                // 2 decimal places: "3.14"
-println!("{count:>10}");               // Right-aligned, width 10: "        42"
-println!("{count:0>10}");              // Zero-padded: "0000000042"
-println!("{count:#06x}");              // Hex with prefix: "0x002a"
-println!("{count:#010b}");             // Binary with prefix: "0b00101010"
-println!("{value:?}");                 // Debug format
-println!("{value:#?}");                // Pretty-printed Debug format
+println!("{name}");                    // Переменная по имени (Rust 1.58+)
+println!("{}", name);                  // Позиционно
+println!("{value:.2}");                // 2 знака после запятой: "3.14"
+println!("{count:>10}");               // Выравнивание по правому краю, ширина 10: "        42"
+println!("{count:0>10}");              // Дополнение нулями: "0000000042"
+println!("{count:#06x}");              // Шестнадцатеричный с префиксом: "0x002a"
+println!("{count:#010b}");             // Двоичный с префиксом: "0b00101010"
+println!("{value:?}");                 // Формат Debug
+println!("{value:#?}");                // Формат Debug с красивым выводом
 ```
 
-> **For C developers:** Think of this as a type-safe `printf` — the compiler checks that `{:.2}` is applied to a float, not a string. No `%s`/`%d` format mismatch bugs.
+> **Для разработчиков на C:** думайте об этом как о типобезопасном `printf` — компилятор проверяет, что `{:.2}` применяется к числу с плавающей точкой, а не к строке. Ошибок несоответствия `%s`/`%d` не бывает.
 >
-> **For C++ developers:** This replaces `std::cout << std::fixed << std::setprecision(2) << value` with a single readable format string.
+> **Для разработчиков на C++:** это заменяет `std::cout << std::fixed << std::setprecision(2) << value` одной читаемой строкой формата.
 
 ---
 
-## Derive Macros
+## Макросы derive
 
-You've seen `#[derive(...)]` on nearly every struct in this book:
+Вы видели `#[derive(...)]` почти у каждой структуры в этой книге:
 
 ```rust
 #[derive(Debug, Clone, PartialEq)]
@@ -292,10 +292,10 @@ struct Point {
 }
 ```
 
-`#[derive(Debug)]` is a **derive macro** — a special kind of procedural macro that generates trait implementations automatically. Here's what it produces (simplified):
+`#[derive(Debug)]` — это **макрос derive**, особый вид процедурного макроса, который автоматически генерирует реализации трейтов. Вот что он создаёт (упрощённо):
 
 ```rust
-// What #[derive(Debug)] generates for Point:
+// То, что #[derive(Debug)] генерирует для Point:
 impl std::fmt::Debug for Point {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Point")
@@ -306,152 +306,152 @@ impl std::fmt::Debug for Point {
 }
 ```
 
-Without `#[derive(Debug)]`, you'd have to write that `impl` block by hand for every struct.
+Без `#[derive(Debug)]` вам пришлось бы писать такой блок `impl` вручную для каждой структуры.
 
-### Commonly derived traits
+### Распространённые производные трейты
 
-| Derive | What it generates | When to use |
+| Derive | Что генерирует | Когда использовать |
 |--------|-------------------|-------------|
-| `Debug` | `{:?}` formatting | Almost always — enables printing for debugging |
-| `Clone` | `.clone()` method | When you need to duplicate values |
-| `Copy` | Implicit copy on assignment | Small, stack-only types (integers, `[f64; 3]`) |
-| `PartialEq` / `Eq` | `==` and `!=` operators | When you need equality comparison |
-| `PartialOrd` / `Ord` | `<`, `>`, `<=`, `>=` operators | When you need ordering |
-| `Hash` | Hashing for `HashMap`/`HashSet` keys | Types used as map keys |
-| `Default` | `Type::default()` constructor | Types with sensible zero/empty values |
-| `serde::Serialize` / `Deserialize` | JSON/TOML/etc. serialization | Data types that cross API boundaries |
+| `Debug` | Форматирование `{:?}` | Почти всегда — позволяет выводить для отладки |
+| `Clone` | Метод `.clone()` | Когда нужно дублировать значения |
+| `Copy` | Неявное копирование при присваивании | Небольшие типы только на стеке (целые, `[f64; 3]`) |
+| `PartialEq` / `Eq` | Операторы `==` и `!=` | Когда нужно сравнение на равенство |
+| `PartialOrd` / `Ord` | Операторы `<`, `>`, `<=`, `>=` | Когда нужен порядок |
+| `Hash` | Хеширование для ключей `HashMap`/`HashSet` | Типы, используемые как ключи словаря |
+| `Default` | Конструктор `Type::default()` | Типы с разумными нулевыми/пустыми значениями |
+| `serde::Serialize` / `Deserialize` | Сериализация в JSON/TOML и т. д. | Типы данных, пересекающие границы API |
 
-### The derive decision tree
+### Дерево решений по derive
 
 ```text
-Should I derive it?
+Стоит ли выводить этот трейт?
   │
-  ├── Does my type contain only types that implement the trait?
-  │     ├── Yes → #[derive] will work
-  │     └── No  → Write a manual impl (or skip it)
+  ├── Содержит ли мой тип только типы, которые реализуют трейт?
+  │     ├── Да → #[derive] сработает
+  │     └── Нет → Напишите реализацию вручную (или пропустите)
   │
-  └── Will users of my type reasonably expect this behavior?
-        ├── Yes → Derive it (Debug, Clone, PartialEq are almost always reasonable)
-        └── No  → Don't derive (e.g., don't derive Copy for a type with a file handle)
+  └── Будут ли пользователи моего типа разумно ожидать такого поведения?
+        ├── Да → Выводите (Debug, Clone, PartialEq почти всегда разумны)
+        └── Нет → Не выводите (например, не выводите Copy для типа с файловым дескриптором)
 ```
 
-> **C++ comparison:** `#[derive(Clone)]` is like auto-generating a correct copy constructor. `#[derive(PartialEq)]` is like auto-generating `operator==` that compares each field — something C++20's `= default` spaceship operator finally provides.
+> **Сравнение с C++:** `#[derive(Clone)]` похож на автоматическую генерацию корректного конструктора копирования. `#[derive(PartialEq)]` похож на автоматически сгенерированный `operator==`, который сравнивает каждое поле — то, что оператор «космического корабля» `= default` из C++20 наконец предоставляет.
 
 ---
 
-## Attribute Macros
+## Макросы-атрибуты
 
-Attribute macros transform the item they're attached to. You've already used several:
+Макросы-атрибуты преобразуют элемент, к которому они прикреплены. Некоторые вы уже использовали:
 
 ```rust
-#[test]                    // Marks a function as a test
+#[test]                    // Помечает функцию как тест
 fn test_addition() {
     assert_eq!(2 + 2, 4);
 }
 
-#[cfg(target_os = "linux")] // Conditionally includes this function
+#[cfg(target_os = "linux")] // Условно включает эту функцию
 fn linux_only() { /* ... */ }
 
-#[derive(Debug)]            // Generates Debug implementation
+#[derive(Debug)]            // Генерирует реализацию Debug
 struct MyType { /* ... */ }
 
-#[allow(dead_code)]         // Suppresses a compiler warning
+#[allow(dead_code)]         // Подавляет предупреждение компилятора
 fn unused_helper() { /* ... */ }
 
-#[must_use]                 // Warn if return value is discarded
+#[must_use]                 // Предупреждает, если возвращаемое значение отброшено
 fn compute_checksum(data: &[u8]) -> u32 { /* ... */ }
 ```
 
-Common built-in attributes:
+Распространённые встроенные атрибуты:
 
-| Attribute | Purpose |
+| Атрибут | Назначение |
 |-----------|---------|
-| `#[test]` | Mark as test function |
-| `#[cfg(...)]` | Conditional compilation |
-| `#[derive(...)]` | Auto-generate trait impls |
-| `#[allow(...)]` / `#[deny(...)]` / `#[warn(...)]` | Control lint levels |
-| `#[must_use]` | Warn on unused return values |
-| `#[inline]` / `#[inline(always)]` | Hint to inline the function |
-| `#[repr(C)]` | Use C-compatible memory layout (for FFI) |
-| `#[no_mangle]` | Don't mangle the symbol name (for FFI) |
-| `#[deprecated]` | Mark as deprecated with optional message |
+| `#[test]` | Пометить как тестовую функцию |
+| `#[cfg(...)]` | Условная компиляция |
+| `#[derive(...)]` | Автоматическая генерация реализаций трейтов |
+| `#[allow(...)]` / `#[deny(...)]` / `#[warn(...)]` | Управление уровнями линтера |
+| `#[must_use]` | Предупреждать о неиспользованных возвращаемых значениях |
+| `#[inline]` / `#[inline(always)]` | Подсказка компилятору встроить функцию |
+| `#[repr(C)]` | Использовать раскладку памяти, совместимую с C (для FFI) |
+| `#[no_mangle]` | Не искажать имя символа (для FFI) |
+| `#[deprecated]` | Пометить как устаревший с необязательным сообщением |
 
-> **For C/C++ developers:** Attributes replace a mix of preprocessor directives (`#pragma`, `__attribute__((...))`), and compiler-specific extensions. They're part of the language grammar, not bolted-on extensions.
+> **Для разработчиков на C/C++:** атрибуты заменяют смесь директив препроцессора (`#pragma`, `__attribute__((...))`) и расширений, специфичных для компилятора. Они входят в грамматику языка, а не являются приклеенными расширениями.
 
 ---
 
-## Procedural Macros (Conceptual Overview)
+## Процедурные макросы (концептуальный обзор)
 
-Procedural macros ("proc macros") are macros written as *separate Rust programs* that run at compile time and generate code. They're more powerful than `macro_rules!` but also more complex.
+Процедурные макросы («proc macros») — это макросы, написанные как *отдельные программы на Rust*, которые выполняются на этапе компиляции и генерируют код. Они мощнее, чем `macro_rules!`, но и сложнее.
 
-There are three kinds:
+Существует три вида:
 
-| Kind | Syntax | Example | What it does |
+| Вид | Синтаксис | Пример | Что делает |
 |------|--------|---------|-------------|
-| **Function-like** | `my_macro!(...)` | `sql!(SELECT * FROM users)` | Parses custom syntax, generates Rust code |
-| **Derive** | `#[derive(MyTrait)]` | `#[derive(Serialize)]` | Generates trait impl from struct definition |
-| **Attribute** | `#[my_attr]` | `#[tokio::main]`, `#[instrument]` | Transforms the annotated item |
+| **Функциональный** | `my_macro!(...)` | `sql!(SELECT * FROM users)` | Разбирает пользовательский синтаксис, генерирует код Rust |
+| **Derive** | `#[derive(MyTrait)]` | `#[derive(Serialize)]` | Генерирует реализацию трейта по определению структуры |
+| **Атрибут** | `#[my_attr]` | `#[tokio::main]`, `#[instrument]` | Преобразует помеченный элемент |
 
-### You've already used proc macros
+### Вы уже используете процедурные макросы
 
-- `#[derive(Error)]` from `thiserror` — generates `Display` and `From` impls for error enums
-- `#[derive(Serialize, Deserialize)]` from `serde` — generates serialization code
-- `#[tokio::main]` — transforms `async fn main()` into a runtime setup + block_on
-- `#[test]` — registered by the test harness (built-in proc macro)
+- `#[derive(Error)]` из `thiserror` — генерирует реализации `Display` и `From` для перечислений ошибок
+- `#[derive(Serialize, Deserialize)]` из `serde` — генерирует код сериализации
+- `#[tokio::main]` — превращает `async fn main()` в настройку среды выполнения + block_on
+- `#[test]` — регистрируется тестовым харнессом (встроенный процедурный макрос)
 
-### When to write your own proc macro
+### Когда стоит писать собственный процедурный макрос
 
-You likely won't need to write proc macros during this course. They're useful when:
-- You need to inspect struct fields/enum variants at compile time (derive macros)
-- You're building a domain-specific language (function-like macros)
-- You need to transform function signatures (attribute macros)
+Скорее всего, в ходе этого курса писать процедурные макросы не понадобится. Они полезны, когда:
+- Нужно анализировать поля структур или варианты перечислений на этапе компиляции (макросы derive)
+- Вы создаёте предметно-ориентированный язык (функциональные макросы)
+- Нужно преобразовывать сигнатуры функций (макросы-атрибуты)
 
-For most code, `macro_rules!` or plain functions are sufficient.
+Для большинства кода достаточно `macro_rules!` или обычных функций.
 
-> **C++ comparison:** Procedural macros fill the role that code generators, template metaprogramming, and external tools like `protoc` fill in C++. The difference is that proc macros are part of the cargo build pipeline — no external build steps, no CMake custom commands.
+> **Сравнение с C++:** процедурные макросы выполняют ту роль, которую в C++ играют генераторы кода, метапрограммирование на шаблонах и внешние инструменты вроде `protoc`. Разница в том, что процедурные макросы — часть конвейера сборки cargo: никаких внешних шагов сборки, никаких пользовательских команд CMake.
 
 ---
 
-## When to Use What: Macros vs Functions vs Generics
+## Когда что использовать: макросы, функции или обобщения
 
 ```text
-Need to generate code?
+Нужно генерировать код?
   │
-  ├── No → Use a function or generic function
-  │         (simpler, better error messages, IDE support)
+  ├── Нет → Используйте функцию или обобщённую функцию
+  │         (проще, лучшие сообщения об ошибках, поддержка IDE)
   │
-  └── Yes ─┬── Variable number of arguments?
-            │     └── Yes → macro_rules! (e.g., println!, vec!)
+  └── Да ─┬── Переменное число аргументов?
+            │     └── Да → macro_rules! (например, println!, vec!)
             │
-            ├── Repetitive impl blocks for many types?
-            │     └── Yes → macro_rules! with repetition
+            ├── Однотипные блоки impl для многих типов?
+            │     └── Да → macro_rules! с повторением
             │
-            ├── Need to inspect struct fields?
-            │     └── Yes → Derive macro (proc macro)
+            ├── Нужно анализировать поля структуры?
+            │     └── Да → Макрос derive (процедурный макрос)
             │
-            ├── Need custom syntax (DSL)?
-            │     └── Yes → Function-like proc macro
+            ├── Нужен собственный синтаксис (DSL)?
+            │     └── Да → Функциональный процедурный макрос
             │
-            └── Need to transform a function/struct?
-                  └── Yes → Attribute proc macro
+            └── Нужно преобразовать функцию/структуру?
+                  └── Да → Процедурный макрос-атрибут
 ```
 
-**General guideline:** If a function or generic can do it, don't use a macro. Macros have worse error messages, no IDE auto-complete inside the macro body, and are harder to debug.
+**Общее правило:** если можно обойтись функцией или обобщением, не используйте макрос. У макросов хуже сообщения об ошибках, нет автодополнения IDE внутри тела макроса, и их труднее отлаживать.
 
 ---
 
-## Exercises
+## Упражнения
 
-### 🟢 Exercise 1: `min!` macro
+### 🟢 Упражнение 1: макрос `min!`
 
-Write a `min!` macro that:
-- `min!(a, b)` returns the smaller of two values
-- `min!(a, b, c)` returns the smallest of three values
-- Works with any type that implements `PartialOrd`
+Напишите макрос `min!`, который:
+- `min!(a, b)` возвращает меньшее из двух значений
+- `min!(a, b, c)` возвращает наименьшее из трёх значений
+- Работает с любым типом, реализующим `PartialOrd`
 
-**Hint:** You'll need two match arms in your `macro_rules!`.
+**Подсказка:** в вашем `macro_rules!` понадобятся два варианта ветвления.
 
-<details><summary>Solution (click to expand)</summary>
+<details><summary>Решение (нажмите, чтобы развернуть)</summary>
 
 ```rust
 macro_rules! min {
@@ -470,18 +470,18 @@ fn main() {
 }
 ```
 
-**Note:** For production code, prefer `std::cmp::min` or `a.min(b)`. This exercise demonstrates the mechanics of multi-arm macros.
+**Примечание:** для продакшн-кода лучше использовать `std::cmp::min` или `a.min(b)`. Это упражнение демонстрирует устройство макросов с несколькими ветвями.
 
 </details>
 
-### 🟡 Exercise 2: `hashmap!` from scratch
+### 🟡 Упражнение 2: `hashmap!` с нуля
 
-Without looking at the example above, write a `hashmap!` macro that:
-- Creates a `HashMap` from `key => value` pairs
-- Supports trailing commas
-- Works with any hashable key type
+Не глядя на пример выше, напишите макрос `hashmap!`, который:
+- Создаёт `HashMap` из пар `ключ => значение`
+- Поддерживает завершающие запятые
+- Работает с любым хешируемым типом ключа
 
-Test with:
+Проверьте на:
 ```rust
 let m = hashmap! {
     "name" => "Alice",
@@ -491,7 +491,7 @@ assert_eq!(m["name"], "Alice");
 assert_eq!(m.len(), 2);
 ```
 
-<details><summary>Solution (click to expand)</summary>
+<details><summary>Решение (нажмите, чтобы развернуть)</summary>
 
 ```rust
 use std::collections::HashMap;
@@ -517,18 +517,18 @@ fn main() {
 
 </details>
 
-### 🟡 Exercise 3: `assert_approx_eq!` for floating-point comparison
+### 🟡 Упражнение 3: `assert_approx_eq!` для сравнения чисел с плавающей точкой
 
-Write a macro `assert_approx_eq!(a, b, epsilon)` that panics if `|a - b| > epsilon`. This is useful for testing floating-point calculations where exact equality fails.
+Напишите макрос `assert_approx_eq!(a, b, epsilon)`, который вызывает panic, если `|a - b| > epsilon`. Он полезен для тестирования вычислений с плавающей точкой, где точное равенство не выполняется.
 
-Test with:
+Проверьте на:
 ```rust
-assert_approx_eq!(0.1 + 0.2, 0.3, 1e-10);        // Should pass
-assert_approx_eq!(3.14159, std::f64::consts::PI, 1e-4); // Should pass
-// assert_approx_eq!(1.0, 2.0, 0.5);              // Should panic
+assert_approx_eq!(0.1 + 0.2, 0.3, 1e-10);        // Должно пройти
+assert_approx_eq!(3.14159, std::f64::consts::PI, 1e-4); // Должно пройти
+// assert_approx_eq!(1.0, 2.0, 0.5);              // Должно вызвать panic
 ```
 
-<details><summary>Solution (click to expand)</summary>
+<details><summary>Решение (нажмите, чтобы развернуть)</summary>
 
 ```rust
 macro_rules! assert_approx_eq {
@@ -553,9 +553,9 @@ fn main() {
 
 </details>
 
-### 🔴 Exercise 4: `impl_display_for_enum!`
+### 🔴 Упражнение 4: `impl_display_for_enum!`
 
-Write a macro that generates a `Display` implementation for simple C-like enums. Given:
+Напишите макрос, который генерирует реализацию `Display` для простых перечислений в стиле C. Дано:
 
 ```rust
 impl_display_for_enum! {
@@ -567,11 +567,11 @@ impl_display_for_enum! {
 }
 ```
 
-It should generate both the `enum Color { Red, Green, Blue }` definition AND the `impl Display for Color` that maps each variant to its string.
+Он должен сгенерировать и определение `enum Color { Red, Green, Blue }`, И `impl Display for Color`, который сопоставляет каждый вариант с его строкой.
 
-**Hint:** You'll need both `$( ... ),*` repetition and multiple fragment specifiers.
+**Подсказка:** понадобятся и повторение `$( ... ),*`, и несколько спецификаторов фрагментов.
 
-<details><summary>Solution (click to expand)</summary>
+<details><summary>Решение (нажмите, чтобы развернуть)</summary>
 
 ```rust
 use std::fmt;

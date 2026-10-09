@@ -1,41 +1,40 @@
-## C++ → Rust Semantic Deep Dives
+## Семантические различия C++ → Rust: углублённый разбор
 
-> **What you'll learn:** Detailed mappings for C++ concepts that don't have obvious Rust equivalents — the four named casts, SFINAE vs trait bounds, CRTP vs associated types, and other common friction points during translation.
+> **Что вы узнаете:** подробное соответствие концепций C++, у которых нет очевидного аналога в Rust, — четыре именованных приведения, SFINAE и ограничения трейтами, CRTP и ассоциированные типы и другие частые трудности при переводе.
 
-The sections below map C++ concepts that don't have an obvious 1:1 Rust
-equivalent. These differences frequently trip up C++ programmers during
-translation work.
+Ниже описаны концепции C++, для которых нет очевидного взаимно однозначного
+соответствия в Rust. Эти различия часто мешают программистам C++ при переводе кода.
 
-### Casting Hierarchy: Four C++ Casts → Rust Equivalents
+### Иерархия приведений: четыре приведения C++ → эквиваленты в Rust
 
-C++ has four named casts. Rust replaces them with different, more explicit mechanisms:
+В C++ есть четыре именованных приведения. Rust заменяет их другими, более явными механизмами:
 
 ```cpp
-// C++ casting hierarchy
-int i = static_cast<int>(3.14);            // 1. Numeric / up-cast
-Derived* d = dynamic_cast<Derived*>(base); // 2. Runtime downcasting
-int* p = const_cast<int*>(cp);              // 3. Cast away const
-auto* raw = reinterpret_cast<char*>(&obj); // 4. Bit-level reinterpretation
+// Иерархия приведений C++
+int i = static_cast<int>(3.14);            // 1. Числовое / приведение вверх
+Derived* d = dynamic_cast<Derived*>(base); // 2. Приведение вниз во время выполнения
+int* p = const_cast<int*>(cp);              // 3. Снятие const
+auto* raw = reinterpret_cast<char*>(&obj); // 4. Переинтерпретация на уровне битов
 ```
 
-| C++ Cast | Rust Equivalent | Safety | Notes |
+| Приведение C++ | Эквивалент в Rust | Безопасность | Примечания |
 |----------|----------------|--------|-------|
-| `static_cast` (numeric) | `as` keyword | Safe but can truncate/wrap | `let i = 3.14_f64 as i32;` — truncates to 3 |
-| `static_cast` (numeric, checked) | `From`/`Into` | Safe, compile-time verified | `let i: i32 = 42_u8.into();` — only widens |
-| `static_cast` (numeric, fallible) | `TryFrom`/`TryInto` | Safe, returns `Result` | `let i: u8 = 300_u16.try_into()?;` — returns Err |
-| `dynamic_cast` (downcast) | `match` on enum / `Any::downcast_ref` | Safe | Pattern matching for enums; `Any` for trait objects |
-| `const_cast` | No equivalent | | Rust has no way to cast away `&` → `&mut` in safe code. Use `Cell`/`RefCell` for interior mutability |
-| `reinterpret_cast` | `std::mem::transmute` | **`unsafe`** | Reinterprets bit pattern. Almost always wrong — prefer `from_le_bytes()` etc. |
+| `static_cast` (числовое) | Ключевое слово `as` | Безопасно, но может обрезать/переполнить | `let i = 3.14_f64 as i32;` — обрезает до 3 |
+| `static_cast` (числовое, проверяемое) | `From`/`Into` | Безопасно, проверяется на этапе компиляции | `let i: i32 = 42_u8.into();` — только расширение |
+| `static_cast` (числовое, с возможной ошибкой) | `TryFrom`/`TryInto` | Безопасно, возвращает `Result` | `let i: u8 = 300_u16.try_into()?;` — вернёт Err |
+| `dynamic_cast` (приведение вниз) | `match` по перечислению / `Any::downcast_ref` | Безопасно | Сопоставление с образцом для перечислений; `Any` для трейт-объектов |
+| `const_cast` | Эквивалента нет | | В безопасном Rust нет способа превратить `&` в `&mut`. Для внутренней изменяемости используйте `Cell`/`RefCell` |
+| `reinterpret_cast` | `std::mem::transmute` | **`unsafe`** | Переинтерпретирует битовый шаблон. Почти всегда ошибочно — предпочитайте `from_le_bytes()` и т. п. |
 
 ```rust
-// Rust equivalents:
+// Эквиваленты в Rust:
 
-// 1. Numeric casts — prefer From/Into over `as`
-let widened: u32 = 42_u8.into();             // Infallible widening — always prefer
-let truncated = 300_u16 as u8;                // ⚠ Wraps to 44! Silent data loss
-let checked: Result<u8, _> = 300_u16.try_into(); // Err — safe fallible conversion
+// 1. Числовые приведения — предпочитайте From/Into вместо `as`
+let widened: u32 = 42_u8.into();             // Расширение без ошибок — всегда предпочтительно
+let truncated = 300_u16 as u8;                // ⚠ Переполняется до 44! Тихая потеря данных
+let checked: Result<u8, _> = 300_u16.try_into(); // Err — безопасное преобразование с возможной ошибкой
 
-// 2. Downcast: enum (preferred) or Any (when needed for type erasure)
+// 2. Приведение вниз: перечисление (предпочтительно) или Any (когда нужно стирание типа)
 use std::any::Any;
 
 fn handle_any(val: &dyn Any) {
@@ -46,58 +45,54 @@ fn handle_any(val: &dyn Any) {
     }
 }
 
-// 3. "const_cast" → interior mutability (no unsafe needed)
+// 3. «const_cast» → внутренняя изменяемость (unsafe не нужен)
 use std::cell::Cell;
 struct Sensor {
-    read_count: Cell<u32>,  // Mutate through &self
+    read_count: Cell<u32>,  // Изменяем через &self
 }
 impl Sensor {
     fn read(&self) -> f64 {
-        self.read_count.set(self.read_count.get() + 1); // &self, not &mut self
+        self.read_count.set(self.read_count.get() + 1); // &self, а не &mut self
         42.0
     }
 }
 
-// 4. reinterpret_cast → transmute (almost never needed)
-// Prefer safe alternatives:
-let bytes: [u8; 4] = 0x12345678_u32.to_ne_bytes();  // ✅ Safe
-let val = u32::from_ne_bytes(bytes);                   // ✅ Safe
-// unsafe { std::mem::transmute::<u32, [u8; 4]>(val) } // ❌ Avoid
+// 4. reinterpret_cast → transmute (почти никогда не нужно)
+// Предпочитайте безопасные альтернативы:
+let bytes: [u8; 4] = 0x12345678_u32.to_ne_bytes();  // ✅ Безопасно
+let val = u32::from_ne_bytes(bytes);                   // ✅ Безопасно
+// unsafe { std::mem::transmute::<u32, [u8; 4]>(val) } // ❌ Избегайте
 ```
 
-> **Guideline**: In idiomatic Rust, `as` should be rare (use `From`/`Into`
-> for widening, `TryFrom`/`TryInto` for narrowing), `transmute` should be
-> exceptional, and `const_cast` has no equivalent because interior mutability
-> types make it unnecessary.
+> **Правило**: в идиоматичном Rust `as` должен встречаться редко (для расширения используйте `From`/`Into`, для сужения — `TryFrom`/`TryInto`), `transmute` — исключительный случай, а у `const_cast` нет эквивалента, потому что типы с внутренней изменяемостью делают его ненужным.
 
 ---
 
-### Preprocessor → `cfg`, Feature Flags, and `macro_rules!`
+### Препроцессор → `cfg`, флаги функций и `macro_rules!`
 
-C++ relies heavily on the preprocessor for conditional compilation, constants, and
-code generation. Rust replaces all of these with first-class language features.
+C++ сильно опирается на препроцессор для условной компиляции, констант и генерации кода. Rust заменяет всё это полноценными возможностями языка.
 
-#### `#define` constants → `const` or `const fn`
+#### `#define`-константы → `const` или `const fn`
 
 ```cpp
 // C++
 #define MAX_RETRIES 5
 #define BUFFER_SIZE (1024 * 64)
-#define SQUARE(x) ((x) * (x))  // Macro — textual substitution, no type safety
+#define SQUARE(x) ((x) * (x))  // Макрос — текстовая подстановка, без проверки типов
 ```
 
 ```rust
-// Rust — type-safe, scoped, no textual substitution
+// Rust — с проверкой типов, с областью видимости, без текстовой подстановки
 const MAX_RETRIES: u32 = 5;
 const BUFFER_SIZE: usize = 1024 * 64;
-const fn square(x: u32) -> u32 { x * x }  // Evaluated at compile time
+const fn square(x: u32) -> u32 { x * x }  // Вычисляется на этапе компиляции
 
-// Can be used in const contexts:
-const AREA: u32 = square(12);  // Computed at compile time
+// Можно использовать в константных контекстах:
+const AREA: u32 = square(12);  // Вычисляется на этапе компиляции
 static BUFFER: [u8; BUFFER_SIZE] = [0; BUFFER_SIZE];
 ```
 
-#### `#ifdef` / `#if` → `#[cfg()]` and `cfg!()`
+#### `#ifdef` / `#if` → `#[cfg()]` и `cfg!()`
 
 ```cpp
 // C++
@@ -113,39 +108,39 @@ static BUFFER: [u8; BUFFER_SIZE] = [0; BUFFER_SIZE];
 ```
 
 ```rust
-// Rust — attribute-based conditional compilation
+// Rust — условная компиляция на основе атрибутов
 #[cfg(debug_assertions)]
 fn log_verbose(msg: &str) { eprintln!("[VERBOSE] {msg}"); }
 
 #[cfg(not(debug_assertions))]
-fn log_verbose(_msg: &str) { /* compiled away in release */ }
+fn log_verbose(_msg: &str) { /* удаляется в релизной сборке */ }
 
-// Combine conditions:
+// Комбинирование условий:
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 fn use_x86_path() { /* ... */ }
 
 #[cfg(not(all(target_os = "linux", target_arch = "x86_64")))]
 fn use_generic_path() { /* ... */ }
 
-// Runtime check (condition is still compile-time, but usable in expressions):
+// Проверка во время выполнения (условие всё равно вычисляется на этапе компиляции, но его можно использовать в выражениях):
 if cfg!(target_os = "windows") {
     println!("Running on Windows");
 }
 ```
 
-#### Feature flags in `Cargo.toml`
+#### Флаги функций в `Cargo.toml`
 
 ```toml
-# Cargo.toml — replace #ifdef FEATURE_FOO
+# Cargo.toml — замена #ifdef FEATURE_FOO
 [features]
 default = ["json"]
-json = ["dep:serde_json"]       # Optional dependency
-verbose-logging = []            # Flag with no extra dependency
-gpu-support = ["dep:cuda-sys"]  # Optional GPU support
+json = ["dep:serde_json"]       # Необязательная зависимость
+verbose-logging = []            # Флаг без дополнительной зависимости
+gpu-support = ["dep:cuda-sys"]  # Необязательная поддержка GPU
 ```
 
 ```rust
-// Conditional code based on feature flags:
+// Условный код на основе флагов функций:
 #[cfg(feature = "json")]
 pub fn parse_config(data: &str) -> Result<Config, Error> {
     serde_json::from_str(data).map_err(Error::from)
@@ -157,20 +152,20 @@ macro_rules! verbose {
 }
 #[cfg(not(feature = "verbose-logging"))]
 macro_rules! verbose {
-    ($($arg:tt)*) => { }; // Compiles to nothing
+    ($($arg:tt)*) => { }; // Компилируется в ничего
 }
 ```
 
 #### `#define MACRO(x)` → `macro_rules!`
 
 ```cpp
-// C++ — textual substitution, notoriously error-prone
+// C++ — текстовая подстановка, печально известная своей подверженностью ошибкам
 #define DIAG_CHECK(cond, msg) \
     do { if (!(cond)) { log_error(msg); return false; } } while(0)
 ```
 
 ```rust
-// Rust — hygienic, type-checked, operates on syntax tree
+// Rust — гигиеничный, с проверкой типов, работает с синтаксическим деревом
 macro_rules! diag_check {
     ($cond:expr, $msg:expr) => {
         if !($cond) {
@@ -187,23 +182,23 @@ fn run_test() -> Result<(), DiagError> {
 }
 ```
 
-| C++ Preprocessor | Rust Equivalent | Advantage |
+| Препроцессор C++ | Эквивалент в Rust | Преимущество |
 |-----------------|----------------|-----------|
-| `#define PI 3.14` | `const PI: f64 = 3.14;` | Typed, scoped, visible to debugger |
-| `#define MAX(a,b) ((a)>(b)?(a):(b))` | `macro_rules!` or generic `fn max<T: Ord>` | No double-evaluation bugs |
-| `#ifdef DEBUG` | `#[cfg(debug_assertions)]` | Checked by compiler, no typo risk |
-| `#ifdef FEATURE_X` | `#[cfg(feature = "x")]` | Cargo manages features; dependency-aware |
-| `#include "header.h"` | `mod module;` + `use module::Item;` | No include guards, no circular includes |
-| `#pragma once` | Not needed | Each `.rs` file is a module — included exactly once |
+| `#define PI 3.14` | `const PI: f64 = 3.14;` | С типом, с областью видимости, видна отладчику |
+| `#define MAX(a,b) ((a)>(b)?(a):(b))` | `macro_rules!` или обобщённая `fn max<T: Ord>` | Нет ошибок двойного вычисления |
+| `#ifdef DEBUG` | `#[cfg(debug_assertions)]` | Проверяется компилятором, нет риска опечатки |
+| `#ifdef FEATURE_X` | `#[cfg(feature = "x")]` | Cargo управляет флагами; учитывает зависимости |
+| `#include "header.h"` | `mod module;` + `use module::Item;` | Нет защиты от повторного включения, нет циклических включений |
+| `#pragma once` | Не нужно | Каждый файл `.rs` — модуль, подключается ровно один раз |
 
 ---
 
-### Header Files and `#include` → Modules and `use`
+### Заголовочные файлы и `#include` → модули и `use`
 
-In C++, the compilation model revolves around textual inclusion:
+В C++ модель компиляции основана на текстовом включении:
 
 ```cpp
-// widget.h — every translation unit that uses Widget includes this
+// widget.h — каждая единица трансляции, использующая Widget, включает этот файл
 #pragma once
 #include <string>
 #include <vector>
@@ -219,18 +214,18 @@ private:
 ```
 
 ```cpp
-// widget.cpp — separate definition
+// widget.cpp — отдельное определение
 #include "widget.h"
 Widget::Widget(std::string name) : name_(std::move(name)) {}
 void Widget::activate() { /* ... */ }
 ```
 
-In Rust, there are **no header files, no forward declarations, no include guards**:
+В Rust **нет заголовочных файлов, предварительных объявлений и защиты от повторного включения**:
 
 ```rust
-// src/widget.rs — declaration AND definition in one file
+// src/widget.rs — объявление И определение в одном файле
 pub struct Widget {
-    name: String,         // Private by default
+    name: String,         // По умолчанию приватное
     data: Vec<i32>,
 }
 
@@ -243,8 +238,8 @@ impl Widget {
 ```
 
 ```rust
-// src/main.rs — import by module path
-mod widget;  // Tells compiler to include src/widget.rs
+// src/main.rs — импорт по пути модуля
+mod widget;  // Сообщает компилятору, что нужно включить src/widget.rs
 use widget::Widget;
 
 fn main() {
@@ -253,27 +248,27 @@ fn main() {
 }
 ```
 
-| C++ | Rust | Why it's better |
+| C++ | Rust | Почему лучше |
 |-----|------|-----------------|
-| `#include "foo.h"` | `mod foo;` in parent + `use foo::Item;` | No textual inclusion, no ODR violations |
-| `#pragma once` / include guards | Not needed | Each `.rs` file is a module — compiled once |
-| Forward declarations | Not needed | Compiler sees entire crate; order doesn't matter |
-| `class Foo;` (incomplete type) | Not needed | No separate declaration/definition split |
-| `.h` + `.cpp` for each class | Single `.rs` file | No declaration/definition mismatch bugs |
-| `using namespace std;` | `use std::collections::HashMap;` | Always explicit — no global namespace pollution |
-| Nested `namespace a::b` | Nested `mod a { mod b { } }` or `a/b.rs` | File system mirrors module tree |
+| `#include "foo.h"` | `mod foo;` в родителе + `use foo::Item;` | Нет текстового включения, нет нарушений ODR |
+| `#pragma once` / защитные макросы | Не нужно | Каждый файл `.rs` — модуль, компилируется один раз |
+| Предварительные объявления | Не нужны | Компилятор видит весь крейт; порядок не важен |
+| `class Foo;` (неполный тип) | Не нужно | Нет разделения на объявление и определение |
+| `.h` + `.cpp` для каждого класса | Один файл `.rs` | Нет ошибок рассогласования объявления и определения |
+| `using namespace std;` | `use std::collections::HashMap;` | Всегда явно — нет загрязнения глобального пространства имён |
+| Вложенные `namespace a::b` | Вложенные `mod a { mod b { } }` или `a/b.rs` | Структура файловой системы повторяет дерево модулей |
 
 ---
 
-### `friend` and Access Control → Module Visibility
+### `friend` и контроль доступа → видимость модулей
 
-C++ uses `friend` to grant specific classes or functions access to private members.
-Rust has no `friend` keyword — instead, **privacy is module-scoped**:
+В C++ `friend` даёт определённым классам или функциям доступ к приватным членам.
+В Rust нет ключевого слова `friend` — вместо этого **приватность ограничена модулем**:
 
 ```cpp
 // C++
 class Engine {
-    friend class Car;   // Car can access private members
+    friend class Car;   // Car может обращаться к приватным членам
     int rpm_;
     void set_rpm(int r) { rpm_ = r; }
 public:
@@ -282,10 +277,10 @@ public:
 ```
 
 ```rust
-// Rust — items in the same module can access all fields, no `friend` needed
+// Rust — элементы одного модуля могут обращаться ко всем полям, `friend` не нужен
 mod vehicle {
     pub struct Engine {
-        rpm: u32,  // Private to the module (not to the struct!)
+        rpm: u32,  // Приватно для модуля (а не для структуры!)
     }
 
     impl Engine {
@@ -300,10 +295,10 @@ mod vehicle {
     impl Car {
         pub fn new() -> Self { Car { engine: Engine::new() } }
         pub fn accelerate(&mut self) {
-            self.engine.rpm = 3000; // ✅ Same module — direct field access
+            self.engine.rpm = 3000; // ✅ Тот же модуль — прямой доступ к полю
         }
         pub fn rpm(&self) -> u32 {
-            self.engine.rpm  // ✅ Same module — can read private field
+            self.engine.rpm  // ✅ Тот же модуль — можно читать приватное поле
         }
     }
 }
@@ -311,127 +306,122 @@ mod vehicle {
 fn main() {
     let mut car = vehicle::Car::new();
     car.accelerate();
-    // car.engine.rpm = 9000;  // ❌ Compile error: `engine` is private
-    println!("RPM: {}", car.rpm()); // ✅ Public method on Car
+    // car.engine.rpm = 9000;  // ❌ Ошибка компиляции: `engine` приватно
+    println!("RPM: {}", car.rpm()); // ✅ Публичный метод Car
 }
 ```
 
-| C++ Access | Rust Equivalent | Scope |
+| Доступ в C++ | Эквивалент в Rust | Область действия |
 |-----------|----------------|-------|
-| `private` | (default, no keyword) | Accessible within the same module only |
-| `protected` | No direct equivalent | Use `pub(super)` for parent module access |
-| `public` | `pub` | Accessible everywhere |
-| `friend class Foo` | Put `Foo` in the same module | Module-level privacy replaces friend |
-| — | `pub(crate)` | Visible within the crate but not to external dependents |
-| — | `pub(super)` | Visible to the parent module only |
-| — | `pub(in crate::path)` | Visible within a specific module subtree |
+| `private` | (по умолчанию, без ключевого слова) | Доступно только внутри того же модуля |
+| `protected` | Прямого аналога нет | Используйте `pub(super)` для доступа из родительского модуля |
+| `public` | `pub` | Доступно везде |
+| `friend class Foo` | Поместить `Foo` в тот же модуль | Приватность на уровне модуля заменяет friend |
+| — | `pub(crate)` | Видно внутри крейта, но не внешним зависимостям |
+| — | `pub(super)` | Видно только родительскому модулю |
+| — | `pub(in crate::path)` | Видно внутри конкретного поддерева модулей |
 
-> **Key insight**: C++ privacy is per-class. Rust privacy is per-module.
-> This means you control access by choosing which types live in the same module —
-> colocated types have full access to each other's private fields.
+> **Ключевая мысль**: приватность в C++ задаётся на уровне класса. Приватность в Rust — на уровне модуля. Это значит, что вы управляете доступом, выбирая, какие типы находятся в одном модуле — размещённые вместе типы имеют полный доступ к приватным полям друг друга.
 
 ---
 
-### `volatile` → Atomics and `read_volatile`/`write_volatile`
+### `volatile` → атомарные операции и `read_volatile`/`write_volatile`
 
-In C++, `volatile` tells the compiler not to optimize away reads/writes — typically
-used for memory-mapped hardware registers. **Rust has no `volatile` keyword.**
+В C++ `volatile` говорит компилятору не оптимизировать чтения и записи — обычно это используется для регистров аппаратуры, отображённых в память. **В Rust нет ключевого слова `volatile`.**
 
 ```cpp
-// C++: volatile for hardware registers
+// C++: volatile для аппаратных регистров
 volatile uint32_t* const GPIO_REG = reinterpret_cast<volatile uint32_t*>(0x4002'0000);
-*GPIO_REG = 0x01;              // Write not optimized away
-uint32_t val = *GPIO_REG;     // Read not optimized away
+*GPIO_REG = 0x01;              // Запись не оптимизируется
+uint32_t val = *GPIO_REG;     // Чтение не оптимизируется
 ```
 
 ```rust
-// Rust: explicit volatile operations — only in unsafe code
+// Rust: явные volatile-операции — только в unsafe-коде
 use std::ptr;
 
 const GPIO_REG: *mut u32 = 0x4002_0000 as *mut u32;
 
-// SAFETY: GPIO_REG is a valid memory-mapped I/O address.
+// SAFETY: GPIO_REG — валидный адрес ввода-вывода, отображённый в память.
 unsafe {
-    ptr::write_volatile(GPIO_REG, 0x01);   // Write not optimized away
-    let val = ptr::read_volatile(GPIO_REG); // Read not optimized away
+    ptr::write_volatile(GPIO_REG, 0x01);   // Запись не оптимизируется
+    let val = ptr::read_volatile(GPIO_REG); // Чтение не оптимизируется
 }
 ```
 
-For **concurrent shared state** (the other common C++ `volatile` use), Rust uses atomics:
+Для **совместно используемого состояния в конкурентном коде** (другое частое применение `volatile` в C++) Rust использует атомарные типы:
 
 ```cpp
-// C++: volatile is NOT sufficient for thread safety (common mistake!)
-volatile bool stop_flag = false;  // ❌ Data race — UB in C++11+
+// C++: volatile НЕДОСТАТОЧЕН для потокобезопасности (распространённая ошибка!)
+volatile bool stop_flag = false;  // ❌ Гонка данных — неопределённое поведение в C++11+
 
-// Correct C++:
+// Правильно в C++:
 std::atomic<bool> stop_flag{false};
 ```
 
 ```rust
-// Rust: atomics are the only way to share mutable state across threads
+// Rust: атомарные типы — единственный способ разделять изменяемое состояние между потоками
 use std::sync::atomic::{AtomicBool, Ordering};
 
 static STOP_FLAG: AtomicBool = AtomicBool::new(false);
 
-// From another thread:
+// Из другого потока:
 STOP_FLAG.store(true, Ordering::Release);
 
-// Check:
+// Проверка:
 if STOP_FLAG.load(Ordering::Acquire) {
     println!("Stopping");
 }
 ```
 
-| C++ Usage | Rust Equivalent | Notes |
+| Применение в C++ | Эквивалент в Rust | Примечания |
 |-----------|----------------|-------|
-| `volatile` for hardware registers | `ptr::read_volatile` / `ptr::write_volatile` | Requires `unsafe` — correct for MMIO |
-| `volatile` for thread signaling | `AtomicBool` / `AtomicU32` etc. | C++ `volatile` is wrong for this too! |
-| `std::atomic<T>` | `std::sync::atomic::AtomicT` | Same semantics, same orderings |
-| `std::atomic<T>::load(memory_order_acquire)` | `AtomicT::load(Ordering::Acquire)` | 1:1 mapping |
+| `volatile` для аппаратных регистров | `ptr::read_volatile` / `ptr::write_volatile` | Требует `unsafe` — корректно для MMIO |
+| `volatile` для сигнализации между потоками | `AtomicBool` / `AtomicU32` и т. д. | `volatile` в C++ для этого тоже неверен! |
+| `std::atomic<T>` | `std::sync::atomic::AtomicT` | Та же семантика, те же порядки доступа |
+| `std::atomic<T>::load(memory_order_acquire)` | `AtomicT::load(Ordering::Acquire)` | Соответствие 1:1 |
 
 ---
 
-### `static` Variables → `static`, `const`, `LazyLock`, `OnceLock`
+### Переменные `static` → `static`, `const`, `LazyLock`, `OnceLock`
 
-#### Basic `static` and `const`
+#### Базовые `static` и `const`
 
 ```cpp
 // C++
-const int MAX_RETRIES = 5;                    // Compile-time constant
-static std::string CONFIG_PATH = "/etc/app";  // Static init — order undefined!
+const int MAX_RETRIES = 5;                    // Константа времени компиляции
+static std::string CONFIG_PATH = "/etc/app";  // Статическая инициализация — порядок не определён!
 ```
 
 ```rust
 // Rust
-const MAX_RETRIES: u32 = 5;                   // Compile-time constant, inlined
-static CONFIG_PATH: &str = "/etc/app";         // 'static lifetime, fixed address
+const MAX_RETRIES: u32 = 5;                   // Константа времени компиляции, встраивается
+static CONFIG_PATH: &str = "/etc/app";         // Время жизни 'static, фиксированный адрес
 ```
 
-#### The static initialization order fiasco
+#### Печально известная проблема порядка статической инициализации
 
-C++ has a well-known problem: global constructors in different translation units
-execute in **unspecified order**. Rust avoids this entirely — `static` values must
-be compile-time constants (no constructors).
+В C++ есть хорошо известная проблема: глобальные конструкторы в разных единицах трансляции выполняются в **неопределённом порядке**. Rust полностью обходит её — значения `static` должны быть константами времени компиляции (без конструкторов).
 
-For runtime-initialized globals, use `LazyLock` (Rust 1.80+) or `OnceLock`:
+Для глобальных переменных, инициализируемых во время выполнения, используйте `LazyLock` (Rust 1.80+) или `OnceLock`:
 
 ```rust
 use std::sync::LazyLock;
 
-// Equivalent to C++ `static std::regex` — initialized on first access, thread-safe
+// Аналог C++ `static std::regex` — инициализируется при первом обращении, потокобезопасно
 static CONFIG_REGEX: LazyLock<regex::Regex> = LazyLock::new(|| {
     regex::Regex::new(r"^[a-z]+_diag$").expect("invalid regex")
 });
 
 fn is_valid_diag(name: &str) -> bool {
-    CONFIG_REGEX.is_match(name)  // First call initializes; subsequent calls are fast
+    CONFIG_REGEX.is_match(name)  // Первый вызов инициализирует; последующие работают быстро
 }
 ```
 
 ```rust
 use std::sync::OnceLock;
 
-// OnceLock: initialized once, can be set from runtime data
+// OnceLock: инициализируется один раз, может быть задан из данных времени выполнения
 static DB_CONN: OnceLock<String> = OnceLock::new();
 
 fn init_db(connection_string: &str) {
@@ -444,28 +434,28 @@ fn get_db() -> &'static str {
 }
 ```
 
-| C++ | Rust | Notes |
+| C++ | Rust | Примечания |
 |-----|------|-------|
-| `const int X = 5;` | `const X: i32 = 5;` | Both compile-time. Rust requires type annotation |
-| `constexpr int X = 5;` | `const X: i32 = 5;` | Rust `const` is always constexpr |
-| `static int count = 0;` (file scope) | `static COUNT: AtomicI32 = AtomicI32::new(0);` | Mutable statics require `unsafe` or atomics |
-| `static std::string s = "hi";` | `static S: &str = "hi";` or `LazyLock<String>` | No runtime constructor for simple cases |
-| `static MyObj obj;` (complex init) | `static OBJ: LazyLock<MyObj> = LazyLock::new(\|\| { ... });` | Thread-safe, lazy, no init order issues |
-| `thread_local` | `thread_local! { static X: Cell<u32> = Cell::new(0); }` | Same semantics |
+| `const int X = 5;` | `const X: i32 = 5;` | Оба — на этапе компиляции. В Rust нужна аннотация типа |
+| `constexpr int X = 5;` | `const X: i32 = 5;` | `const` в Rust всегда constexpr |
+| `static int count = 0;` (на уровне файла) | `static COUNT: AtomicI32 = AtomicI32::new(0);` | Изменяемые статики требуют `unsafe` или атомарных типов |
+| `static std::string s = "hi";` | `static S: &str = "hi";` или `LazyLock<String>` | Для простых случаев нет конструктора времени выполнения |
+| `static MyObj obj;` (сложная инициализация) | `static OBJ: LazyLock<MyObj> = LazyLock::new(\|\| { ... });` | Потокобезопасно, ленивая инициализация, нет проблем с порядком |
+| `thread_local` | `thread_local! { static X: Cell<u32> = Cell::new(0); }` | Та же семантика |
 
 ---
 
 ### `constexpr` → `const fn`
 
-C++ `constexpr` marks functions and variables for compile-time evaluation. Rust
-uses `const fn` and `const` for the same purpose:
+`constexpr` в C++ помечает функции и переменные для вычисления на этапе компиляции. Rust
+использует `const fn` и `const` для той же цели:
 
 ```cpp
 // C++
 constexpr int factorial(int n) {
     return n <= 1 ? 1 : n * factorial(n - 1);
 }
-constexpr int val = factorial(5);  // Computed at compile time → 120
+constexpr int val = factorial(5);  // Вычисляется на этапе компиляции → 120
 ```
 
 ```rust
@@ -473,37 +463,37 @@ constexpr int val = factorial(5);  // Computed at compile time → 120
 const fn factorial(n: u32) -> u32 {
     if n <= 1 { 1 } else { n * factorial(n - 1) }
 }
-const VAL: u32 = factorial(5);  // Computed at compile time → 120
+const VAL: u32 = factorial(5);  // Вычисляется на этапе компиляции → 120
 
-// Also works in array sizes and match patterns:
+// Также работает в размерах массивов и в шаблонах match:
 const LOOKUP: [u32; 5] = [factorial(1), factorial(2), factorial(3),
                            factorial(4), factorial(5)];
 ```
 
-| C++ | Rust | Notes |
+| C++ | Rust | Примечания |
 |-----|------|-------|
-| `constexpr int f()` | `const fn f() -> i32` | Same intent — compile-time evaluable |
-| `constexpr` variable | `const` variable | Rust `const` is always compile-time |
-| `consteval` (C++20) | No equivalent | `const fn` can also run at runtime |
-| `if constexpr` (C++17) | No equivalent (use `cfg!` or generics) | Trait specialization fills some use cases |
-| `constinit` (C++20) | `static` with const initializer | Rust `static` must be const-initialized by default |
+| `constexpr int f()` | `const fn f() -> i32` | Та же цель — вычисляемая на этапе компиляции |
+| Переменная `constexpr` | Переменная `const` | `const` в Rust всегда вычисляется на этапе компиляции |
+| `consteval` (C++20) | Эквивалента нет | `const fn` может выполняться и во время выполнения |
+| `if constexpr` (C++17) | Эквивалента нет (используйте `cfg!` или обобщения) | Специализация трейтов покрывает часть случаев |
+| `constinit` (C++20) | `static` с константным инициализатором | `static` в Rust по умолчанию должен инициализироваться константой |
 
-> **Current limitations of `const fn`** (stabilized as of Rust 1.82):
-> - No trait methods (can't call `.len()` on a `Vec` in const context)
-> - No heap allocation (`Box::new`, `Vec::new` not const)
-> - ~~No floating-point arithmetic~~ — **stabilized in Rust 1.82**
-> - Can't use `for` loops (use recursion or `while` with manual index)
+> **Текущие ограничения `const fn`** (стабилизировано в Rust 1.82):
+> - Нельзя вызывать методы трейтов (нельзя вызвать `.len()` у `Vec` в константном контексте)
+> - Нет выделения памяти в куче (`Box::new`, `Vec::new` не являются `const`)
+> - ~~Нет арифметики с плавающей точкой~~ — **стабилизирована в Rust 1.82**
+> - Нельзя использовать циклы `for` (используйте рекурсию или `while` с ручным индексом)
 
 ---
 
-### SFINAE and `enable_if` → Trait Bounds and `where` Clauses
+### SFINAE и `enable_if` → ограничения трейтами и предложения `where`
 
-In C++, SFINAE (Substitution Failure Is Not An Error) is the mechanism behind
-conditional generic programming. It is powerful but notoriously unreadable. Rust
-replaces it entirely with **trait bounds**:
+В C++ SFINAE (Substitution Failure Is Not An Error, «неудача подстановки — не ошибка») — механизм
+условного обобщённого программирования. Он мощен, но печально известен нечитаемостью. Rust
+полностью заменяет его **ограничениями трейтами** (trait bounds):
 
 ```cpp
-// C++: SFINAE-based conditional function (pre-C++20)
+// C++: условная функция на основе SFINAE (до C++20)
 template<typename T,
          std::enable_if_t<std::is_integral_v<T>, int> = 0>
 T double_it(T val) { return val * 2; }
@@ -512,20 +502,20 @@ template<typename T,
          std::enable_if_t<std::is_floating_point_v<T>, int> = 0>
 T double_it(T val) { return val * 2.0; }
 
-// C++20 concepts — cleaner but still verbose:
+// Концепты C++20 — чище, но всё ещё многословны:
 template<std::integral T>
 T double_it(T val) { return val * 2; }
 ```
 
 ```rust
-// Rust: trait bounds — readable, composable, excellent error messages
+// Rust: ограничения трейтами — читаемо, компонуемо, отличные сообщения об ошибках
 use std::ops::Mul;
 
 fn double_it<T: Mul<Output = T> + From<u8>>(val: T) -> T {
     val * T::from(2)
 }
 
-// Or with where clause for complex bounds:
+// Или с предложением where для сложных ограничений:
 fn process<T>(val: T) -> String
 where
     T: std::fmt::Display + Clone + Send,
@@ -533,7 +523,7 @@ where
     format!("Processing: {}", val)
 }
 
-// Conditional behavior via separate impls (replaces SFINAE overloads):
+// Условное поведение через отдельные реализации (замена перегрузок на основе SFINAE):
 trait Describable {
     fn describe(&self) -> String;
 }
@@ -547,30 +537,27 @@ impl Describable for f64 {
 }
 ```
 
-| C++ Template Metaprogramming | Rust Equivalent | Readability |
+| Шаблонное метапрограммирование C++ | Эквивалент в Rust | Читаемость |
 |-----------------------------|----------------|-------------|
-| `std::enable_if_t<cond>` | `where T: Trait` | 🟢 Clear English |
-| `std::is_integral_v<T>` | Bound on a numeric trait or specific types | 🟢 No `_v` / `_t` suffixes |
-| SFINAE overload sets | Separate `impl Trait for ConcreteType` blocks | 🟢 Each impl stands alone |
-| `if constexpr (std::is_same_v<T, int>)` | Specialization via trait impls | 🟢 Compile-time dispatched |
-| C++20 `concept` | `trait` | 🟢 Nearly identical intent |
-| `requires` clause | `where` clause | 🟢 Same position, similar syntax |
-| Compilation fails deep inside template | Compilation fails at the call site with trait mismatch | 🟢 No 200-line error cascades |
+| `std::enable_if_t<cond>` | `where T: Trait` | 🟢 Понятно, как обычный английский |
+| `std::is_integral_v<T>` | Ограничение числовым трейтом или конкретными типами | 🟢 Без суффиксов `_v` / `_t` |
+| Наборы перегрузок SFINAE | Отдельные блоки `impl Trait for ConcreteType` | 🟢 Каждая реализация самостоятельна |
+| `if constexpr (std::is_same_v<T, int>)` | Специализация через реализации трейтов | 🟢 Диспетчеризация на этапе компиляции |
+| Концепт C++20 | `trait` | 🟢 Почти одинаковый смысл |
+| Клауза `requires` | Предложение `where` | 🟢 Та же позиция, похожий синтаксис |
+| Компиляция падает глубоко внутри шаблона | Компиляция падает в месте вызова с несоответствием трейта | 🟢 Без каскадов ошибок на 200 строк |
 
-> **Key insight**: C++ concepts (C++20) are the closest thing to Rust traits.
-> If you're familiar with C++20 concepts, think of Rust traits as concepts
-> that have been a first-class language feature since 1.0, with a coherent
-> implementation model (trait impls) instead of duck typing.
+> **Ключевая мысль**: концепты C++20 — самое близкое к трейтам Rust. Если вы знакомы с концептами C++20, думайте о трейтах Rust как о концептах, которые являются полноценной возможностью языка с версии 1.0 и имеют согласованную модель реализации (реализации трейтов), а не утиной типизации.
 
 ---
 
-### `std::function` → Function Pointers, `impl Fn`, and `Box<dyn Fn>`
+### `std::function` → указатели на функции, `impl Fn` и `Box<dyn Fn>`
 
-C++ `std::function<R(Args...)>` is a type-erased callable. Rust has three options,
-each with different trade-offs:
+`std::function<R(Args...)>` в C++ — это вызываемый объект со стёртым типом. В Rust есть три варианта
+с разными компромиссами:
 
 ```cpp
-// C++: one-size-fits-all (heap-allocated, type-erased)
+// C++: универсальное решение (в куче, со стёртым типом)
 #include <functional>
 std::function<int(int)> make_adder(int n) {
     return [n](int x) { return x + n; };
@@ -578,24 +565,24 @@ std::function<int(int)> make_adder(int n) {
 ```
 
 ```rust
-// Rust Option 1: fn pointer — simple, no captures, no allocation
+// Вариант 1 в Rust: указатель на функцию — просто, без захватов, без выделения памяти
 fn add_one(x: i32) -> i32 { x + 1 }
 let f: fn(i32) -> i32 = add_one;
 println!("{}", f(5)); // 6
 
-// Rust Option 2: impl Fn — monomorphized, zero overhead, can capture
+// Вариант 2 в Rust: impl Fn — мономорфизация, без накладных расходов, может захватывать
 fn apply(val: i32, f: impl Fn(i32) -> i32) -> i32 { f(val) }
 let n = 10;
-let result = apply(5, |x| x + n);  // Closure captures `n`
+let result = apply(5, |x| x + n);  // Замыкание захватывает `n`
 
-// Rust Option 3: Box<dyn Fn> — type-erased, heap-allocated (like std::function)
+// Вариант 3 в Rust: Box<dyn Fn> — стирание типа, выделение в куче (как std::function)
 fn make_adder(n: i32) -> Box<dyn Fn(i32) -> i32> {
     Box::new(move |x| x + n)
 }
 let adder = make_adder(10);
 println!("{}", adder(5));  // 15
 
-// Storing heterogeneous callables (like vector<function<int(int)>>):
+// Хранение разнородных вызываемых объектов (как vector<function<int(int)>>):
 let callbacks: Vec<Box<dyn Fn(i32) -> i32>> = vec![
     Box::new(|x| x + 1),
     Box::new(|x| x * 2),
@@ -606,86 +593,86 @@ for cb in &callbacks {
 }
 ```
 
-| When to use | C++ Equivalent | Rust Choice |
+| Когда использовать | Аналог в C++ | Выбор в Rust |
 |------------|---------------|-------------|
-| Top-level function, no captures | Function pointer | `fn(Args) -> Ret` |
-| Generic function accepting callables | Template parameter | `impl Fn(Args) -> Ret` (static dispatch) |
-| Trait bound in generics | `template<typename F>` | `F: Fn(Args) -> Ret` |
-| Stored callable, type-erased | `std::function<R(Args)>` | `Box<dyn Fn(Args) -> Ret>` |
-| Callback that mutates state | `std::function` with mutable lambda | `Box<dyn FnMut(Args) -> Ret>` |
-| One-shot callback (consumed) | `std::function` (moved) | `Box<dyn FnOnce(Args) -> Ret>` |
+| Функция верхнего уровня без захватов | Указатель на функцию | `fn(Args) -> Ret` |
+| Обобщённая функция, принимающая вызываемые объекты | Параметр шаблона | `impl Fn(Args) -> Ret` (статическая диспетчеризация) |
+| Ограничение трейтом в обобщениях | `template<typename F>` | `F: Fn(Args) -> Ret` |
+| Хранимый вызываемый объект со стёртым типом | `std::function<R(Args)>` | `Box<dyn Fn(Args) -> Ret>` |
+| Обратный вызов, изменяющий состояние | `std::function` с изменяемой лямбдой | `Box<dyn FnMut(Args) -> Ret>` |
+| Одноразовый обратный вызов (потребляется) | `std::function` (перемещённый) | `Box<dyn FnOnce(Args) -> Ret>` |
 
-> **Performance note**: `impl Fn` has zero overhead (monomorphized, like a C++ template).
-> `Box<dyn Fn>` has the same overhead as `std::function` (vtable + heap allocation).
-> Prefer `impl Fn` unless you need to store heterogeneous callables.
+> **Замечание о производительности**: `impl Fn` не имеет накладных расходов (мономорфизация, как шаблон C++).
+> `Box<dyn Fn>` имеет те же накладные расходы, что и `std::function` (vtable и выделение в куче).
+> Предпочитайте `impl Fn`, если не нужно хранить разнородные вызываемые объекты.
 
 ---
 
-### Container Mapping: C++ STL → Rust `std::collections`
+### Соответствие контейнеров: STL C++ → `std::collections` Rust
 
-| C++ STL Container | Rust Equivalent | Notes |
+| Контейнер STL C++ | Эквивалент в Rust | Примечания |
 |------------------|----------------|-------|
-| `std::vector<T>` | `Vec<T>` | Nearly identical API. Rust checks bounds by default |
-| `std::array<T, N>` | `[T; N]` | Stack-allocated fixed-size array |
-| `std::deque<T>` | `std::collections::VecDeque<T>` | Ring buffer. Efficient push/pop at both ends |
-| `std::list<T>` | `std::collections::LinkedList<T>` | Rarely used in Rust — `Vec` is almost always faster |
-| `std::forward_list<T>` | No equivalent | Use `Vec` or `VecDeque` |
-| `std::unordered_map<K, V>` | `std::collections::HashMap<K, V>` | Uses `SipHash` by default (DoS-resistant) |
-| `std::map<K, V>` | `std::collections::BTreeMap<K, V>` | B-tree; keys sorted; `K: Ord` required |
-| `std::unordered_set<T>` | `std::collections::HashSet<T>` | `T: Hash + Eq` required |
-| `std::set<T>` | `std::collections::BTreeSet<T>` | Sorted set; `T: Ord` required |
-| `std::priority_queue<T>` | `std::collections::BinaryHeap<T>` | Max-heap by default (same as C++) |
-| `std::stack<T>` | `Vec<T>` with `.push()` / `.pop()` | No separate stack type needed |
-| `std::queue<T>` | `VecDeque<T>` with `.push_back()` / `.pop_front()` | No separate queue type needed |
-| `std::string` | `String` | UTF-8 guaranteed, not null-terminated |
-| `std::string_view` | `&str` | Borrowed UTF-8 slice |
-| `std::span<T>` (C++20) | `&[T]` / `&mut [T]` | Rust slices have been a first-class type since 1.0 |
-| `std::tuple<A, B, C>` | `(A, B, C)` | First-class syntax, destructurable |
-| `std::pair<A, B>` | `(A, B)` | Just a 2-element tuple |
-| `std::bitset<N>` | No std equivalent | Use the `bitvec` crate or `[u8; N/8]` |
+| `std::vector<T>` | `Vec<T>` | Почти идентичный API. Rust проверяет границы по умолчанию |
+| `std::array<T, N>` | `[T; N]` | Массив фиксированного размера на стеке |
+| `std::deque<T>` | `std::collections::VecDeque<T>` | Кольцевой буфер. Эффективные push/pop с обоих концов |
+| `std::list<T>` | `std::collections::LinkedList<T>` | В Rust используется редко — `Vec` почти всегда быстрее |
+| `std::forward_list<T>` | Эквивалента нет | Используйте `Vec` или `VecDeque` |
+| `std::unordered_map<K, V>` | `std::collections::HashMap<K, V>` | По умолчанию использует `SipHash` (устойчив к DoS) |
+| `std::map<K, V>` | `std::collections::BTreeMap<K, V>` | B-дерево; ключи отсортированы; требуется `K: Ord` |
+| `std::unordered_set<T>` | `std::collections::HashSet<T>` | Требуется `T: Hash + Eq` |
+| `std::set<T>` | `std::collections::BTreeSet<T>` | Отсортированное множество; требуется `T: Ord` |
+| `std::priority_queue<T>` | `std::collections::BinaryHeap<T>` | Max-куча по умолчанию (как в C++) |
+| `std::stack<T>` | `Vec<T>` с `.push()` / `.pop()` | Отдельный тип стека не нужен |
+| `std::queue<T>` | `VecDeque<T>` с `.push_back()` / `.pop_front()` | Отдельный тип очереди не нужен |
+| `std::string` | `String` | Гарантированный UTF-8, без завершающего нуля |
+| `std::string_view` | `&str` | Заимствованный срез UTF-8 |
+| `std::span<T>` (C++20) | `&[T]` / `&mut [T]` | Срезы Rust — полноценный тип с версии 1.0 |
+| `std::tuple<A, B, C>` | `(A, B, C)` | Встроенный синтаксис, поддерживает деструктуризацию |
+| `std::pair<A, B>` | `(A, B)` | Просто кортеж из двух элементов |
+| `std::bitset<N>` | Эквивалента в std нет | Используйте крейт `bitvec` или `[u8; N/8]` |
 
-**Key differences**:
-- Rust's `HashMap`/`HashSet` require `K: Hash + Eq` — the compiler enforces this at the type level, unlike C++ where using an unhashable key gives a template error deep in the STL
-- `Vec` indexing (`v[i]`) panics on out-of-bounds by default. Use `.get(i)` for `Option<&T>` or iterators to avoid bounds checks entirely
-- No `std::multimap` or `std::multiset` — use `HashMap<K, Vec<V>>` or `BTreeMap<K, Vec<V>>`
+**Ключевые различия**:
+- Для `HashMap`/`HashSet` в Rust требуется `K: Hash + Eq` — компилятор проверяет это на уровне типов, в отличие от C++, где использование ключа без хеширования даёт ошибку шаблона глубоко внутри STL
+- Индексация `Vec` (`v[i]`) по умолчанию вызывает panic при выходе за границы. Используйте `.get(i)` для `Option<&T>` или итераторы, чтобы полностью избежать проверок границ
+- Нет `std::multimap` и `std::multiset` — используйте `HashMap<K, Vec<V>>` или `BTreeMap<K, Vec<V>>`
 
 ---
 
-### Exception Safety → Panic Safety
+### Безопасность исключений → безопасность при panic
 
-C++ defines three levels of exception safety (Abrahams guarantees):
+C++ определяет три уровня безопасности исключений (гарантии Абрахамса):
 
-| C++ Level | Meaning | Rust Equivalent |
+| Уровень C++ | Значение | Эквивалент в Rust |
 |----------|---------|----------------|
-| **No-throw** | Function never throws | Function never panics (returns `Result`) |
-| **Strong** (commit-or-rollback) | If it throws, state is unchanged | Ownership model makes this natural — if `?` returns early, partially built values are dropped |
-| **Basic** | If it throws, invariants are preserved | Rust's default — `Drop` runs, no leaks |
+| **No-throw** | Функция никогда не выбрасывает исключение | Функция никогда не вызывает panic (возвращает `Result`) |
+| **Strong** (фиксация или откат) | Если выброшено исключение, состояние не меняется | Модель владения делает это естественным — если `?` досрочно возвращает управление, частично построенные значения уничтожаются |
+| **Basic** | Если выброшено исключение, инварианты сохраняются | Поведение Rust по умолчанию — `Drop` выполняется, утечек нет |
 
-#### How Rust's ownership model helps
+#### Как модель владения помогает
 
 ```rust
-// Strong guarantee for free — if file.write() fails, config is unchanged
+// Сильная гарантия бесплатно — если file.write() завершится ошибкой, config не меняется
 fn update_config(config: &mut Config, path: &str) -> Result<(), Error> {
-    let new_data = fetch_from_network()?; // Err → early return, config untouched
-    let validated = validate(new_data)?;   // Err → early return, config untouched
-    *config = validated;                   // Only reached on success (commit)
+    let new_data = fetch_from_network()?; // Err → ранний возврат, config не тронут
+    let validated = validate(new_data)?;   // Err → ранний возврат, config не тронут
+    *config = validated;                   // Выполняется только при успехе (фиксация)
     Ok(())
 }
 ```
 
-In C++, achieving the strong guarantee requires manual rollback or the copy-and-swap
-idiom. In Rust, `?` propagation gives you the strong guarantee by default for most code.
+В C++ для сильной гарантии нужен ручной откат или идиома copy-and-swap. В Rust
+распространение через `?` даёт сильную гарантию по умолчанию для большинства кода.
 
-#### `catch_unwind` — Rust's equivalent of `catch(...)`
+#### `catch_unwind` — аналог `catch(...)` в Rust
 
 ```rust
 use std::panic;
 
-// Catch a panic (like catch(...) in C++) — rarely needed
+// Перехват panic (как catch(...) в C++) — нужно редко
 let result = panic::catch_unwind(|| {
-    // Code that might panic
+    // Код, который может вызвать panic
     let v = vec![1, 2, 3];
-    v[10]  // Panics! (index out of bounds)
+    v[10]  // Panic! (выход за границы индекса)
 });
 
 match result {
@@ -694,18 +681,18 @@ match result {
 }
 ```
 
-#### `UnwindSafe` — marking types as panic-safe
+#### `UnwindSafe` — отметка типов как безопасных при panic
 
 ```rust
 use std::panic::UnwindSafe;
 
-// Types behind &mut are NOT UnwindSafe by default — the panic may have
-// left them in a partially-modified state
+// Типы за &mut по умолчанию НЕ UnwindSafe — panic мог оставить их
+// в частично изменённом состоянии
 fn safe_execute<F: FnOnce() + UnwindSafe>(f: F) {
     let _ = std::panic::catch_unwind(f);
 }
 
-// Use AssertUnwindSafe to override when you've audited the code:
+// Используйте AssertUnwindSafe, чтобы переопределить, когда вы проверили код:
 use std::panic::AssertUnwindSafe;
 let mut data = vec![1, 2, 3];
 let _ = std::panic::catch_unwind(AssertUnwindSafe(|| {
@@ -713,53 +700,44 @@ let _ = std::panic::catch_unwind(AssertUnwindSafe(|| {
 }));
 ```
 
-| C++ Exception Pattern | Rust Equivalent |
+| Шаблон исключений C++ | Эквивалент в Rust |
 |-----------------------|-----------------|
-| `throw MyException()` | `return Err(MyError::...)` (preferred) or `panic!("...")` |
-| `try { } catch (const E& e)` | `match result { Ok(v) => ..., Err(e) => ... }` or `?` |
+| `throw MyException()` | `return Err(MyError::...)` (предпочтительно) или `panic!("...")` |
+| `try { } catch (const E& e)` | `match result { Ok(v) => ..., Err(e) => ... }` или `?` |
 | `catch (...)` | `std::panic::catch_unwind(...)` |
-| `noexcept` | `-> Result<T, E>` (errors are values, not exceptions) |
-| RAII cleanup in stack unwinding | `Drop::drop()` runs during panic unwinding |
+| `noexcept` | `-> Result<T, E>` (ошибки — это значения, а не исключения) |
+| Очистка RAII при раскрутке стека | `Drop::drop()` выполняется при раскрутке panic |
 | `std::uncaught_exceptions()` | `std::thread::panicking()` |
-| `-fno-exceptions` compile flag | `panic = "abort"` in `Cargo.toml` [profile] |
+| Флаг компиляции `-fno-exceptions` | `panic = "abort"` в секции `[profile]` файла `Cargo.toml` |
 
-> **Bottom line**: In Rust, most code uses `Result<T, E>` instead of exceptions,
-> making error paths explicit and composable. `panic!` is reserved for bugs
-> (like `assert!` failures), not routine errors. This means "exception safety"
-> is largely a non-issue — the ownership system handles cleanup automatically.
+> **Главное**: в Rust большинство кода использует `Result<T, E>` вместо исключений, что делает пути ошибок явными и компонуемыми. `panic!` зарезервирован для ошибок в программе (например, при сбое `assert!`), а не для рутинных ошибок. Поэтому «безопасность исключений» во многом перестаёт быть проблемой — система владения автоматически занимается очисткой.
 
 ---
 
-## C++ to Rust Migration Patterns
+## Шаблоны миграции с C++ на Rust
 
-### Quick Reference: C++ → Rust Idiom Map
+### Краткий справочник: соответствие идиом C++ → Rust
 
-| **C++ Pattern** | **Rust Idiom** | **Notes** |
+| **Шаблон C++** | **Идиома Rust** | **Примечания** |
 |----------------|---------------|----------|
-| `class Derived : public Base` | `enum Variant { A {...}, B {...} }` | Prefer enums for closed sets |
-| `virtual void method() = 0` | `trait MyTrait { fn method(&self); }` | Use for open/extensible interfaces |
-| `dynamic_cast<Derived*>(ptr)` | `match value { Variant::A(data) => ..., }` | Exhaustive, no runtime failure |
-| `vector<unique_ptr<Base>>` | `Vec<Box<dyn Trait>>` | Only when genuinely polymorphic |
-| `shared_ptr<T>` | `Rc<T>` or `Arc<T>` | Prefer `Box<T>` or owned values first |
-| `enable_shared_from_this<T>` | Arena pattern (`Vec<T>` + indices) | Eliminates reference cycles entirely |
-| `Base* m_pFramework` in every class | `fn execute(&mut self, ctx: &mut Context)` | Pass context, don't store pointers |
-| `try { } catch (...) { }` | `match result { Ok(v) => ..., Err(e) => ... }` | Or use `?` for propagation |
-| `std::optional<T>` | `Option<T>` | `match` required, can't forget None |
-| `const std::string&` parameter | `&str` parameter | Accepts both `String` and `&str` |
-| `enum class Foo { A, B, C }` | `enum Foo { A, B, C }` | Rust enums can also carry data |
-| `auto x = std::move(obj)` | `let x = obj;` | Move is the default, no `std::move` needed |
-| CMake + make + lint | `cargo build / test / clippy / fmt` | One tool for everything |
+| `class Derived : public Base` | `enum Variant { A {...}, B {...} }` | Для закрытых наборов предпочитайте перечисления |
+| `virtual void method() = 0` | `trait MyTrait { fn method(&self); }` | Для открытых/расширяемых интерфейсов |
+| `dynamic_cast<Derived*>(ptr)` | `match value { Variant::A(data) => ..., }` | Исчерпывающе, без ошибок во время выполнения |
+| `vector<unique_ptr<Base>>` | `Vec<Box<dyn Trait>>` | Только когда действительно нужен полиморфизм |
+| `shared_ptr<T>` | `Rc<T>` или `Arc<T>` | Сначала рассмотрите `Box<T>` или владеющие значения |
+| `enable_shared_from_this<T>` | Паттерн арены (`Vec<T>` + индексы) | Полностью устраняет циклы ссылок |
+| `Base* m_pFramework` в каждом классе | `fn execute(&mut self, ctx: &mut Context)` | Передавайте контекст, не храните указатели |
+| `try { } catch (...) { }` | `match result { Ok(v) => ..., Err(e) => ... }` | Или `?` для распространения |
+| `std::optional<T>` | `Option<T>` | Требуется `match`, нельзя забыть None |
+| Параметр `const std::string&` | Параметр `&str` | Принимает и `String`, и `&str` |
+| `enum class Foo { A, B, C }` | `enum Foo { A, B, C }` | Перечисления Rust могут также хранить данные |
+| `auto x = std::move(obj)` | `let x = obj;` | Перемещение по умолчанию, `std::move` не нужен |
+| CMake + make + линтер | `cargo build / test / clippy / fmt` | Один инструмент для всего |
 
-### Migration Strategy
-1. **Start with data types**: Translate structs and enums first — this forces you to think about ownership
-2. **Convert factories to enums**: If a factory creates different derived types, it should probably be `enum` + `match`
-3. **Convert god objects to composed structs**: Group related fields into focused structs
-4. **Replace pointers with borrows**: Convert `Base*` stored pointers to `&'a T` lifetime-bounded borrows
-5. **Use `Box<dyn Trait>` sparingly**: Only for plugin systems and test mocking
-6. **Let the compiler guide you**: Rust's error messages are excellent — read them carefully
-
-
-
-
-
-
+### Стратегия миграции
+1. **Начните с типов данных**: сначала переводите структуры и перечисления — это заставляет думать о владении
+2. **Превращайте фабрики в перечисления**: если фабрика создаёт разные производные типы, скорее всего, это должно быть `enum` + `match`
+3. **Превращайте божественные объекты в компонуемые структуры**: группируйте связанные поля в сфокусированные структуры
+4. **Заменяйте указатели заимствованиями**: переводите хранимые указатели `Base*` в заимствования с ограниченным временем жизни `&'a T`
+5. **Используйте `Box<dyn Trait>` экономно**: только для систем плагинов и моков в тестах
+6. **Доверьтесь компилятору**: сообщения об ошибках Rust отличны — читайте их внимательно

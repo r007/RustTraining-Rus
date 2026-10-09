@@ -1,43 +1,39 @@
-# `no_std` — Rust Without the Standard Library
+# `no_std` — Rust без стандартной библиотеки
 
-> **What you'll learn:** How to write Rust for bare-metal and embedded targets using `#![no_std]` — the `core` and `alloc` crate split, panic handlers, and how this compares to embedded C without `libc`.
+> **Что вы узнаете:** как писать на Rust под bare-metal и встраиваемые платформы с помощью `#![no_std]` — разделение крейтов `core` и `alloc`, обработчики panic и то, как это сравнивается со встраиваемым C без `libc`.
 
-If you come from embedded C, you're already used to working without `libc` or with a minimal
-runtime.  Rust has a first-class equivalent: the **`#![no_std]`** attribute.
+Если вы работаете со встраиваемым C, вам уже привычно работать без `libc` или с минимальной средой выполнения. У Rust есть полноценный аналог: атрибут **`#![no_std]`**.
 
-## What is `no_std`?
+## Что такое `no_std`?
 
-When you add `#![no_std]` to the crate root, the compiler removes the
-implicit `extern crate std;` and links only against **`core`** (and optionally **`alloc`**).
+Когда вы добавляете `#![no_std]` в корень крейта, компилятор убирает неявное `extern crate std;` и линкуется только с **`core`** (и, при необходимости, с **`alloc`**).
 
-| Layer | What it provides | Requires OS / heap? |
+| Уровень | Что предоставляет | Требует ОС / кучу? |
 |-------|-----------------|---------------------|
-| `core` | Primitive types, `Option`, `Result`, `Iterator`, math, `slice`, `str`, atomics, `fmt` | **No** — runs on bare metal |
-| `alloc` | `Vec`, `String`, `Box`, `Rc`, `Arc`, `BTreeMap` | Needs a global allocator, but **no OS** |
-| `std` | `HashMap`, `fs`, `net`, `thread`, `io`, `env`, `process` | **Yes** — needs an OS |
+| `core` | Примитивные типы, `Option`, `Result`, `Iterator`, математика, `slice`, `str`, атомарные операции, `fmt` | **Нет** — работает на bare metal |
+| `alloc` | `Vec`, `String`, `Box`, `Rc`, `Arc`, `BTreeMap` | Нужен глобальный аллокатор, но **без ОС** |
+| `std` | `HashMap`, `fs`, `net`, `thread`, `io`, `env`, `process` | **Да** — нужна ОС |
 
-> **Rule of thumb for embedded devs:** if your C project links against `-lc` and
-> uses `malloc`, you can probably use `core` + `alloc`.  If it runs on bare metal
-> without `malloc`, stick with `core` only.
+> **Эмпирическое правило для встраиваемых разработчиков:** если ваш проект на C линкуется с `-lc` и использует `malloc`, скорее всего, можно использовать `core` + `alloc`. Если же он работает на bare metal без `malloc`, оставайтесь только на `core`.
 
-## Declaring `no_std`
+## Объявление `no_std`
 
 ```rust
-// src/lib.rs  (or src/main.rs for a binary with #![no_main])
+// src/lib.rs  (или src/main.rs для бинарника с #![no_main])
 #![no_std]
 
-// You still get everything in `core`:
+// Всё из `core` вам по-прежнему доступно:
 use core::fmt;
 use core::result::Result;
 use core::option::Option;
 
-// If you have an allocator, opt in to heap types:
+// Если есть аллокатор, подключаем типы, работающие с кучей:
 extern crate alloc;
 use alloc::vec::Vec;
 use alloc::string::String;
 ```
 
-For a bare-metal binary you also need `#![no_main]` and a panic handler:
+Для bare-metal бинарника также нужны `#![no_main]` и обработчик panic:
 
 ```rust
 #![no_std]
@@ -47,46 +43,46 @@ use core::panic::PanicInfo;
 
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
-    loop {} // hang on panic — replace with your board's reset/LED blink
+    loop {} // Зависаем при panic — замените на перезагрузку платы или мигание светодиодом
 }
 
-// Entry point depends on your HAL / linker script
+// Точка входа зависит от вашего HAL / скрипта компоновщика
 ```
 
-## What you lose (and alternatives)
+## Что вы теряете (и альтернативы)
 
-| `std` feature | `no_std` alternative |
+| Возможность `std` | Альтернатива в `no_std` |
 |---------------|---------------------|
-| `println!` | `core::write!` to a UART / `defmt` |
-| `HashMap` | `heapless::FnvIndexMap` (fixed capacity) or `BTreeMap` (with `alloc`) |
-| `Vec` | `heapless::Vec` (stack-allocated, fixed capacity) |
-| `String` | `heapless::String` or `&str` |
+| `println!` | `core::write!` в UART / `defmt` |
+| `HashMap` | `heapless::FnvIndexMap` (фиксированная ёмкость) или `BTreeMap` (с `alloc`) |
+| `Vec` | `heapless::Vec` (на стеке, фиксированная ёмкость) |
+| `String` | `heapless::String` или `&str` |
 | `std::io::Read/Write` | `embedded_io::Read/Write` |
-| `thread::spawn` | Interrupt handlers, RTIC tasks |
-| `std::time` | Hardware timer peripherals |
-| `std::fs` | Flash / EEPROM drivers |
+| `thread::spawn` | Обработчики прерываний, задачи RTIC |
+| `std::time` | Аппаратные таймерные периферийные блоки |
+| `std::fs` | Драйверы flash / EEPROM |
 
-## Notable `no_std` crates for embedded
+## Заметные крейты `no_std` для встраиваемых систем
 
-| Crate | Purpose | Notes |
+| Крейт | Назначение | Примечания |
 |-------|---------|-------|
-| [`heapless`](https://crates.io/crates/heapless) | Fixed-capacity `Vec`, `String`, `Queue`, `Map` | No allocator needed — all on the stack |
-| [`defmt`](https://crates.io/crates/defmt) | Efficient logging over probe/ITM | Like `printf` but deferred formatting on the host |
-| [`embedded-hal`](https://crates.io/crates/embedded-hal) | Hardware abstraction traits (SPI, I²C, GPIO, UART) | Implement once, run on any MCU |
-| [`cortex-m`](https://crates.io/crates/cortex-m) | ARM Cortex-M intrinsics & register access | Low-level, like CMSIS |
-| [`cortex-m-rt`](https://crates.io/crates/cortex-m-rt) | Runtime / startup code for Cortex-M | Replaces your `startup.s` |
-| [`rtic`](https://crates.io/crates/rtic) | Real-Time Interrupt-driven Concurrency | Compile-time task scheduling, zero overhead |
-| [`embassy`](https://crates.io/crates/embassy-executor) | Async executor for embedded | `async/await` on bare metal |
-| [`postcard`](https://crates.io/crates/postcard) | `no_std` serde serialization (binary) | Replaces `serde_json` when you can't afford strings |
-| [`thiserror`](https://crates.io/crates/thiserror) | Derive macro for `Error` trait | Works in `no_std` since v2; prefer over `anyhow` |
-| [`smoltcp`](https://crates.io/crates/smoltcp) | `no_std` TCP/IP stack | When you need networking without an OS |
+| [`heapless`](https://crates.io/crates/heapless) | Vec, String, Queue, Map фиксированной ёмкости | Аллокатор не нужен — всё на стеке |
+| [`defmt`](https://crates.io/crates/defmt) | Эффективное логирование через probe/ITM | Как `printf`, но форматирование откладывается на хост |
+| [`embedded-hal`](https://crates.io/crates/embedded-hal) | Трейты абстракции оборудования (SPI, I²C, GPIO, UART) | Реализуете один раз — работает на любом MCU |
+| [`cortex-m`](https://crates.io/crates/cortex-m) | Интринсики и доступ к регистрам ARM Cortex-M | Низкоуровневый, как CMSIS |
+| [`cortex-m-rt`](https://crates.io/crates/cortex-m-rt) | Среда выполнения / стартовый код для Cortex-M | Заменяет ваш `startup.s` |
+| [`rtic`](https://crates.io/crates/rtic) | Real-Time Interrupt-driven Concurrency | Планирование задач на этапе компиляции, без накладных расходов |
+| [`embassy`](https://crates.io/crates/embassy-executor) | Асинхронный исполнитель для встраиваемых систем | `async/await` на bare metal |
+| [`postcard`](https://crates.io/crates/postcard) | `no_std` сериализация serde (бинарная) | Заменяет `serde_json`, когда строки не по карману |
+| [`thiserror`](https://crates.io/crates/thiserror) | Derive-макрос для трейта `Error` | Работает в `no_std` начиная с v2; предпочтительнее `anyhow` |
+| [`smoltcp`](https://crates.io/crates/smoltcp) | Стек TCP/IP на `no_std` | Когда нужна сеть без ОС |
 
-## C vs Rust: bare-metal comparison
+## C и Rust: сравнение для bare metal
 
-A typical embedded C blinky:
+Типичный встраиваемый «blinky» на C:
 
 ```c
-// C — bare metal, vendor HAL
+// C — bare metal, вендорский HAL
 #include "stm32f4xx_hal.h"
 
 void SysTick_Handler(void) {
@@ -103,14 +99,14 @@ int main(void) {
 }
 ```
 
-The Rust equivalent (using `embedded-hal` + a board crate):
+Эквивалент на Rust (с использованием `embedded-hal` и крейта платы):
 
 ```rust
 #![no_std]
 #![no_main]
 
 use cortex_m_rt::entry;
-use panic_halt as _; // panic handler: infinite loop
+use panic_halt as _; // обработчик panic: бесконечный цикл
 use stm32f4xx_hal::{pac, prelude::*};
 
 #[entry]
@@ -130,51 +126,51 @@ fn main() -> ! {
 }
 ```
 
-**Key differences for C devs:**
-- `Peripherals::take()` returns `Option` — ensures the singleton pattern at compile time (no double-init bugs)
-- `.split()` moves ownership of individual pins — no risk of two modules driving the same pin
-- All register access is type-checked — you can't accidentally write to a read-only register
-- The borrow checker prevents data races between `main` and interrupt handlers (with RTIC)
+**Ключевые отличия для разработчиков на C:**
+- `Peripherals::take()` возвращает `Option` — это обеспечивает паттерн синглтона на этапе компиляции (без ошибок двойной инициализации)
+- `.split()` передаёт владение отдельными выводами — нет риска, что два модуля будут управлять одним выводом
+- Весь доступ к регистрам проверяется типами — вы не сможете случайно записать в регистр только для чтения
+- Проверка заимствований предотвращает гонки данных между `main` и обработчиками прерываний (с RTIC)
 
-## When to use `no_std` vs `std`
+## Когда использовать `no_std`, а когда `std`
 
 ```mermaid
 flowchart TD
-    A[Does your target have an OS?] -->|Yes| B[Use std]
-    A -->|No| C[Do you have a heap allocator?]
-    C -->|Yes| D["Use #![no_std] + extern crate alloc"]
-    C -->|No| E["Use #![no_std] with core only"]
-    B --> F[Full Vec, HashMap, threads, fs, net]
-    D --> G[Vec, String, Box, BTreeMap — no fs/net/threads]
-    E --> H[Fixed-size arrays, heapless collections, no allocation]
+    A[Есть ли у вашей целевой платформы ОС?] -->|Да| B[Используйте std]
+    A -->|Нет| C[Есть ли у вас аллокатор кучи?]
+    C -->|Да| D["Используйте #![no_std] + extern crate alloc"]
+    C -->|Нет| E["Используйте #![no_std] только с core"]
+    B --> F[Полные Vec, HashMap, потоки, fs, net]
+    D --> G[Vec, String, Box, BTreeMap — без fs/net/потоков]
+    E --> H[Массивы фиксированного размера, коллекции heapless, без выделения памяти]
 ```
 
-# Exercise: `no_std` ring buffer
+# Упражнение: кольцевой буфер `no_std`
 
-🔴 **Challenge** — combines generics, `MaybeUninit`, and `#[cfg(test)]` in a `no_std` context
+🔴 **Сложный уровень** — объединяет обобщения, `MaybeUninit` и `#[cfg(test)]` в контексте `no_std`
 
-In embedded systems you often need a fixed-size ring buffer (circular buffer) that
-never allocates.  Implement one using only `core` (no `alloc`, no `std`).
+Во встраиваемых системах часто нужен кольцевой буфер фиксированного размера, который
+никогда не выделяет память. Реализуйте его, используя только `core` (без `alloc` и без `std`).
 
-**Requirements:**
-- Generic over element type `T: Copy`
-- Fixed capacity `N` (const generic)
-- `push(&mut self, item: T)` — overwrites oldest element when full
-- `pop(&mut self) -> Option<T>` — returns oldest element
+**Требования:**
+- Обобщённый по типу элемента `T: Copy`
+- Фиксированная ёмкость `N` (константный обобщённый параметр)
+- `push(&mut self, item: T)` — перезаписывает самый старый элемент, когда буфер заполнен
+- `pop(&mut self) -> Option<T>` — возвращает самый старый элемент
 - `len(&self) -> usize`
 - `is_empty(&self) -> bool`
-- Must compile with `#![no_std]`
+- Должен компилироваться с `#![no_std]`
 
 ```rust
-// Starter code
+// Стартовый код
 #![no_std]
 
 use core::mem::MaybeUninit;
 
 pub struct RingBuffer<T: Copy, const N: usize> {
     buf: [MaybeUninit<T>; N],
-    head: usize,  // next write position
-    tail: usize,  // next read position
+    head: usize,  // позиция следующей записи
+    tail: usize,  // позиция следующего чтения
     count: usize,
 }
 
@@ -198,7 +194,7 @@ impl<T: Copy, const N: usize> RingBuffer<T, N> {
 ```
 
 <details>
-<summary>Solution</summary>
+<summary>Решение</summary>
 
 ```rust
 #![no_std]
@@ -215,7 +211,7 @@ pub struct RingBuffer<T: Copy, const N: usize> {
 impl<T: Copy, const N: usize> RingBuffer<T, N> {
     pub const fn new() -> Self {
         Self {
-            // SAFETY: MaybeUninit does not require initialization
+            // SAFETY: MaybeUninit не требует инициализации
             buf: unsafe { MaybeUninit::uninit().assume_init() },
             head: 0,
             tail: 0,
@@ -227,7 +223,7 @@ impl<T: Copy, const N: usize> RingBuffer<T, N> {
         self.buf[self.head] = MaybeUninit::new(item);
         self.head = (self.head + 1) % N;
         if self.count == N {
-            // Buffer is full — overwrite oldest, advance tail
+            // Буфер заполнен — перезаписываем самый старый элемент, сдвигаем tail
             self.tail = (self.tail + 1) % N;
         } else {
             self.count += 1;
@@ -238,7 +234,7 @@ impl<T: Copy, const N: usize> RingBuffer<T, N> {
         if self.count == 0 {
             return None;
         }
-        // SAFETY: We only read positions that were previously written via push()
+        // SAFETY: читаем только те позиции, которые ранее были записаны через push()
         let item = unsafe { self.buf[self.tail].assume_init() };
         self.tail = (self.tail + 1) % N;
         self.count -= 1;
@@ -280,11 +276,11 @@ mod tests {
         rb.push(1);
         rb.push(2);
         rb.push(3);
-        // Buffer full: [1, 2, 3]
+        // Буфер заполнен: [1, 2, 3]
 
-        rb.push(4); // Overwrites 1 → [4, 2, 3], tail advances
+        rb.push(4); // Перезаписывает 1 → [4, 2, 3], tail сдвигается
         assert_eq!(rb.len(), 3);
-        assert_eq!(rb.pop(), Some(2)); // oldest surviving
+        assert_eq!(rb.pop(), Some(2)); // самый старый из оставшихся
         assert_eq!(rb.pop(), Some(3));
         assert_eq!(rb.pop(), Some(4));
         assert_eq!(rb.pop(), None);
@@ -292,14 +288,11 @@ mod tests {
 }
 ```
 
-**Why this matters for embedded C devs:**
-- `MaybeUninit` is Rust's equivalent of uninitialized memory — the compiler
-  won't insert zero-fills, just like `char buf[N];` in C
-- The `unsafe` blocks are minimal (2 lines) and each has a `// SAFETY:` comment
-- The `const fn new()` means you can create ring buffers in `static` variables
-  without a runtime constructor
-- The tests run on your host with `cargo test` even though the code is `no_std`
+**Почему это важно для разработчиков встраиваемого C:**
+- `MaybeUninit` — это аналог неинициализированной памяти в Rust: компилятор не вставляет заполнение нулями, так же как в `char buf[N];` в C
+- Блоки `unsafe` минимальны (по 2 строки), и у каждого есть комментарий `// SAFETY:`
+- `const fn new()` означает, что кольцевые буферы можно создавать в переменных `static` без конструктора времени выполнения
+- Тесты запускаются на вашей машине командой `cargo test`, хотя код рассчитан на `no_std`
 
 </details>
-
 
