@@ -1,38 +1,35 @@
-## No GIL: True Parallelism
+## Нет GIL: настоящий параллелизм
 
-> **What you'll learn:** Why the GIL limits Python concurrency, Rust's `Send`/`Sync` traits for compile-time thread safety,
-> `Arc<Mutex<T>>` vs Python `threading.Lock`, channels vs `queue.Queue`, and async/await differences.
+> **Что вы узнаете:** почему GIL ограничивает конкурентность в Python, трейты `Send`/`Sync` Rust для проверки потокобезопасности на этапе компиляции, `Arc<Mutex<T>>` в сравнении с `threading.Lock` в Python, каналы в сравнении с `queue.Queue` и различия async/await.
 >
-> **Difficulty:** 🔴 Advanced
+> **Сложность:** 🔴 Продвинутый
 
-The GIL (Global Interpreter Lock) is Python's biggest limitation for CPU-bound work.
-Rust has no GIL — threads run truly in parallel, and the type system prevents data races
-at compile time.
+GIL (Global Interpreter Lock, глобальная блокировка интерпретатора) — главное ограничение Python для задач, ограниченных CPU. В Rust GIL нет: потоки действительно работают параллельно, а система типов предотвращает гонки данных на этапе компиляции.
 
 ```mermaid
 gantt
-    title CPU-bound Work: Python GIL vs Rust Threads
+    title Работа, ограниченная CPU: GIL в Python против потоков Rust
     dateFormat X
     axisFormat %s
     section Python (GIL)
-        Thread 1 :a1, 0, 4
-        Thread 2 :a2, 4, 8
-        Thread 3 :a3, 8, 12
-        Thread 4 :a4, 12, 16
-    section Rust (no GIL)
-        Thread 1 :b1, 0, 4
-        Thread 2 :b2, 0, 4
-        Thread 3 :b3, 0, 4
-        Thread 4 :b4, 0, 4
+        Поток 1 :a1, 0, 4
+        Поток 2 :a2, 4, 8
+        Поток 3 :a3, 8, 12
+        Поток 4 :a4, 12, 16
+    section Rust (без GIL)
+        Поток 1 :b1, 0, 4
+        Поток 2 :b2, 0, 4
+        Поток 3 :b3, 0, 4
+        Поток 4 :b4, 0, 4
 ```
 
-> **Key insight**: Python threads run sequentially for CPU work (GIL serializes them). Rust threads run truly in parallel — 4 threads = ~4x speedup.
+> **Ключевая мысль**: потоки Python при работе с CPU выполняются последовательно (GIL их сериализует). Потоки Rust действительно работают параллельно: 4 потока дают ускорение примерно в 4 раза.
 >
-> 📌 **Prerequisite**: Make sure you're comfortable with [Ch. 7 — Ownership and Borrowing](ch07-ownership-and-borrowing.md) before tackling this chapter. `Arc`, `Mutex`, and move closures all build on ownership concepts.
+> 📌 **Предварительное требование**: убедитесь, что вы освоили [Гл. 7 — Владение и заимствование](ch07-ownership-and-borrowing.md), прежде чем переходить к этой главе. `Arc`, `Mutex` и замыкания `move` опираются на понятия владения.
 
-### Python's GIL Problem
+### Проблема GIL в Python
 ```python
-# Python — threads don't help for CPU-bound work
+# Python — потоки не помогают при работе, ограниченной CPU
 import threading
 import time
 
@@ -41,7 +38,7 @@ counter = 0
 def increment(n):
     global counter
     for _ in range(n):
-        counter += 1  # NOT thread-safe! But GIL "protects" simple operations
+        counter += 1  # НЕ потокобезопасно! Но GIL как бы «защищает» простые операции
 
 threads = [threading.Thread(target=increment, args=(1_000_000,)) for _ in range(4)]
 start = time.perf_counter()
@@ -51,16 +48,16 @@ for t in threads:
     t.join()
 elapsed = time.perf_counter() - start
 
-print(f"Counter: {counter}")    # Might not be 4,000,000!
-print(f"Time: {elapsed:.2f}s")  # About the SAME as single-threaded (GIL)
+print(f"Счётчик: {counter}")    # Может быть не 4 000 000!
+print(f"Время: {elapsed:.2f}s")  # Примерно ТАКОЕ ЖЕ время, как у одного потока (GIL)
 
-# For true parallelism, Python requires multiprocessing:
+# Для настоящего параллелизма в Python нужен multiprocessing:
 from multiprocessing import Pool
 with Pool(4) as pool:
-    results = pool.map(cpu_work, data)  # Separate processes, pickle overhead
+    results = pool.map(cpu_work, data)  # Отдельные процессы, накладные расходы на pickle
 ```
 
-### Rust — True Parallelism, Compile-Time Safety
+### Rust: настоящий параллелизм и проверка на этапе компиляции
 ```rust
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::Arc;
@@ -82,60 +79,60 @@ fn main() {
         h.join().unwrap();
     }
 
-    println!("Counter: {}", counter.load(Ordering::Relaxed)); // Always 4,000,000
-    // Runs on ALL cores — true parallelism, no GIL
+    println!("Счётчик: {}", counter.load(Ordering::Relaxed)); // Всегда 4 000 000
+    // Работает на ВСЕХ ядрах: настоящий параллелизм, без GIL
 }
 ```
 
 ***
 
-## Thread Safety: Type System Guarantees
+## Безопасность потоков: гарантии системы типов
 
-### Python — Runtime Errors
+### Python: ошибки во время выполнения
 ```python
-# Python — data races caught at runtime (or not at all)
+# Python — гонки данных обнаруживаются во время выполнения (или не обнаруживаются вовсе)
 import threading
 
 shared_list = []
 
 def append_items(items):
     for item in items:
-        shared_list.append(item)  # "Thread-safe" due to GIL for append
-        # But complex operations are NOT safe:
+        shared_list.append(item)  # «Потокобезопасно» благодаря GIL для append
+        # Но сложные операции НЕ безопасны:
         # if item not in shared_list:
-        #     shared_list.append(item)  # RACE CONDITION!
+        #     shared_list.append(item)  # ГОНКА ДАННЫХ!
 
-# Using Lock for safety:
+# Использование Lock для безопасности:
 lock = threading.Lock()
 def safe_append(items):
     for item in items:
         with lock:
             if item not in shared_list:
                 shared_list.append(item)
-# Forgetting the lock? No compiler warning. Bug discovered in production.
+# Забыли блокировку? Предупреждения компилятора не будет. Ошибка обнаружится в продакшене.
 ```
 
-### Rust — Compile-Time Errors
+### Rust: ошибки на этапе компиляции
 ```rust
 use std::sync::{Arc, Mutex};
 use std::thread;
 
 fn main() {
-    // Trying to share a Vec across threads without protection:
+    // Попытка разделить Vec между потоками без защиты:
     // let shared = vec![];
     // thread::spawn(move || shared.push(1));
-    // ❌ Compile error: Vec is not Send/Sync without protection
+    // ❌ Ошибка компиляции: Vec не реализует Send/Sync без защиты
 
-    // With Mutex (Rust's equivalent of threading.Lock):
+    // С Mutex (аналог threading.Lock в Rust):
     let shared = Arc::new(Mutex::new(Vec::new()));
 
     let handles: Vec<_> = (0..4).map(|i| {
         let shared = Arc::clone(&shared);
         thread::spawn(move || {
-            let mut data = shared.lock().unwrap(); // Lock is REQUIRED to access
+            let mut data = shared.lock().unwrap(); // Блокировка ОБЯЗАТЕЛЬНА для доступа
             data.push(i);
-            // Lock is automatically released when `data` goes out of scope
-            // No "forgetting to unlock" — RAII guarantees it
+            // Блокировка автоматически освобождается, когда `data` выходит из области видимости
+            // Нельзя «забыть разблокировать»: RAII гарантирует это
         })
     }).collect();
 
@@ -143,47 +140,47 @@ fn main() {
         h.join().unwrap();
     }
 
-    println!("{:?}", shared.lock().unwrap()); // [0, 1, 2, 3] (order may vary)
+    println!("{:?}", shared.lock().unwrap()); // [0, 1, 2, 3] (порядок может отличаться)
 }
 ```
 
-### Send and Sync Traits
+### Трейты Send и Sync
 ```rust
-// Rust uses two marker traits to enforce thread safety:
+// Rust использует два маркерных трейта для обеспечения потокобезопасности:
 
-// Send — "this type can be transferred to another thread"
-// Most types are Send. Rc<T> is NOT (use Arc<T> for threads).
+// Send — «этот тип можно передать в другой поток»
+// Большинство типов — Send. Rc<T> — НЕТ (для потоков используйте Arc<T>).
 
-// Sync — "this type can be referenced from multiple threads"
-// Most types are Sync. Cell<T>/RefCell<T> are NOT (use Mutex<T>).
+// Sync — «на этот тип можно ссылаться из нескольких потоков»
+// Большинство типов — Sync. Cell<T>/RefCell<T> — НЕТ (используйте Mutex<T>).
 
-// The compiler checks these automatically:
+// Компилятор проверяет это автоматически:
 // thread::spawn(move || { ... })
-//   ↑ The closure's captures must be Send
-//   ↑ Shared references must be Sync
-//   ↑ If they're not → compile error
+//   ↑ Захваченные замыканием значения должны быть Send
+//   ↑ Общие ссылки должны быть Sync
+//   ↑ Если нет, то ошибка компиляции
 
-// Python has no equivalent. Thread safety bugs are discovered at runtime.
-// Rust catches them at compile time. This is "fearless concurrency."
+// У Python аналога нет. Ошибки потокобезопасности обнаруживаются во время выполнения.
+// Rust ловит их на этапе компиляции. Это и есть «конкурентность без страха».
 ```
 
-### Concurrency Primitives Comparison
+### Сравнение примитивов конкурентности
 
-| Python | Rust | Purpose |
-|--------|------|---------|
-| `threading.Lock()` | `Mutex<T>` | Mutual exclusion |
-| `threading.RLock()` | `Mutex<T>` (no reentrant) | Reentrant lock (use differently) |
-| `threading.RWLock` (N/A) | `RwLock<T>` | Multiple readers OR one writer |
-| `threading.Event()` | `Condvar` | Condition variable |
-| `queue.Queue()` | `mpsc::channel()` | Thread-safe channel |
-| `multiprocessing.Pool` | `rayon::ThreadPool` | Thread pool |
-| `concurrent.futures` | `rayon` / `tokio::spawn` | Task-based parallelism |
-| `threading.local()` | `thread_local!` | Thread-local storage |
-| N/A | `Atomic*` types | Lock-free counters and flags |
+| Python | Rust | Назначение |
+|--------|------|------------|
+| `threading.Lock()` | `Mutex<T>` | Взаимное исключение |
+| `threading.RLock()` | `Mutex<T>` (не реентерабельный) | Реентерабельная блокировка (используется иначе) |
+| `threading.RWLock` (нет) | `RwLock<T>` | Много читателей ИЛИ один писатель |
+| `threading.Event()` | `Condvar` | Условная переменная |
+| `queue.Queue()` | `mpsc::channel()` | Потокобезопасный канал |
+| `multiprocessing.Pool` | `rayon::ThreadPool` | Пул потоков |
+| `concurrent.futures` | `rayon` / `tokio::spawn` | Параллелизм на основе задач |
+| `threading.local()` | `thread_local!` | Локальное для потока хранилище |
+| Нет | Типы `Atomic*` | Безблокировочные счётчики и флаги |
 
-### Mutex Poisoning
+### Отравление мьютекса
 
-If a thread **panics** while holding a `Mutex`, the lock becomes *poisoned*. Python has no equivalent — if a thread crashes holding a `threading.Lock()`, the lock stays stuck.
+Если поток **паникует**, удерживая `Mutex`, блокировка становится *отравленной* (poisoned). В Python аналога нет: если поток падает, удерживая `threading.Lock()`, блокировка остаётся захваченной навсегда.
 
 ```rust
 use std::sync::{Arc, Mutex};
@@ -195,42 +192,41 @@ let data2 = Arc::clone(&data);
 let _ = thread::spawn(move || {
     let mut guard = data2.lock().unwrap();
     guard.push(4);
-    panic!("oops!");  // Lock is now poisoned
+    panic!("упс!");  // Блокировка теперь отравлена
 }).join();
 
-// Subsequent lock attempts return Err(PoisonError)
+// Последующие попытки блокировки возвращают Err(PoisonError)
 match data.lock() {
-    Ok(guard) => println!("Data: {guard:?}"),
+    Ok(guard) => println!("Данные: {guard:?}"),
     Err(poisoned) => {
-        println!("Lock was poisoned! Recovering...");
+        println!("Блокировка отравлена! Восстанавливаем...");
         let guard = poisoned.into_inner();
-        println!("Recovered: {guard:?}");  // [1, 2, 3, 4]
+        println!("Восстановлено: {guard:?}");  // [1, 2, 3, 4]
     }
 }
 ```
 
-### Atomic Ordering (brief note)
+### Порядок атомарных операций (краткая заметка)
 
-The `Ordering` parameter on atomic operations controls memory visibility guarantees:
+Параметр `Ordering` в атомарных операциях управляет гарантиями видимости памяти:
 
-| Ordering | When to use |
-|----------|-------------|
-| `Relaxed` | Simple counters where ordering doesn't matter |
-| `Acquire`/`Release` | Producer-consumer: writer uses `Release`, reader uses `Acquire` |
-| `SeqCst` | When in doubt — strictest ordering, most intuitive |
+| Ordering | Когда использовать |
+|----------|--------------------|
+| `Relaxed` | Простые счётчики, где порядок не важен |
+| `Acquire`/`Release` | Производитель-потребитель: писатель использует `Release`, читатель `Acquire` |
+| `SeqCst` | Если сомневаетесь: самый строгий порядок, самый понятный |
 
-Python's `threading` module hides these details behind the GIL. In Rust, you choose explicitly — use `SeqCst` until profiling shows you need something weaker.
+Модуль `threading` в Python скрывает эти детали за GIL. В Rust вы выбираете явно: используйте `SeqCst`, пока профилирование не покажет, что нужно что-то послабее.
 
 ***
 
-## async/await Comparison
+## Сравнение async/await
 
-Python and Rust both have `async`/`await` syntax, but they work very differently
-under the hood.
+Python и Rust имеют синтаксис `async`/`await`, но внутри работают очень по-разному.
 
-### Python async/await
+### async/await в Python
 ```python
-# Python — asyncio for concurrent I/O
+# Python — asyncio для параллельного ввода-вывода
 import asyncio
 import aiohttp
 
@@ -246,21 +242,21 @@ async def main():
         results = await asyncio.gather(*tasks)
 
     for url, result in zip(urls, results):
-        print(f"{url}: {len(result)} bytes")
+        print(f"{url}: {len(result)} байт")
 
 asyncio.run(main())
 
-# Python async is single-threaded (still GIL)!
-# It only helps with I/O-bound work (waiting for network/disk).
-# CPU-bound work in async still blocks the event loop.
+# Async в Python работает в одном потоке (всё ещё под GIL)!
+# Помогает только при задачах, ограниченных вводом-выводом (ожидание сети или диска).
+# Задачи, ограниченные CPU, внутри async всё равно блокируют цикл событий.
 ```
 
-### Rust async/await
+### async/await в Rust
 ```rust
-// Rust — tokio for concurrent I/O (and CPU parallelism!)
+// Rust — tokio для параллельного ввода-вывода (и параллелизма CPU!)
 use reqwest;
 use tokio;
-use futures::future::join_all;  // add `futures` to Cargo.toml
+use futures::future::join_all;  // добавьте `futures` в Cargo.toml
 
 async fn fetch_url(url: &str) -> Result<String, reqwest::Error> {
     reqwest::get(url).await?.text().await
@@ -271,16 +267,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let urls = vec!["https://example.com", "https://httpbin.org/get"];
 
     let tasks: Vec<_> = urls.iter()
-        .map(|url| tokio::spawn(fetch_url(url)))  // No GIL limitation
-        .collect();                                 // Can use all CPU cores
+        .map(|url| tokio::spawn(fetch_url(url)))  // Без ограничений GIL
+        .collect();                                 // Можно использовать все ядра CPU
 
     let results = futures::future::join_all(tasks).await;
 
     for (url, result) in urls.iter().zip(results) {
         match result {
-            Ok(Ok(body)) => println!("{url}: {} bytes", body.len()),
-            Ok(Err(e)) => println!("{url}: error {e}"),
-            Err(e) => println!("{url}: task failed {e}"),
+            Ok(Ok(body)) => println!("{url}: {} байт", body.len()),
+            Ok(Err(e)) => println!("{url}: ошибка {e}"),
+            Err(e) => println!("{url}: задача завершилась с ошибкой {e}"),
         }
     }
 
@@ -288,22 +284,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-### Key Differences
+### Ключевые различия
 
-| Aspect | Python asyncio | Rust tokio |
+| Аспект | Python asyncio | Rust tokio |
 |--------|---------------|------------|
-| GIL | Still applies | No GIL |
-| CPU parallelism | ❌ Single-threaded | ✅ Multi-threaded |
-| Runtime | Built-in (asyncio) | External crate (tokio) |
-| Ecosystem | aiohttp, asyncpg, etc. | reqwest, sqlx, etc. |
-| Performance | Good for I/O | Excellent for I/O AND CPU |
-| Error handling | Exceptions | `Result<T, E>` |
-| Cancellation | `task.cancel()` | Drop the future |
-| Color problem | Sync ↔ async boundary | Same issue exists |
+| GIL | Действует | Нет GIL |
+| Параллелизм CPU | ❌ Один поток | ✅ Многопоточность |
+| Рантайм | Встроен (asyncio) | Внешний крейт (tokio) |
+| Экосистема | aiohttp, asyncpg и др. | reqwest, sqlx и др. |
+| Производительность | Хорошо для I/O | Отлично и для I/O, и для CPU |
+| Обработка ошибок | Исключения | `Result<T, E>` |
+| Отмена | `task.cancel()` | Удалить future (drop) |
+| «Проблема цвета» функций | Граница sync ↔ async | Та же проблема существует |
 
-### Simple Parallelism with Rayon
+### Простой параллелизм с Rayon
 ```python
-# Python — multiprocessing for CPU parallelism
+# Python — multiprocessing для параллелизма CPU
 from multiprocessing import Pool
 
 def process_item(item):
@@ -314,47 +310,47 @@ with Pool(8) as pool:
 ```
 
 ```rust
-// Rust — rayon for effortless CPU parallelism (one line change!)
+// Rust — rayon для лёгкого параллелизма CPU (изменение одной строки!)
 use rayon::prelude::*;
 
-// Sequential:
+// Последовательно:
 let results: Vec<_> = items.iter().map(|item| heavy_computation(item)).collect();
 
-// Parallel (change .iter() to .par_iter() — that's it!):
+// Параллельно (замените .iter() на .par_iter(), и всё!):
 let results: Vec<_> = items.par_iter().map(|item| heavy_computation(item)).collect();
 
-// No pickle, no process overhead, no serialization.
-// Rayon automatically distributes work across cores.
+// Без pickle, без накладных расходов на процессы, без сериализации.
+// Rayon автоматически распределяет работу по ядрам.
 ```
 
 ---
 
-## 💼 Case Study: Parallel Image Processing Pipeline
+## 💼 Кейс: параллельный конвейер обработки изображений
 
-A data science team processes 50,000 satellite images nightly. Their Python pipeline uses `multiprocessing.Pool`:
+Команда специалистов по данным ежедневно обрабатывает 50 000 спутниковых снимков. Их конвейер на Python использует `multiprocessing.Pool`:
 
 ```python
-# Python — multiprocessing for CPU-bound image work
+# Python — multiprocessing для обработки изображений, ограниченной CPU
 import multiprocessing
 from PIL import Image
 import numpy as np
 
 def process_image(path: str) -> dict:
     img = np.array(Image.open(path))
-    # CPU-intensive: histogram equalization, edge detection, classification
+    # Ресурсоёмкие операции: выравнивание гистограммы, выделение границ, классификация
     histogram = np.histogram(img, bins=256)[0]
-    edges = detect_edges(img)       # ~200ms per image
-    label = classify(edges)          # ~100ms per image
+    edges = detect_edges(img)       # ~200 мс на изображение
+    label = classify(edges)          # ~100 мс на изображение
     return {"path": path, "label": label, "edge_count": len(edges)}
 
-# Problem: each subprocess copies the full Python interpreter
-# Memory: 50MB per worker × 16 workers = 800MB overhead
-# Startup: 2-3 seconds to fork and pickle arguments
+# Проблема: каждый подпроцесс копирует весь интерпретатор Python
+# Память: 50 МБ на воркер × 16 воркеров = 800 МБ накладных расходов
+# Запуск: 2–3 секунды на fork и pickle аргументов
 with multiprocessing.Pool(16) as pool:
-    results = pool.map(process_image, image_paths)  # ~4.5 hours for 50k images
+    results = pool.map(process_image, image_paths)  # ~4,5 часа на 50 тыс. изображений
 ```
 
-**Pain points**: 800MB memory overhead from forking, pickle serialization of arguments/results, GIL prevents using threads, error handling is opaque (exceptions in workers are hard to debug).
+**Болевые точки**: 800 МБ памяти на форк, сериализация pickle аргументов и результатов, GIL мешает использовать потоки, обработка ошибок непрозрачна (исключения в воркерах трудно отлаживать).
 
 ```rust
 use rayon::prelude::*;
@@ -368,10 +364,10 @@ struct ImageResult {
 
 fn process_image(path: &str) -> Result<ImageResult, image::ImageError> {
     let img = image::open(path)?;
-    // Application-specific functions (implement for your use case)
-    let histogram = compute_histogram(&img);       // ~50ms (no numpy overhead)
-    let edges = detect_edges(&img);                // ~40ms (SIMD-optimized)
-    let label = classify(&edges);                  // ~20ms
+    // Специфичные для приложения функции (реализуйте под свою задачу)
+    let histogram = compute_histogram(&img);       // ~50 мс (без накладных расходов numpy)
+    let edges = detect_edges(&img);                // ~40 мс (оптимизировано через SIMD)
+    let label = classify(&edges);                  // ~20 мс
     Ok(ImageResult {
         path: path.to_string(),
         label,
@@ -382,40 +378,41 @@ fn process_image(path: &str) -> Result<ImageResult, image::ImageError> {
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let paths: Vec<String> = load_image_paths()?;
 
-    // Rayon automatically uses all CPU cores — no forking, no pickle, no GIL
+    // Rayon автоматически использует все ядра CPU: без форка, без pickle, без GIL
     let results: Vec<ImageResult> = paths
-        .par_iter()                                // Parallel iterator
-        .filter_map(|p| process_image(p).ok())     // Skip errors gracefully
-        .collect();                                // Collect in parallel
+        .par_iter()                                // Параллельный итератор
+        .filter_map(|p| process_image(p).ok())     // Аккуратно пропускаем ошибки
+        .collect();                                // Собираем параллельно
 
-    println!("Processed {} images", results.len());
+    println!("Обработано изображений: {}", results.len());
     Ok(())
 }
-// 50k images in ~35 minutes (vs 4.5 hours in Python)
-// Memory: ~50MB total (shared threads, no forking)
+// 50 тыс. изображений за ~35 минут (против 4,5 часа в Python)
+// Память: ~50 МБ всего (общие потоки, без форка)
 ```
 
-**Results**:
-| Metric | Python (multiprocessing) | Rust (rayon) |
-|--------|------------------------|--------------|
-| Time (50k images) | ~4.5 hours | ~35 minutes |
-| Memory overhead | 800MB (16 workers) | ~50MB (shared) |
-| Error handling | Opaque pickle errors | `Result<T, E>` at every step |
-| Startup cost | 2–3s (fork + pickle) | None (threads) |
+**Результаты**:
 
-> **Key lesson**: For CPU-bound parallel work, Rust's threads + rayon replace Python's `multiprocessing` with zero serialization overhead, shared memory, and compile-time safety.
+| Метрика | Python (multiprocessing) | Rust (rayon) |
+|---------|--------------------------|--------------|
+| Время (50 тыс. изображений) | ~4,5 часа | ~35 минут |
+| Накладные расходы памяти | 800 МБ (16 воркеров) | ~50 МБ (общая) |
+| Обработка ошибок | Непрозрачные ошибки pickle | `Result<T, E>` на каждом шаге |
+| Стоимость запуска | 2–3 с (fork + pickle) | Нет (потоки) |
+
+> **Ключевой урок**: для параллельной работы, ограниченной CPU, потоки Rust и rayon заменяют `multiprocessing` из Python без накладных расходов на сериализацию, с общей памятью и проверкой безопасности на этапе компиляции.
 
 ---
 
-## Exercises
+## Упражнения
 
 <details>
-<summary><strong>🏋️ Exercise: Thread-Safe Counter</strong> (click to expand)</summary>
+<summary><strong>🏋️ Упражнение: потокобезопасный счётчик</strong> (нажмите, чтобы раскрыть)</summary>
 
-**Challenge**: In Python, you might use `threading.Lock` to protect a shared counter. Translate this to Rust: spawn 10 threads, each incrementing a shared counter 1000 times. Print the final value (should be 10000). Use `Arc<Mutex<u64>>`.
+**Задание**: в Python для защиты общего счётчика вы могли бы использовать `threading.Lock`. Перепишите это на Rust: запустите 10 потоков, каждый из которых 1000 раз увеличивает общий счётчик. Выведите итоговое значение (должно быть 10000). Используйте `Arc<Mutex<u64>>`.
 
 <details>
-<summary>🔑 Solution</summary>
+<summary>🔑 Решение</summary>
 
 ```rust
 use std::sync::{Arc, Mutex};
@@ -439,15 +436,14 @@ fn main() {
         handle.join().unwrap();
     }
 
-    println!("Final count: {}", *counter.lock().unwrap());
+    println!("Итоговый счёт: {}", *counter.lock().unwrap());
 }
 ```
 
-**Key takeaway**: `Arc<Mutex<T>>` is Rust's equivalent of Python's `lock = threading.Lock()` + shared variable — but Rust *won't compile* if you forget the `Arc` or `Mutex`. Python happily runs a racy program and gives you wrong answers silently.
+**Ключевой вывод**: `Arc<Mutex<T>>` — это аналог в Rust для `lock = threading.Lock()` плюс общая переменная, но Rust *не скомпилируется*, если вы забудете `Arc` или `Mutex`. Python спокойно запустит программу с гонкой и молча выдаст неверный ответ.
 
 </details>
 </details>
 
 ***
-
 

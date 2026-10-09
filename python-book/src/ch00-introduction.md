@@ -98,8 +98,8 @@
 
 #### 11. Трейты From и Into 🟡
 - [Преобразование типов в Rust](ch11-from-and-into-traits.md#преобразование-типов-в-rust)
-- [From, Into, TryFrom](ch11-from-and-into-traits.md#трейты-from-into)
-- [Паттерны преобразования строк](ch11-from-and-into-traits.md#преобразования-строк)
+- [From, Into, TryFrom](ch11-from-and-into-traits.md#rust-frominto)
+- [Паттерны преобразования строк](ch11-from-and-into-traits.md#паттерны-преобразования-строк)
 
 #### 12. Замыкания и итераторы 🟡
 - [Замыкания и лямбды](ch12-closures-and-iterators.md#замыкания-rust-и-лямбды-python)
