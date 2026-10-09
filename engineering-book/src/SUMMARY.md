@@ -1,36 +1,36 @@
-# Summary
+# Содержание
 
-[Introduction](ch00-introduction.md)
-
----
-
-# Part I — Build & Ship
-
-- [1. Build Scripts — build.rs in Depth](ch01-build-scripts-buildrs-in-depth.md)
-- [2. Cross-Compilation — One Source, Many Targets](ch02-cross-compilation-one-source-many-target.md)
+[Введение](ch00-introduction.md)
 
 ---
 
-# Part II — Measure & Verify
+# Часть I — Сборка и поставка
 
-- [3. Benchmarking — Measuring What Matters](ch03-benchmarking-measuring-what-matters.md)
-- [4. Code Coverage — Seeing What Tests Miss](ch04-code-coverage-seeing-what-tests-miss.md)
-- [5. Miri, Valgrind, and Sanitizers — Verifying Unsafe Code](ch05-miri-valgrind-and-sanitizers-verifying-u.md)
-
----
-
-# Part III — Harden & Optimize
-
-- [6. Dependency Management and Supply Chain Security](ch06-dependency-management-and-supply-chain-s.md)
-- [7. Release Profiles and Binary Size](ch07-release-profiles-and-binary-size.md)
-- [8. Compile-Time and Developer Tools](ch08-compile-time-and-developer-tools.md)
-- [9. `no_std` and Feature Verification](ch09-no-std-and-feature-verification.md)
-- [10. Windows and Conditional Compilation](ch10-windows-and-conditional-compilation.md)
+- [1. Build-скрипты — build.rs в деталях](ch01-build-scripts-buildrs-in-depth.md)
+- [2. Кросс-компиляция — один исходник, много целей](ch02-cross-compilation-one-source-many-target.md)
 
 ---
 
-# Part IV — Integrate
+# Часть II — Измерение и верификация
 
-- [11. Putting It All Together — A Production CI/CD Pipeline](ch11-putting-it-all-together-a-production-cic.md)
-- [12. Tricks from the Trenches](ch12-tricks-from-the-trenches.md)
-- [13. Quick Reference Card](ch13-quick-reference-card.md)
+- [3. Бенчмаркинг — измеряем то, что важно](ch03-benchmarking-measuring-what-matters.md)
+- [4. Покрытие кода — видим то, что пропускают тесты](ch04-code-coverage-seeing-what-tests-miss.md)
+- [5. Miri, Valgrind и санитайзеры — проверка unsafe-кода](ch05-miri-valgrind-and-sanitizers-verifying-u.md)
+
+---
+
+# Часть III — Укрепление и оптимизация
+
+- [6. Управление зависимостями и безопасность цепочки поставок](ch06-dependency-management-and-supply-chain-s.md)
+- [7. Профили релиза и размер бинарного файла](ch07-release-profiles-and-binary-size.md)
+- [8. Инструменты времени компиляции и разработки](ch08-compile-time-and-developer-tools.md)
+- [9. `no_std` и проверка фич](ch09-no-std-and-feature-verification.md)
+- [10. Windows и условная компиляция](ch10-windows-and-conditional-compilation.md)
+
+---
+
+# Часть IV — Интеграция
+
+- [11. Собираем всё вместе — продакшн-конвейер CI/CD](ch11-putting-it-all-together-a-production-cic.md)
+- [12. Проверенные на практике приёмы](ch12-tricks-from-the-trenches.md)
+- [13. Краткая справочная карточка](ch13-quick-reference-card.md)
