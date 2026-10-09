@@ -1,82 +1,82 @@
-# 7. Closures and Higher-Order Functions 🟢
+# 7. Замыкания и функции высшего порядка 🟢
 
-> **What you'll learn:**
-> - The three closure traits (`Fn`, `FnMut`, `FnOnce`) and how capture works
-> - Passing closures as parameters and returning them from functions
-> - Combinator chains and iterator adapters for functional-style programming
-> - Designing your own higher-order APIs with the right trait bounds
+> **Что вы узнаете:**
+> - Три трейта замыканий (`Fn`, `FnMut`, `FnOnce`) и то, как устроен захват переменных
+> - Передачу замыканий в качестве параметров и возврат их из функций
+> - Цепочки комбинаторов и адаптеры итераторов для функционального стиля
+> - Проектирование собственных API высшего порядка с правильными границами трейтов
 
-## Fn, FnMut, FnOnce — The Closure Traits
+## Fn, FnMut, FnOnce: трейты замыканий
 
-Every closure in Rust implements one or more of three traits, based on how it captures variables:
+Каждое замыкание в Rust реализует один или несколько из трёх трейтов в зависимости от того, как оно захватывает переменные:
 
 ```rust
-// FnOnce — consumes captured values (can only be called once)
+// FnOnce: потребляет захваченные значения (вызвать можно только один раз)
 let name = String::from("Alice");
 let greet = move || {
-    println!("Hello, {name}!"); // Takes ownership of `name`
-    drop(name); // name is consumed
+    println!("Hello, {name}!"); // Забирает владение `name`
+    drop(name); // name потреблено
 };
-greet(); // ✅ First call
-// greet(); // ❌ Can't call again — `name` was consumed
+greet(); // ✅ Первый вызов
+// greet(); // ❌ Нельзя вызвать снова: `name` уже потреблено
 
-// FnMut — mutably borrows captured values (can be called many times)
+// FnMut: изменяемо заимствует захваченные значения (можно вызывать многократно)
 let mut count = 0;
 let mut increment = || {
-    count += 1; // Mutably borrows `count`
+    count += 1; // Изменяемо заимствует `count`
 };
 increment(); // count == 1
 increment(); // count == 2
 
-// Fn — immutably borrows captured values (can be called many times, concurrently)
+// Fn: неизменяемо заимствует захваченные значения (можно вызывать многократно и одновременно)
 let prefix = "Result";
 let display = |x: i32| {
-    println!("{prefix}: {x}"); // Immutably borrows `prefix`
+    println!("{prefix}: {x}"); // Неизменяемо заимствует `prefix`
 };
 display(1);
 display(2);
 ```
 
-**The hierarchy**: `Fn` : `FnMut` : `FnOnce` — each is a subtrait of the next:
+**Иерархия**: `Fn` : `FnMut` : `FnOnce`, каждый из них является подтрейтом следующего:
 
 ```text
-FnOnce  ← everything can be called at least once
+FnOnce  ← любое замыкание можно вызвать хотя бы один раз
  ↑
-FnMut   ← can be called repeatedly (may mutate state)
+FnMut   ← можно вызывать многократно (может изменять состояние)
  ↑
-Fn      ← can be called repeatedly and concurrently (no mutation)
+Fn      ← можно вызывать многократно и одновременно (без изменения состояния)
 ```
 
-If a closure implements `Fn`, it also implements `FnMut` and `FnOnce`.
+Если замыкание реализует `Fn`, то оно реализует также `FnMut` и `FnOnce`.
 
-### Closures as Parameters and Return Values
+### Замыкания как параметры и возвращаемые значения
 
 ```rust
-// --- Parameters ---
+// --- Параметры ---
 
-// Static dispatch (monomorphized — fastest)
+// Статическая диспетчеризация (мономорфизация, самая быстрая)
 fn apply_twice<F: Fn(i32) -> i32>(f: F, x: i32) -> i32 {
     f(f(x))
 }
 
-// Also written with impl Trait:
+// То же, записанное через impl Trait:
 fn apply_twice_v2(f: impl Fn(i32) -> i32, x: i32) -> i32 {
     f(f(x))
 }
 
-// Dynamic dispatch (trait object — flexible, slight overhead)
+// Динамическая диспетчеризация (трейт-объект, гибко, с небольшими накладными расходами)
 fn apply_dyn(f: &dyn Fn(i32) -> i32, x: i32) -> i32 {
     f(x)
 }
 
-// --- Return Values ---
+// --- Возвращаемые значения ---
 
-// Can't return closures by value without boxing (they have anonymous types):
+// Нельзя вернуть замыкание по значению без упаковки в Box (у него анонимный тип):
 fn make_adder(n: i32) -> Box<dyn Fn(i32) -> i32> {
     Box::new(move |x| x + n)
 }
 
-// With impl Trait (simpler, monomorphized, but can't be dynamic):
+// С impl Trait (проще, мономорфизируется, но динамически использовать нельзя):
 fn make_adder_v2(n: i32) -> impl Fn(i32) -> i32 {
     move |x| x + n
 }
@@ -90,12 +90,12 @@ fn main() {
 }
 ```
 
-### Combinator Chains and Iterator Adapters
+### Цепочки комбинаторов и адаптеры итераторов
 
-Higher-order functions shine with iterators — this is idiomatic Rust:
+Функции высшего порядка особенно хороши с итераторами: это идиоматичный Rust:
 
 ```rust
-// C-style loop (imperative):
+// Императивный цикл в стиле C:
 let data = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 let mut result = Vec::new();
 for x in &data {
@@ -104,39 +104,39 @@ for x in &data {
     }
 }
 
-// Idiomatic Rust (functional combinator chain):
+// Идиоматичный Rust (функциональная цепочка комбинаторов):
 let result: Vec<i32> = data.iter()
     .filter(|&&x| x % 2 == 0)
     .map(|&x| x * x)
     .collect();
 
-// Same performance — iterators are lazy and optimized by LLVM
+// Производительность та же: итераторы ленивые и оптимизируются LLVM
 assert_eq!(result, vec![4, 16, 36, 64, 100]);
 ```
 
-**Common combinators cheat sheet**:
+**Шпаргалка по распространённым комбинаторам**:
 
-| Combinator | What It Does | Example |
-|-----------|-------------|---------|
-| `.map(f)` | Transform each element | `.map(|x| x * 2)` |
-| `.filter(p)` | Keep elements where predicate is true | `.filter(|x| x > &5)` |
-| `.filter_map(f)` | Map + filter in one step (returns `Option`) | `.filter_map(|x| x.parse().ok())` |
-| `.flat_map(f)` | Map then flatten nested iterators | `.flat_map(|s| s.chars())` |
-| `.fold(init, f)` | Reduce to single value (like `Aggregate` in C#) | `.fold(0, |acc, x| acc + x)` |
-| `.any(p)` / `.all(p)` | Short-circuit boolean check | `.any(|x| x > 100)` |
-| `.enumerate()` | Add index | `.enumerate().map(|(i, x)| ...)` |
-| `.zip(other)` | Pair with another iterator | `.zip(labels.iter())` |
-| `.take(n)` / `.skip(n)` | First/skip N elements | `.take(10)` |
-| `.chain(other)` | Concatenate two iterators | `.chain(extra.iter())` |
-| `.peekable()` | Look ahead without consuming | `.peek()` |
-| `.collect()` | Gather into a collection | `.collect::<Vec<_>>()` |
+| Комбинатор | Что делает | Пример |
+|------------|-----------|--------|
+| `.map(f)` | Преобразует каждый элемент | `.map(|x| x * 2)` |
+| `.filter(p)` | Оставляет элементы, для которых предикат истинен | `.filter(|x| x > &5)` |
+| `.filter_map(f)` | Отображение и фильтрация за один шаг (возвращает `Option`) | `.filter_map(|x| x.parse().ok())` |
+| `.flat_map(f)` | Отображение с последующим разворачиванием вложенных итераторов | `.flat_map(|s| s.chars())` |
+| `.fold(init, f)` | Свёртка в одно значение (аналог `Aggregate` в C#) | `.fold(0, |acc, x| acc + x)` |
+| `.any(p)` / `.all(p)` | Логическая проверка с ранним выходом | `.any(|x| x > 100)` |
+| `.enumerate()` | Добавляет индекс | `.enumerate().map(|(i, x)| ...)` |
+| `.zip(other)` | Объединяет в пары с другим итератором | `.zip(labels.iter())` |
+| `.take(n)` / `.skip(n)` | Первые N элементов / пропуск N элементов | `.take(10)` |
+| `.chain(other)` | Конкатенация двух итераторов | `.chain(extra.iter())` |
+| `.peekable()` | Заглядывание вперёд без потребления | `.peek()` |
+| `.collect()` | Собирает результат в коллекцию | `.collect::<Vec<_>>()` |
 
-### Implementing Your Own Higher-Order APIs
+### Собственные API высшего порядка
 
-Design APIs that accept closures for customization:
+Проектируйте API, которые принимают замыкания для настройки:
 
 ```rust
-/// Retry an operation with a configurable strategy
+/// Повторяет операцию с настраиваемой стратегией
 fn retry<T, E, F, S>(
     mut operation: F,
     mut should_retry: S,
@@ -144,7 +144,7 @@ fn retry<T, E, F, S>(
 ) -> Result<T, E>
 where
     F: FnMut() -> Result<T, E>,
-    S: FnMut(&E, usize) -> bool, // (error, attempt) → try again?
+    S: FnMut(&E, usize) -> bool, // (ошибка, попытка) → повторить ли?
 {
     for attempt in 1..=max_attempts {
         match operation() {
@@ -158,7 +158,7 @@ where
     unreachable!()
 }
 
-// Usage — caller controls retry logic:
+// Использование: вызывающая сторона управляет логикой повторов:
 ```
 
 ```rust
@@ -170,48 +170,41 @@ where
 let result = retry(
     || connect_to_database(),
     |err, attempt| {
-        eprintln!("Attempt {attempt} failed: {err}");
-        true // Always retry
+        eprintln!("Попытка {attempt} не удалась: {err}");
+        true // Всегда повторять
     },
     3,
 );
 
-// Usage — retry only specific errors:
+// Использование: повторять только определённые ошибки
 let result = retry(
     || http_get(url),
-    |err, _| err.is_transient(), // Only retry transient errors
+    |err, _| err.is_transient(), // Повторять только временные ошибки
     5,
 );
 ```
 
-### The `with` Pattern — Bracketed Resource Access
+### Паттерн `with`: доступ к ресурсу в скобках
 
-Sometimes you need to guarantee that a resource is in a specific state for the
-duration of an operation, and restored afterward — regardless of how the caller's
-code exits (early return, `?`, panic). Instead of exposing the resource directly
-and hoping callers remember to set up and tear down, **lend it through a closure**:
+Иногда нужно гарантировать, что ресурс находится в определённом состоянии на время операции и восстанавливается после неё, независимо от того, как завершился код вызывающей стороны (досрочный выход, `?`, паника). Вместо того чтобы открывать ресурс напрямую и надеяться, что вызывающие не забудут его настроить и откатить, **передайте ресурс через замыкание**:
 
 ```text
-set up → call closure with resource → tear down
+настройка → вызов замыкания с ресурсом → откат
 ```
 
-The caller never touches setup or teardown. They can't forget, can't get it wrong,
-and can't hold the resource beyond the closure's scope.
+Вызывающий код никогда не трогает настройку и откат. Он не может ничего забыть или сделать неправильно, и не может удерживать ресурс за пределами области действия замыкания.
 
-#### Example: GPIO Pin Direction
+#### Пример: направление GPIO-пина
 
-A GPIO controller manages pins that support bidirectional I/O. Some callers need
-the pin configured as input, others as output. Rather than exposing raw pin access
-and trusting callers to set direction correctly, the controller provides
-`with_pin_input` and `with_pin_output`:
+Контроллер GPIO управляет пинами, которые поддерживают двунаправленный ввод-вывод. Одним вызывающим нужно, чтобы пин был настроен на ввод, другим на вывод. Вместо того чтобы открывать прямой доступ к пину и надеяться, что вызывающие правильно выставят направление, контроллер предоставляет `with_pin_input` и `with_pin_output`:
 
 ```rust
-/// GPIO pin direction — not public, callers never set this directly.
+/// Направление GPIO-пина: не публичное, вызывающие никогда не выставляют его напрямую.
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum Direction { In, Out }
 
-/// A GPIO pin handle lent to the closure. Cannot be stored or cloned —
-/// it exists only for the duration of the callback.
+/// Дескриптор GPIO-пина, переданный в замыкание. Его нельзя сохранить или клонировать:
+/// он существует только на время вызова callback-функции.
 pub struct GpioPin<'a> {
     pin_number: u8,
     _controller: &'a GpioController,
@@ -219,14 +212,14 @@ pub struct GpioPin<'a> {
 
 impl GpioPin<'_> {
     pub fn read(&self) -> bool {
-        // Read pin level from hardware register
-        println!("  reading pin {}", self.pin_number);
-        true // stub
+        // Считываем уровень пина из аппаратного регистра
+        println!("  чтение пина {}", self.pin_number);
+        true // заглушка
     }
 
     pub fn write(&self, high: bool) {
-        // Drive pin level via hardware register
-        println!("  writing pin {} = {high}", self.pin_number);
+        // Устанавливаем уровень пина через аппаратный регистр
+        println!("  запись в пин {} = {high}", self.pin_number);
     }
 }
 
@@ -241,8 +234,8 @@ impl GpioController {
         }
     }
 
-    /// Configure pin as input, run the closure, restore state.
-    /// The caller receives a `GpioPin` that lives only for the callback.
+    /// Настраиваем пин на ввод, выполняем замыкание, восстанавливаем состояние.
+    /// Вызывающая сторона получает `GpioPin`, который живёт только на время callback-функции.
     pub fn with_pin_input<R>(
         &self,
         pin: u8,
@@ -252,14 +245,14 @@ impl GpioController {
         self.set_direction(pin, Direction::In);
         let handle = GpioPin { pin_number: pin, _controller: self };
         let result = f(&handle);
-        // Restore previous direction (or leave as-is — policy choice)
+        // Восстанавливаем предыдущее направление (или оставляем как есть: вопрос политики)
         if let Some(dir) = prev {
             self.set_direction(pin, dir);
         }
         result
     }
 
-    /// Configure pin as output, run the closure, restore state.
+    /// Настраиваем пин на вывод, выполняем замыкание, восстанавливаем состояние.
     pub fn with_pin_output<R>(
         &self,
         pin: u8,
@@ -276,7 +269,7 @@ impl GpioController {
     }
 
     fn set_direction(&self, pin: u8, dir: Direction) {
-        println!("  [hw] pin {pin} → {dir:?}");
+        println!("  [hw] пин {pin} → {dir:?}");
         self.current_direction.set(Some(dir));
     }
 }
@@ -284,95 +277,84 @@ impl GpioController {
 fn main() {
     let gpio = GpioController::new();
 
-    // Caller 1: needs input — doesn't know or care how direction is managed
+    // Вызывающая сторона 1: нужен ввод. Ей не важно и не нужно знать, как управляется направление
     let level = gpio.with_pin_input(4, |pin| {
         pin.read()
     });
-    println!("Pin 4 level: {level}");
+    println!("Уровень пина 4: {level}");
 
-    // Caller 2: needs output — same API shape, different guarantee
+    // Вызывающая сторона 2: нужен вывод. Форма API та же, гарантия другая
     gpio.with_pin_output(4, |pin| {
         pin.write(true);
-        // do more work...
+        // делаем другую работу...
         pin.write(false);
     });
 
-    // Can't use the pin handle outside the closure:
+    // Нельзя использовать дескриптор пина вне замыкания:
     // let escaped_pin = gpio.with_pin_input(4, |pin| pin);
     // ❌ ERROR: borrowed value does not live long enough
 }
 ```
 
-**What the `with` pattern guarantees:**
-- Direction is **always set before** the caller's code runs
-- Direction is **always restored after**, even if the closure returns early
-- The `GpioPin` handle **cannot escape** the closure — the borrow checker enforces
-  this via the lifetime tied to the controller reference
-- Callers never import `Direction`, never call `set_direction` — the API is
-  impossible to misuse
+**Что гарантирует паттерн `with`:**
+- Направление **всегда выставляется до** выполнения кода вызывающей стороны
+- Направление **всегда восстанавливается после**, даже если замыкание вернуло управление досрочно
+- Дескриптор `GpioPin` **не может выйти** за пределы замыкания: заимствующая проверка обеспечивает это через время жизни, привязанное к ссылке на контроллер
+- Вызывающим не нужно импортировать `Direction` или вызывать `set_direction`: API невозможно использовать неправильно
 
-#### Where This Pattern Appears
+#### Где встречается этот паттерн
 
-The `with` pattern shows up throughout Rust's standard library and ecosystem:
+Паттерн `with` встречается по всей стандартной библиотеке Rust и экосистеме:
 
-| API | Setup | Callback | Teardown |
-|-----|-------|----------|----------|
-| `std::thread::scope` | Create scope | `\|s\| { s.spawn(...) }` | Join all threads |
-| `Mutex::lock` | Acquire lock | Use `MutexGuard` (RAII, not closure, but same idea) | Release on drop |
-| `tempfile::tempdir` | Create temp directory | Use path | Delete on drop |
-| `std::io::BufWriter::new` | Buffer writes | Write operations | Flush on drop |
-| GPIO `with_pin_*` (above) | Set direction | Use pin handle | Restore direction |
+| API | Настройка | Замыкание (callback) | Откат |
+|-----|-----------|----------------------|-------|
+| `std::thread::scope` | Создание области | `\|s\| { s.spawn(...) }` | Ожидание всех потоков |
+| `Mutex::lock` | Захват блокировки | Использование `MutexGuard` (RAII, не замыкание, но та же идея) | Освобождение при уничтожении |
+| `tempfile::tempdir` | Создание временного каталога | Использование пути | Удаление при уничтожении |
+| `std::io::BufWriter::new` | Буферизация записи | Операции записи | Сброс буфера при уничтожении |
+| GPIO `with_pin_*` (выше) | Выставление направления | Использование дескриптора пина | Восстановление направления |
 
-The closure-based variant is strongest when:
-- **Setup and teardown are paired** and forgetting either is a bug
-- **The resource shouldn't outlive the operation** — the borrow checker enforces
-  this naturally
-- **Multiple configurations exist** (`with_pin_input` vs `with_pin_output`) — each
-  `with_*` method encapsulates a different setup without exposing the configuration
-  to the caller
+Вариант на основе замыканий наиболее эффективен, когда:
+- **настройка и откат идут парами**, и пропуск любого из них является ошибкой
+- **ресурс не должен жить дольше операции**: заимствующая проверка обеспечивает это естественным образом
+- **существует несколько конфигураций** (`with_pin_input` и `with_pin_output`): каждый метод `with_*` инкапсулирует свою настройку и не раскрывает конфигурацию вызывающей стороне
 
-> **`with` vs RAII (Drop):** Both guarantee cleanup. Use RAII / `Drop` when the
-> caller needs to hold the resource across multiple statements and function calls.
-> Use `with` when the operation is **bracketed** — one setup, one block of work,
-> one teardown — and you don't want the caller to be able to break the bracket.
+> **`with` и RAII (Drop):** оба варианта гарантируют очистку. Используйте RAII / `Drop`, когда вызывающему нужно удерживать ресурс через несколько инструкций и вызовов функций. Используйте `with`, когда операция **заключена в скобки**: одна настройка, один блок работы, один откат, и вы не хотите, чтобы вызывающий мог нарушить эти скобки.
 
-> **FnMut vs Fn in API design**: Use `FnMut` as the default bound — it's
-> the most flexible (callers can pass `Fn` or `FnMut` closures). Only
-> require `Fn` if you need to call the closure concurrently (e.g., from
-> multiple threads). Only require `FnOnce` if you call it exactly once.
+> **FnMut или Fn в дизайне API**: используйте `FnMut` как границу по умолчанию. Это самый гибкий вариант: вызывающие могут передавать и `Fn`, и `FnMut`. Требуйте `Fn`, только если нужно вызывать замыкание одновременно (например, из нескольких потоков). Требуйте `FnOnce`, только если вызываете его ровно один раз.
 
-> **Key Takeaways — Closures**
-> - `Fn` borrows, `FnMut` borrows mutably, `FnOnce` consumes — accept the weakest bound your API needs
-> - `impl Fn` in parameters, `Box<dyn Fn>` for storage, `impl Fn` in return (or `Box<dyn Fn>` if dynamic)
-> - Combinator chains (`map`, `filter`, `and_then`) compose cleanly and inline to tight loops
-> - The `with` pattern (bracketed access via closure) guarantees setup/teardown and prevents resource escape — use it when the caller shouldn't manage configuration lifecycle
+> **Ключевые выводы: замыкания**
+> - `Fn` заимствует, `FnMut` заимствует изменяемо, `FnOnce` потребляет: принимайте самую слабую границу, которая нужна вашему API
+> - `impl Fn` в параметрах, `Box<dyn Fn>` для хранения, `impl Fn` в возвращаемом значении (или `Box<dyn Fn>`, если нужна динамика)
+> - Цепочки комбинаторов (`map`, `filter`, `and_then`) чисто компонуются и инлайнятся в плотные циклы
+> - Паттерн `with` (доступ в скобках через замыкание) гарантирует настройку и откат и не даёт ресурсу «утечь»: используйте его, когда вызывающий не должен управлять жизненным циклом конфигурации
 
-> **See also:** [Ch 2 — Traits In Depth](ch02-traits-in-depth.md) for how `Fn`/`FnMut`/`FnOnce` relate to trait objects. [Ch 8 — Functional vs. Imperative](ch08-functional-vs-imperative-when-elegance-wins.md) for when to choose combinators over loops. [Ch 15 — API Design](ch15-crate-architecture-and-api-design.md) for ergonomic parameter patterns.
+> **См. также:** [гл. 2 — Трейты в деталях](ch02-traits-in-depth.md) о том, как `Fn`/`FnMut`/`FnOnce` связаны с трейт-объектами. [гл. 8 — Функциональный и императивный стили](ch08-functional-vs-imperative-when-elegance-wins.md) о том, когда выбирать комбинаторы вместо циклов. [гл. 15 — Дизайн API](ch15-crate-architecture-and-api-design.md) о паттернах эргономичных параметров.
 
 ```mermaid
 graph TD
-    FnOnce["FnOnce<br>(can call once)"]
-    FnMut["FnMut<br>(can call many times,<br>may mutate captures)"]
-    Fn["Fn<br>(can call many times,<br>immutable captures)"]
+    FnOnce["FnOnce<br>(можно вызвать один раз)"]
+    FnMut["FnMut<br>(можно вызывать многократно,<br>может изменять захваченное)"]
+    Fn["Fn<br>(можно вызывать многократно,<br>захваченное неизменяемо)"]
 
-    Fn -->|"implements"| FnMut
-    FnMut -->|"implements"| FnOnce
+    Fn -->|"реализует"| FnMut
+    FnMut -->|"реализует"| FnOnce
 
     style Fn fill:#d4efdf,stroke:#27ae60,color:#000
     style FnMut fill:#fef9e7,stroke:#f1c40f,color:#000
     style FnOnce fill:#fadbd8,stroke:#e74c3c,color:#000
 ```
 
-> Every `Fn` is also `FnMut`, and every `FnMut` is also `FnOnce`. Accept `FnMut` by default — it’s the most flexible bound for callers.
+> Каждый `Fn` также является `FnMut`, а каждый `FnMut` также является `FnOnce`. По умолчанию принимайте `FnMut`: это самая гибкая граница для вызывающих.
 
 ---
 
-### Exercise: Higher-Order Combinator Pipeline ★★ (~25 min)
+### Упражнение: конвейер комбинаторов высшего порядка ★★ (~25 минут)
 
-Create a `Pipeline` struct that chains transformations. It should support `.pipe(f)` to add a transformation and `.execute(input)` to run the full chain.
+Создайте структуру `Pipeline`, которая связывает преобразования в цепочку. Она должна поддерживать `.pipe(f)` для добавления преобразования и `.execute(input)` для выполнения всей цепочки.
 
 <details>
-<summary>🔑 Solution</summary>
+<summary>🔑 Решение</summary>
 
 ```rust
 struct Pipeline<T> {
@@ -416,4 +398,3 @@ fn main() {
 </details>
 
 ***
-

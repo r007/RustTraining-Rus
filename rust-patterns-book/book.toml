@@ -1,7 +1,7 @@
 [book]
-title = "Rust Patterns & Engineering How-Tos"
+title = "Паттерны Rust и практические руководства по инженерии"
 authors = ["Rust Training Team"]
-language = "en"
+language = "ru"
 src = "src"
 
 [build]

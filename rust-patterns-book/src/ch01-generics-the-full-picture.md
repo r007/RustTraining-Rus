@@ -1,14 +1,14 @@
-# 1. Generics — The Full Picture 🟢
+# 1. Обобщённые типы — полная картина 🟢
 
-> **What you'll learn:**
-> - How monomorphization gives zero-cost generics — and when it causes code bloat
-> - The decision framework: generics vs enums vs trait objects
-> - Const generics for compile-time array sizes and `const fn` for compile-time evaluation
-> - When to trade static dispatch for dynamic dispatch on cold paths
+> **Что вы узнаете:**
+> - Как мономорфизация даёт обобщения без накладных расходов и когда она приводит к раздуванию кода
+> - Схему выбора: обобщения, перечисления или трейт-объекты
+> - Const-обобщения для размеров массивов на этапе компиляции и `const fn` для вычислений на этапе компиляции
+> - Когда на холодных путях стоит заменить статическую диспетчеризацию динамической
 
-## Monomorphization and Zero Cost
+## Мономорфизация и нулевые затраты
 
-Generics in Rust are **monomorphized** — the compiler generates a specialized copy of each generic function for every concrete type it's used with. This is the opposite of Java/C# where generics are erased at runtime.
+Обобщения в Rust **мономорфизируются**: компилятор генерирует специализированную копию каждой обобщённой функции для каждого конкретного типа, с которым она используется. Это противоположность Java и C#, где обобщения стираются во время выполнения.
 
 ```rust
 fn max_of<T: PartialOrd>(a: T, b: T) -> T {
@@ -16,99 +16,94 @@ fn max_of<T: PartialOrd>(a: T, b: T) -> T {
 }
 
 fn main() {
-    max_of(3_i32, 5_i32);     // Compiler generates max_of_i32
-    max_of(2.0_f64, 7.0_f64); // Compiler generates max_of_f64
-    max_of("a", "z");         // Compiler generates max_of_str
+    max_of(3_i32, 5_i32);     // Компилятор сгенерирует max_of_i32
+    max_of(2.0_f64, 7.0_f64); // Компилятор сгенерирует max_of_f64
+    max_of("a", "z");         // Компилятор сгенерирует max_of_str
 }
 ```
 
-**What the compiler actually produces** (conceptually):
+**Что на самом деле создаёт компилятор** (концептуально):
 
 ```rust
-// Three separate functions — no runtime dispatch, no vtable:
+// Три отдельные функции — никакой динамической диспетчеризации и никакой vtable:
 fn max_of_i32(a: i32, b: i32) -> i32 { if a >= b { a } else { b } }
 fn max_of_f64(a: f64, b: f64) -> f64 { if a >= b { a } else { b } }
 fn max_of_str<'a>(a: &'a str, b: &'a str) -> &'a str { if a >= b { a } else { b } }
 ```
 
-> **Why does `max_of_str` need `<'a>` but `max_of_i32` doesn't?**  `i32` and `f64`
-> are `Copy` types — the function returns an owned value. But `&str` is a reference,
-> so the compiler must know the returned reference's lifetime. The `<'a>` annotation
-> says "the returned `&str` lives at least as long as both inputs."
+> **Почему `max_of_str` требует `<'a>`, а `max_of_i32` — нет?** `i32` и `f64` — типы с `Copy`, функция возвращает копию значения, которая не зависит ни от каких заимствований. А `&str` — это ссылка, поэтому компилятор должен знать время жизни возвращаемой ссылки. Аннотация `<'a>` означает: «возвращаемый `&str` живёт не меньше, чем оба входных параметра».
 
-**Advantages**: Zero runtime cost — identical to hand-written specialized code. The optimizer can inline, vectorize, and specialize each copy independently.
+**Преимущества**: нулевые затраты во время выполнения — код совпадает с вручную написанной специализированной версией. Оптимизатор может независимо инлайнить, векторизовать и специализировать каждую копию.
 
-**Comparison with C++**: Rust generics work like C++ templates but with one crucial difference — **bounds checking happens at definition, not instantiation**. In C++, a template compiles only when used with a specific type, leading to cryptic error messages deep in library code. In Rust, `T: PartialOrd` is checked when you define the function, so errors are caught early and messages are clear.
+**Сравнение с C++**: обобщения в Rust работают как шаблоны C++, но есть одно принципиальное отличие — **проверка ограничений происходит в момент определения, а не инстанцирования**. В C++ шаблон компилируется только при использовании с конкретным типом, поэтому ошибки всплывают глубоко в библиотечном коде и выглядят запутанно. В Rust `T: PartialOrd` проверяется при определении функции, поэтому ошибки находятся раньше, а сообщения понятны.
 
 ```rust
-// Rust: error at definition site — "T doesn't implement Display"
+// Rust: ошибка уже в месте определения — "T doesn't implement Display"
 fn broken<T>(val: T) {
     println!("{val}"); // ❌ Error: T doesn't implement Display
 }
 
-// Fix: add the bound
+// Исправление: добавляем ограничение
 fn fixed<T: std::fmt::Display>(val: T) {
     println!("{val}"); // ✅
 }
 ```
 
-### When Generics Hurt: Code Bloat
+### Когда обобщения вредят: раздувание кода
 
-Monomorphization has a cost — binary size. Each unique instantiation duplicates the function body:
+У мономорфизации есть цена — размер бинарного файла. Каждая уникальная инстанциация дублирует тело функции:
 
 ```rust
-// This innocent function...
+// Эта невинная функция...
 fn serialize<T: serde::Serialize>(value: &T) -> Vec<u8> {
     serde_json::to_vec(value).unwrap()
 }
 
-// ...used with 50 different types → 50 copies in the binary.
+// ...используемая с 50 разными типами → 50 копий в бинарном файле.
 ```
 
-**Mitigation strategies**:
+**Стратегии смягчения**:
 
 ```rust
-// 1. Extract the non-generic core ("outline" pattern)
+// 1. Вынести необобщённое ядро (паттерн «outline»)
 fn serialize<T: serde::Serialize>(value: &T) -> Result<Vec<u8>, serde_json::Error> {
-    // Generic part: only the serialization call
+    // Обобщённая часть: только вызов сериализации
     let json_value = serde_json::to_value(value)?;
-    // Non-generic part: extracted into a separate function
+    // Необобщённая часть: вынесена в отдельную функцию
     serialize_value(json_value)
 }
 
 fn serialize_value(value: serde_json::Value) -> Result<Vec<u8>, serde_json::Error> {
-    // This function exists only ONCE in the binary
+    // Эта функция существует в бинарном файле ТОЛЬКО ОДИН раз
     serde_json::to_vec(&value)
 }
 
-// 2. Use trait objects (dynamic dispatch) when inlining isn't critical
+// 2. Использовать трейт-объекты (динамическая диспетчеризация), когда инлайнинг не критичен
 fn log_item(item: &dyn std::fmt::Display) {
-    // One copy — uses vtable for dispatch
+    // Одна копия — диспетчеризация через vtable
     println!("[LOG] {item}");
 }
 ```
 
-> **Rule of thumb**: Use generics for hot paths where inlining matters.
-> Use `dyn Trait` for cold paths (error handling, logging, configuration)
-> where a vtable call is negligible.
+> **Практическое правило**: используйте обобщения на горячих путях, где важен инлайнинг. Используйте `dyn Trait` на холодных путях (обработка ошибок, логирование, конфигурация), где вызов через vtable несущественен.
 
-### Generics vs Enums vs Trait Objects — Decision Guide
+### Обобщения, перечисления и трейт-объекты: руководство по выбору
 
-Three ways to handle "different types, same interface" in Rust:
+В Rust есть три способа реализовать «разные типы с одинаковым интерфейсом»:
 
-| Approach | Dispatch | Known at | Extensible? | Overhead |
-|----------|----------|----------|-------------|----------|
-| **Generics** (`impl Trait` / `<T: Trait>`) | Static (monomorphized) | Compile time | ✅ (open set) | Zero — inlined |
-| **Enum** | Match arm | Compile time | ❌ (closed set) | Zero — no vtable |
-| **Trait object** (`dyn Trait`) | Dynamic (vtable) | Runtime | ✅ (open set) | Vtable pointer + indirect call |
+| Подход | Диспетчеризация | Известен на этапе | Расширяемый? | Накладные расходы |
+|--------|-----------------|-------------------|--------------|-------------------|
+| **Обобщения** (`impl Trait` / `<T: Trait>`) | Статическая (мономорфизация) | Компиляции | ✅ (открытое множество) | Нулевые — инлайнятся |
+| **Перечисление** | Ветка `match` | Компиляции | ❌ (закрытое множество) | Нулевые — без vtable |
+| **Трейт-объект** (`dyn Trait`) | Динамическая (vtable) | Выполнения | ✅ (открытое множество) | Указатель на vtable и косвенный вызов |
 
 ```rust
-// --- GENERICS: Open set, zero cost, compile-time ---
+// --- ОБОБЩЕНИЯ: открытое множество, нулевые затраты, решается на этапе компиляции ---
 fn process<H: Handler>(handler: H, request: Request) -> Response {
-    handler.handle(request) // Monomorphized — one copy per H
+    handler.handle(request) // Мономорфизировано — по одной копии на каждый H
 }
 
-// --- ENUM: Closed set, zero cost, exhaustive matching ---
+// --- ПЕРЕЧИСЛЕНИЕ: закрытое множество, нулевые затраты, исчерпывающее сопоставление ---
 enum Shape {
     Circle(f64),
     Rect(f64, f64),
@@ -127,33 +122,33 @@ impl Shape {
         }
     }
 }
-// Adding a new variant forces updating ALL match arms — the compiler
-// enforces exhaustiveness. Great for "I control all the variants."
+// При добавлении нового варианта придётся обновить ВСЕ ветки match: компилятор
+// требует исчерпывающего сопоставления. Это удобно, когда вы контролируете все варианты.
 
-// --- TRAIT OBJECT: Open set, runtime cost, extensible ---
+// --- ТРЕЙТ-ОБЪЕКТ: открытое множество, затраты во время выполнения, расширяемый ---
 fn log_all(items: &[Box<dyn std::fmt::Display>]) {
     for item in items {
-        println!("{item}"); // vtable dispatch
+        println!("{item}"); // диспетчеризация через vtable
     }
 }
 ```
 
-**Decision flowchart**:
+**Схема выбора**:
 
 ```mermaid
 flowchart TD
-    A["Do you know ALL<br>possible types at<br>compile time?"]
-    A -->|"Yes, small<br>closed set"| B["Enum"]
-    A -->|"Yes, but set<br>is open"| C["Generics<br>(monomorphized)"]
-    A -->|"No — types<br>determined at runtime"| D["dyn Trait"]
+    A["Знаете ли вы ВСЕ<br>возможные типы на<br>этапе компиляции?"]
+    A -->|"Да, небольшое<br>закрытое множество"| B["Перечисление"]
+    A -->|"Да, но множество<br>открытое"| C["Обобщения<br>(мономорфизированные)"]
+    A -->|"Нет — типы определяются<br>во время выполнения"| D["dyn Trait"]
 
-    C --> E{"Hot path?<br>(millions of calls)"}
-    E -->|Yes| F["Generics<br>(inlineable)"]
-    E -->|No| G["dyn Trait<br>is fine"]
+    C --> E{"Горячий путь?<br>(миллионы вызовов)"}
+    E -->|Да| F["Обобщения<br>(инлайнируемые)"]
+    E -->|Нет| G["dyn Trait<br>подойдёт"]
 
-    D --> H{"Need mixed types<br>in one collection?"}
-    H -->|Yes| I["Vec&lt;Box&lt;dyn Trait&gt;&gt;"]
-    H -->|No| C
+    D --> H{"Нужны разные типы<br>в одной коллекции?"}
+    H -->|Да| I["Vec&lt;Box&lt;dyn Trait&gt;&gt;"]
+    H -->|Нет| C
 
     style A fill:#e8f4f8,stroke:#2980b9,color:#000
     style B fill:#d4efdf,stroke:#27ae60,color:#000
@@ -166,12 +161,12 @@ flowchart TD
     style H fill:#fef9e7,stroke:#f1c40f,color:#000
 ```
 
-### Const Generics
+### Const-обобщения
 
-Since Rust 1.51, you can parameterize types and functions over *constant values*, not just types:
+Начиная с Rust 1.51, типы и функции можно параметризовать *константными значениями*, а не только типами:
 
 ```rust
-// Array wrapper parameterized over size
+// Обёртка над массивом, параметризованная размерами
 struct Matrix<const ROWS: usize, const COLS: usize> {
     data: [[f64; COLS]; ROWS],
 }
@@ -192,10 +187,10 @@ impl<const ROWS: usize, const COLS: usize> Matrix<ROWS, COLS> {
     }
 }
 
-// The compiler enforces dimensional correctness:
+// Компилятор следит за согласованностью размерностей:
 fn multiply<const M: usize, const N: usize, const P: usize>(
     a: &Matrix<M, N>,
-    b: &Matrix<N, P>, // N must match!
+    b: &Matrix<N, P>, // N должно совпадать!
 ) -> Matrix<M, P> {
     let mut result = Matrix::<M, P>::new();
     for i in 0..M {
@@ -208,7 +203,7 @@ fn multiply<const M: usize, const N: usize, const P: usize>(
     result
 }
 
-// Usage:
+// Использование:
 let a = Matrix::<2, 3>::new(); // 2×3
 let b = Matrix::<3, 4>::new(); // 3×4
 let c = multiply(&a, &b);      // 2×4 ✅
@@ -217,24 +212,22 @@ let c = multiply(&a, &b);      // 2×4 ✅
 // multiply(&a, &d); // ❌ Compile error: expected Matrix<3, _>, got Matrix<5, 5>
 ```
 
-> **C++ comparison**: This is similar to `template<int N>` in C++, but Rust
-> const generics are type-checked eagerly and don't suffer from SFINAE complexity.
+> **Сравнение с C++**: это похоже на `template<int N>` в C++, но const-обобщения в Rust проверяются сразу и не страдают от сложности SFINAE.
 
-### Const Functions (const fn)
+### Константные функции (const fn)
 
-`const fn` marks a function as evaluable at compile time — Rust's equivalent
-of C++ `constexpr`. The result can be used in `const` and `static` contexts:
+`const fn` помечает функцию как вычислимую на этапе компиляции. Это аналог `constexpr` в C++. Результат можно использовать в контекстах `const` и `static`:
 
 ```rust
-// Basic const fn — evaluated at compile time when used in const context
+// Простая const fn — вычисляется на этапе компиляции в константном контексте
 const fn celsius_to_fahrenheit(c: f64) -> f64 {
     c * 9.0 / 5.0 + 32.0
 }
 
-const BOILING_F: f64 = celsius_to_fahrenheit(100.0); // Computed at compile time
+const BOILING_F: f64 = celsius_to_fahrenheit(100.0); // Вычисляется на этапе компиляции
 const FREEZING_F: f64 = celsius_to_fahrenheit(0.0);  // 32.0
 
-// Const constructors — create statics without lazy_static!
+// Константные конструкторы — создаём статические значения без lazy_static!
 struct BitMask(u32);
 
 impl BitMask {
@@ -251,83 +244,76 @@ impl BitMask {
     }
 }
 
-// Static lookup table — no runtime cost, no lazy initialization
+// Статическая таблица поиска — без затрат во время выполнения и без ленивой инициализации
 const GPIO_INPUT:  BitMask = BitMask::new(0);
 const GPIO_OUTPUT: BitMask = BitMask::new(1);
 const GPIO_IRQ:    BitMask = BitMask::new(2);
 const GPIO_IO:     BitMask = GPIO_INPUT.or(GPIO_OUTPUT);
 
-// Register maps as const arrays:
+// Таблицы регистров как константные массивы:
 const SENSOR_THRESHOLDS: [u16; 4] = {
     let mut table = [0u16; 4];
-    table[0] = 50;   // Warning
-    table[1] = 70;   // High
-    table[2] = 85;   // Critical
-    table[3] = 100;  // Shutdown
+    table[0] = 50;   // Предупреждение
+    table[1] = 70;   // Высокая температура
+    table[2] = 85;   // Критическая
+    table[3] = 100;  // Аварийное отключение
     table
 };
-// The entire table exists in the binary — no heap, no runtime init.
+// Вся таблица находится в бинарном файле: без кучи и без инициализации во время выполнения.
 ```
 
-**What you CAN do in `const fn`** (as of Rust 1.79+):
-- Arithmetic, bit operations, comparisons
-- `if`/`else`, `match`, `loop`, `while` (control flow)
-- Creating and modifying local variables (`let mut`)
-- Calling other `const fn`s
-- References (`&`, `&mut` — within the const context)
-- `panic!()` (becomes a compile error if reached at compile time)
+**Что МОЖНО делать в `const fn`** (начиная с Rust 1.79):
+- арифметика, битовые операции, сравнения
+- `if`/`else`, `match`, `loop`, `while` (управление потоком)
+- создание и изменение локальных переменных (`let mut`)
+- вызов других `const fn`
+- ссылки (`&`, `&mut` в пределах константного контекста)
+- `panic!()` (становится ошибкой компиляции, если достигается на этапе компиляции)
 
-**What you CANNOT do** (yet):
-- Heap allocation (`Box`, `Vec`, `String`)
-- Trait method calls (only inherent methods)
-- Floating-point in some contexts (stabilized for basic ops)
-- I/O or side effects
+**Чего НЕЛЬЗЯ** (пока):
+- выделение памяти в куче (`Box`, `Vec`, `String`)
+- вызов методов трейтов (только собственные методы типа)
+- операции с плавающей точкой в некоторых контекстах (стабилизированы только базовые операции)
+- ввод-вывод и побочные эффекты
 
 ```rust
-// const fn with panic — becomes a compile-time error:
+// const fn с panic — становится ошибкой компиляции:
 const fn checked_div(a: u32, b: u32) -> u32 {
     if b == 0 {
-        panic!("division by zero"); // Compile error if b is 0 at const time
+        panic!("деление на ноль"); // Ошибка компиляции, если b равно 0 на этапе const
     }
     a / b
 }
 
 const RESULT: u32 = checked_div(100, 4);  // ✅ 25
-// const BAD: u32 = checked_div(100, 0);  // ❌ Compile error: "division by zero"
+// const BAD: u32 = checked_div(100, 0);  // ❌ Ошибка компиляции: паника «деление на ноль»
 ```
 
-> **C++ comparison**: `const fn` is Rust's `constexpr`. The key difference:
-> Rust's version is opt-in and the compiler rigorously verifies that only
-> const-compatible operations are used. In C++, `constexpr` functions can
-> silently fall back to runtime evaluation — in Rust, a `const` context
-> *requires* compile-time evaluation or it's a hard error.
+> **Сравнение с C++**: `const fn` — это аналог `constexpr` в Rust. Ключевое отличие: в Rust это явный выбор, и компилятор строго проверяет, что используются только операции, совместимые с const. Функции `constexpr` в C++ могут молча перейти к вычислению во время выполнения. В Rust контекст `const` *требует* вычисления на этапе компиляции, иначе это жёсткая ошибка.
 
-> **Practical advice**: Make constructors and simple utility functions `const fn`
-> whenever possible — it costs nothing and enables callers to use them in const
-> contexts. For hardware diagnostic code, `const fn` is ideal for register
-> definitions, bitmask construction, and threshold tables.
+> **Практический совет**: делайте конструкторы и простые служебные функции `const fn`, когда это возможно. Это ничего не стоит, а вызывающий код сможет использовать их в константных контекстах. Для кода диагностики оборудования `const fn` идеально подходит для описания регистров, построения битовых масок и таблиц пороговых значений.
 
-> **Key Takeaways — Generics**
-> - Monomorphization gives zero-cost abstractions but can cause code bloat — use `dyn Trait` for cold paths
-> - Const generics (`[T; N]`) replace C++ template tricks with compile-time–checked array sizes
-> - `const fn` eliminates `lazy_static!` for compile-time–computable values
+> **Ключевые выводы — обобщения**
+> - Мономорфизация даёт абстракции без накладных расходов, но может раздувать код — на холодных путях используйте `dyn Trait`
+> - Const-обобщения (`[T; N]`) заменяют шаблонные трюки C++ размерами массивов, проверяемыми на этапе компиляции
+> - `const fn` избавляет от `lazy_static!` для значений, которые можно вычислить на этапе компиляции
 
-> **See also:** [Ch 2 — Traits In Depth](ch02-traits-in-depth.md) for trait bounds, associated types, and trait objects. [Ch 4 — PhantomData](ch04-phantomdata-types-that-carry-no-data.md) for zero-sized generic markers.
+> **См. также:** [гл. 2 — Трейты в деталях](ch02-traits-in-depth.md) — ограничения трейтов, ассоциированные типы и трейт-объекты. [гл. 4 — PhantomData](ch04-phantomdata-types-that-carry-no-data.md) — маркеры-обобщения нулевого размера.
 
 ---
 
-### Exercise: Generic Cache with Eviction ★★ (~30 min)
+### Упражнение: обобщённый кэш с вытеснением ★★ (~30 минут)
 
-Build a generic `Cache<K, V>` struct that stores key-value pairs with a configurable maximum capacity. When full, the oldest entry is evicted (FIFO). Requirements:
+Реализуйте обобщённую структуру `Cache<K, V>`, которая хранит пары «ключ — значение» с настраиваемой максимальной ёмкостью. Когда кэш заполнен, вытесняется самая старая запись (FIFO). Требования:
 
 - `fn new(capacity: usize) -> Self`
-- `fn insert(&mut self, key: K, value: V)` — evicts the oldest if at capacity
+- `fn insert(&mut self, key: K, value: V)` — вытесняет самую старую запись, если достигнута ёмкость
 - `fn get(&self, key: &K) -> Option<&V>`
 - `fn len(&self) -> usize`
-- Constrain `K: Eq + Hash + Clone`
+- Ограничьте `K: Eq + Hash + Clone`
 
 <details>
-<summary>🔑 Solution</summary>
+<summary>🔑 Решение</summary>
 
 ```rust
 use std::collections::{HashMap, VecDeque};
@@ -378,14 +364,13 @@ fn main() {
     cache.insert("c", 3);
     assert_eq!(cache.len(), 3);
 
-    cache.insert("d", 4); // Evicts "a"
+    cache.insert("d", 4); // Вытесняет "a"
     assert_eq!(cache.get(&"a"), None);
     assert_eq!(cache.get(&"d"), Some(&4));
-    println!("Cache works! len = {}", cache.len());
+    println!("Кэш работает! len = {}", cache.len());
 }
 ```
 
 </details>
 
 ***
-

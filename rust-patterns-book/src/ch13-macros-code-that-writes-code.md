@@ -1,19 +1,19 @@
-# 12. Macros — Code That Writes Code 🟡
+# 13. Макросы: код, который пишет код 🟡
 
-> **What you'll learn:**
-> - Declarative macros (`macro_rules!`) with pattern matching and repetition
-> - When macros are the right tool vs generics/traits
-> - Procedural macros: derive, attribute, and function-like
-> - Writing a custom derive macro with `syn` and `quote`
+> **Что вы узнаете:**
+> - Декларативные макросы (`macro_rules!`) с сопоставлением с образцом и повторениями
+> - Когда макросы подходят лучше обобщений и трейтов
+> - Процедурные макросы: derive-, атрибутные и функциональные
+> - Написание собственного derive-макроса с `syn` и `quote`
 
-## Declarative Macros (macro_rules!)
+## Декларативные макросы (macro_rules!)
 
-Macros match patterns on syntax and expand to code at compile time:
+Макросы сопоставляют образцы с синтаксисом и раскрываются в код на этапе компиляции:
 
 ```rust
-// A simple macro that creates a HashMap
+// Простой макрос, который создаёт HashMap
 macro_rules! hashmap {
-    // Match: key => value pairs separated by commas
+    // Сопоставление: пары «ключ => значение», разделённые запятыми
     ( $( $key:expr => $value:expr ),* $(,)? ) => {
         {
             let mut map = std::collections::HashMap::new();
@@ -28,7 +28,7 @@ let scores = hashmap! {
     "Bob" => 87,
     "Carol" => 92,
 };
-// Expands to:
+// Раскрывается в:
 // let mut map = HashMap::new();
 // map.insert("Alice", 95);
 // map.insert("Bob", 87);
@@ -36,22 +36,22 @@ let scores = hashmap! {
 // map
 ```
 
-**Macro fragment types**:
+**Типы фрагментов в макросах**:
 
-| Fragment | Matches | Example |
-|----------|---------|---------|
-| `$x:expr` | Any expression | `42`, `a + b`, `foo()` |
-| `$x:ty` | A type | `i32`, `Vec<String>` |
-| `$x:ident` | An identifier | `my_var`, `Config` |
-| `$x:pat` | A pattern | `Some(x)`, `_` |
-| `$x:stmt` | A statement | `let x = 5;` |
-| `$x:tt` | A single token tree | Anything (most flexible) |
-| `$x:literal` | A literal value | `42`, `"hello"`, `true` |
+| Фрагмент | Что сопоставляет | Пример |
+|----------|------------------|--------|
+| `$x:expr` | Любое выражение | `42`, `a + b`, `foo()` |
+| `$x:ty` | Тип | `i32`, `Vec<String>` |
+| `$x:ident` | Идентификатор | `my_var`, `Config` |
+| `$x:pat` | Образец | `Some(x)`, `_` |
+| `$x:stmt` | Инструкцию | `let x = 5;` |
+| `$x:tt` | Одно дерево токенов | Что угодно (самый гибкий) |
+| `$x:literal` | Литерал | `42`, `"hello"`, `true` |
 
-**Repetition**: `$( ... ),*` means "zero or more, comma-separated"
+**Повторения**: `$( ... ),*` означает «ноль или больше, разделённых запятыми»
 
 ```rust
-// Generate test functions automatically
+// Автоматически генерируем тестовые функции
 macro_rules! test_cases {
     ( $( $name:ident: $input:expr => $expected:expr ),* $(,)? ) => {
         $(
@@ -68,74 +68,74 @@ test_cases! {
     test_hello: "hello" => "HELLO",
     test_trim: "  spaces  " => "SPACES",
 }
-// Generates three separate #[test] functions
+// Генерирует три отдельные функции #[test]
 ```
 
-### When (Not) to Use Macros
+### Когда (не) стоит использовать макросы
 
-**Use macros when**:
-- Reducing boilerplate that traits/generics can't handle (variadic arguments, DRY test generation)
-- Creating DSLs (`html!`, `sql!`, `vec!`)
-- Conditional code generation (`cfg!`, `compile_error!`)
+**Используйте макросы, когда**:
+- Нужно убрать шаблонный код, с которым не справляются трейты и обобщения (вариативные аргументы, генерация тестов без повторов, DRY)
+- Создаёте предметно-ориентированный язык (DSL), например `html!`, `sql!`, `vec!`
+- Нужна условная генерация кода (`cfg!`, `compile_error!`)
 
-**Don't use macros when**:
-- A function or generic would work (macros are harder to debug, autocomplete doesn't help)
-- You need type checking inside the macro (macros operate on tokens, not types)
-- The pattern is used once or twice (not worth the abstraction cost)
+**Не используйте макросы, когда**:
+- Подойдёт функция или обобщение (макросы труднее отлаживать, и автодополнение в них не помогает)
+- Внутри макроса нужна проверка типов (макросы работают с токенами, а не с типами)
+- Шаблон используется один-два раза (абстракция не стоит того)
 
 ```rust
-// ❌ Unnecessary macro — a function works fine:
+// ❌ Лишний макрос: функция справляется
 macro_rules! double {
     ($x:expr) => { $x * 2 };
 }
 
-// ✅ Just use a function:
+// ✅ Просто используйте функцию:
 fn double(x: i32) -> i32 { x * 2 }
 
-// ✅ Good macro use — variadic, can't be a function:
+// ✅ Хорошее применение макроса: вариативные аргументы, не может быть функцией:
 macro_rules! println {
-    ($($arg:tt)*) => { /* format string + args */ };
+    ($($arg:tt)*) => { /* строка формата + аргументы */ };
 }
 ```
 
-### Procedural Macros Overview
+### Обзор процедурных макросов
 
-Procedural macros are Rust functions that transform token streams. They require a separate crate with `proc-macro = true`:
+Процедурные макросы это функции на Rust, которые преобразуют потоки токенов. Они требуют отдельного крейта с `proc-macro = true`:
 
 ```rust
-// Three types of proc macros:
+// Три вида процедурных макросов:
 
-// 1. Derive macros — #[derive(MyTrait)]
-// Generate trait implementations from struct definitions
+// 1. Derive-макросы — #[derive(MyTrait)]
+// Генерируют реализации трейтов по определениям структур
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct Config {
     name: String,
     port: u16,
 }
 
-// 2. Attribute macros — #[my_attribute]
-// Transform the annotated item
+// 2. Атрибутные макросы — #[my_attribute]
+// Преобразуют помеченный элемент
 #[route(GET, "/api/users")]
 async fn list_users() -> Json<Vec<User>> { /* ... */ }
 
-// 3. Function-like macros — my_macro!(...)
-// Custom syntax
+// 3. Функциональные макросы — my_macro!(...)
+// Пользовательский синтаксис
 let query = sql!(SELECT * FROM users WHERE id = ?);
 ```
 
-### Derive Macros in Practice
+### Derive-макросы на практике
 
-The most common proc macro type. Here's how `#[derive(Debug)]` works conceptually:
+Это самый распространённый вид процедурных макросов. Вот как концептуально работает `#[derive(Debug)]`:
 
 ```rust
-// Input (your struct):
+// Вход (ваша структура):
 #[derive(Debug)]
 struct Point {
     x: f64,
     y: f64,
 }
 
-// The derive macro generates:
+// Derive-макрос генерирует:
 impl std::fmt::Debug for Point {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Point")
@@ -146,47 +146,43 @@ impl std::fmt::Debug for Point {
 }
 ```
 
-**Commonly used derive macros**:
+**Часто используемые derive-макросы**:
 
-| Derive | Crate | What It Generates |
-|--------|-------|-------------------|
-| `Debug` | std | `fmt::Debug` impl (debug printing) |
-| `Clone`, `Copy` | std | Value duplication |
-| `PartialEq`, `Eq` | std | Equality comparison |
-| `Hash` | std | Hashing for HashMap keys |
-| `Serialize`, `Deserialize` | serde | JSON/YAML/etc. encoding |
-| `Error` | thiserror | `std::error::Error` + `Display` |
-| `Parser` | `clap` | CLI argument parsing |
-| `Builder` | derive_builder | Builder pattern |
+| Derive | Крейт | Что генерирует |
+|--------|-------|----------------|
+| `Debug` | std | Реализацию `fmt::Debug` (отладочный вывод) |
+| `Clone`, `Copy` | std | Дублирование значений |
+| `PartialEq`, `Eq` | std | Сравнение на равенство |
+| `Hash` | std | Хеширование для ключей HashMap |
+| `Serialize`, `Deserialize` | serde | Кодирование в JSON, YAML и др. |
+| `Error` | thiserror | `std::error::Error` и `Display` |
+| `Parser` | `clap` | Разбор аргументов командной строки |
+| `Builder` | derive_builder | Паттерн builder |
 
-> **Practical advice**: Use derive macros liberally — they eliminate error-prone
-> boilerplate. Writing your own proc macros is an advanced topic; use existing
-> ones (`serde`, `thiserror`, `clap`) before building custom ones.
+> **Практический совет**: используйте derive-макросы без колебаний: они убирают подверженный ошибкам шаблонный код. Написание собственных процедурных макросов относится к продвинутым темам, поэтому сначала используйте готовые (`serde`, `thiserror`, `clap`).
 
-### Macro Hygiene and `$crate`
+### Гигиена макросов и `$crate`
 
-**Hygiene** means that identifiers created inside a macro don't collide with
-identifiers in the caller's scope. Rust's `macro_rules!` is *partially* hygienic:
+**Гигиена** означает, что идентификаторы, созданные внутри макроса, не конфликтуют с идентификаторами в области видимости вызывающего кода. `macro_rules!` в Rust *частично* гигиеничен:
 
 ```rust
 macro_rules! make_var {
     () => {
-        let x = 42; // This 'x' is in the MACRO's scope
+        let x = 42; // Этот 'x' находится в области видимости МАКРОСА
     };
 }
 
 fn main() {
     let x = 10;
-    make_var!();   // Creates a different 'x' (hygienic)
-    println!("{x}"); // Prints 10, not 42 — macro's x doesn't leak
+    make_var!();   // Создаёт другой 'x' (гигиенично)
+    println!("{x}"); // Выведет 10, а не 42: x из макроса не просачивается наружу
 }
 ```
 
-**`$crate`**: When writing macros in a library, use `$crate` to refer to
-your own crate — it resolves correctly regardless of how users import your crate:
+**`$crate`**: при написании макросов в библиотеке используйте `$crate`, чтобы ссылаться на собственный крейт. Он корректно разрешается независимо от того, как пользователи импортируют ваш крейт:
 
 ```rust
-// In my_diagnostics crate:
+// В крейте my_diagnostics:
 
 pub fn log_result(msg: &str) {
     println!("[diag] {msg}");
@@ -195,32 +191,30 @@ pub fn log_result(msg: &str) {
 #[macro_export]
 macro_rules! diag_log {
     ($($arg:tt)*) => {
-        // ✅ $crate always resolves to my_diagnostics, even if the user
-        // renamed the crate in their Cargo.toml
+        // ✅ $crate всегда ссылается на my_diagnostics, даже если пользователь
+        // переименовал крейт в своём Cargo.toml
         $crate::log_result(&format!($($arg)*))
     };
 }
 
-// ❌ Without $crate:
-// my_diagnostics::log_result(...)  ← breaks if user writes:
+// ❌ Без $crate:
+// my_diagnostics::log_result(...)  ← сломается, если пользователь напишет:
 //   [dependencies]
 //   diag = { package = "my_diagnostics", version = "1" }
 ```
 
-> **Rule**: Always use `$crate::` in `#[macro_export]` macros. Never use
-> your crate's name directly.
+> **Правило**: всегда используйте `$crate::` в макросах с `#[macro_export]`. Никогда не используйте имя своего крейта напрямую.
 
-### Recursive Macros and `tt` Munching
+### Рекурсивные макросы и `tt` munching
 
-Recursive macros process input one token at a time — a technique called
-**`tt` munching** (token-tree munching):
+Рекурсивные макросы обрабатывают вход по одному токену за раз. Этот приём называется **`tt` munching** (token-tree munching, «поедание» деревьев токенов):
 
 ```rust
-// Count the number of expressions passed to the macro
+// Считаем, сколько выражений передано в макрос
 macro_rules! count {
-    // Base case: no tokens left
+    // Базовый случай: токенов не осталось
     () => { 0usize };
-    // Recursive case: consume one expression, count the rest
+    // Рекурсивный случай: забираем одно выражение и считаем остальные
     ($head:expr $(, $tail:expr)* $(,)?) => {
         1usize + count!($($tail),*)
     };
@@ -230,49 +224,44 @@ fn main() {
     let n = count!("a", "b", "c", "d");
     assert_eq!(n, 4);
 
-    // Works at compile time too:
+    // Работает и на этапе компиляции:
     const N: usize = count!(1, 2, 3);
     assert_eq!(N, 3);
 }
 ```
 
 ```rust
-// Build a heterogeneous tuple from a list of expressions:
+// Строим гетерогенный кортеж из списка выражений:
 macro_rules! tuple_from {
-    // Base: single element
+    // Базовый случай: один элемент
     ($single:expr $(,)?) => { ($single,) };
-    // Recursive: first element + rest
+    // Рекурсивный случай: первый элемент и остальные
     ($head:expr, $($tail:expr),+ $(,)?) => {
         ($head, tuple_from!($($tail),+))
     };
 }
 
 let t = tuple_from!(1, "hello", 3.14, true);
-// Expands to: (1, ("hello", (3.14, (true,))))
+// Раскрывается в: (1, ("hello", (3.14, (true,))))
 ```
 
-**Fragment specifier subtleties**:
+**Тонкости фрагментов**:
 
-| Fragment | Gotcha |
+| Фрагмент | Подвох |
 |----------|--------|
-| `$x:expr` | Greedily parses — `1 + 2` is ONE expression, not three tokens |
-| `$x:ty` | Greedily parses — `Vec<String>` is one type; can't be followed by `+` or `<` |
-| `$x:tt` | Matches exactly ONE token tree — most flexible, least checked |
-| `$x:ident` | Only plain identifiers — not paths like `std::io` |
-| `$x:pat` | In Rust 2021, matches `A \| B` patterns; use `$x:pat_param` for single patterns |
+| `$x:expr` | Жадный разбор: `1 + 2` это ОДНО выражение, а не три токена |
+| `$x:ty` | Жадный разбор: `Vec<String>` это один тип; за ним нельзя ставить `+` или `<` |
+| `$x:tt` | Сопоставляет ровно ОДНО дерево токенов: самый гибкий, но меньше всего проверяется |
+| `$x:ident` | Только простые идентификаторы, а не пути вроде `std::io` |
+| `$x:pat` | В Rust 2021 сопоставляет шаблоны `A \| B`; для одиночных образцов используйте `$x:pat_param` |
 
-> **When to use `tt`**: When you need to forward tokens to another macro without
-> the parser constraining them. `$($args:tt)*` is the "accept everything" pattern
-> (used by `println!`, `format!`, `vec!`).
+> **Когда использовать `tt`**: когда нужно передать токены другому макросу, не ограничивая их парсером. Шаблон `$($args:tt)*` означает «принять всё» (его используют `println!`, `format!`, `vec!`).
 
-### Writing a Derive Macro with `syn` and `quote`
+### Пишем derive-макрос с `syn` и `quote`
 
-Derive macros live in a separate crate (`proc-macro = true`) and transform
-a token stream using `syn` (parse Rust) and `quote` (generate Rust):
+Derive-макросы живут в отдельном крейте (`proc-macro = true`) и преобразуют поток токенов с помощью `syn` (разбор Rust) и `quote` (генерация Rust):
 
 ```toml
-```
-
 # my_derive/Cargo.toml
 [lib]
 proc-macro = true
@@ -281,6 +270,7 @@ proc-macro = true
 syn = { version = "2", features = ["full"] }
 quote = "1"
 proc-macro2 = "1"
+```
 
 ```rust
 // my_derive/src/lib.rs
@@ -288,15 +278,15 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, DeriveInput};
 
-/// Derive macro that generates a `describe()` method
-/// returning the struct name and field names.
+/// Derive-макрос, который генерирует метод `describe()`,
+/// возвращающий имя структуры и имена её полей.
 #[proc_macro_derive(Describe)]
 pub fn derive_describe(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let name = &input.ident;
     let name_str = name.to_string();
 
-    // Extract field names (only for structs with named fields)
+    // Извлекаем имена полей (только для структур с именованными полями)
     let fields = match &input.data {
         syn::Data::Struct(data) => {
             data.fields.iter()
@@ -322,7 +312,7 @@ pub fn derive_describe(input: TokenStream) -> TokenStream {
 ```
 
 ```rust
-// In the application crate:
+// В приложении:
 use my_derive::Describe;
 
 #[derive(Describe)]
@@ -338,40 +328,36 @@ fn main() {
 }
 ```
 
-**The workflow**: `TokenStream` (raw tokens) → `syn::parse` (AST) →
-inspect/transform → `quote!` (generate tokens) → `TokenStream` (back to compiler).
+**Рабочий процесс**: `TokenStream` (сырые токены) → `syn::parse` (AST) → анализ и преобразование → `quote!` (генерация токенов) → `TokenStream` (обратно компилятору).
 
-| Crate | Role | Key types |
-|-------|------|-----------|
-| `proc-macro` | Compiler interface | `TokenStream` |
-| `syn` | Parse Rust source into AST | `DeriveInput`, `ItemFn`, `Type` |
-| `quote` | Generate Rust tokens from templates | `quote!{}`, `#variable` interpolation |
-| `proc-macro2` | Bridge between syn/quote and proc-macro | `TokenStream`, `Span` |
+| Крейт | Роль | Ключевые типы |
+|-------|------|---------------|
+| `proc-macro` | Интерфейс с компилятором | `TokenStream` |
+| `syn` | Разбор исходного кода Rust в AST | `DeriveInput`, `ItemFn`, `Type` |
+| `quote` | Генерация токенов Rust из шаблонов | `quote!{}`, интерполяция `#variable` |
+| `proc-macro2` | Мост между syn/quote и proc-macro | `TokenStream`, `Span` |
 
-> **Practical tip**: Start by studying the source of a simple derive macro
-> like `thiserror` or `derive_more` before writing your own. The
-> `cargo expand` command (via `cargo-expand`) shows what any macro expands
-> to — invaluable for debugging.
+> **Практический совет**: прежде чем писать собственный макрос, изучите исходники простого derive-макроса, например `thiserror` или `derive_more`. Команда `cargo expand` (через `cargo-expand`) показывает, во что раскрывается любой макрос: это бесценно для отладки.
 
-> **Key Takeaways — Macros**
-> - `macro_rules!` for simple code generation; proc macros (`syn` + `quote`) for complex derives
-> - Prefer generics/traits over macros when possible — macros are harder to debug and maintain
-> - `$crate` ensures hygiene; `tt` munching enables recursive pattern matching
+> **Ключевые выводы: макросы**
+> - `macro_rules!` для простой генерации кода; процедурные макросы (`syn` и `quote`) для сложных derive-макросов
+> - По возможности предпочитайте обобщения и трейты макросам: макросы труднее отлаживать и поддерживать
+> - `$crate` обеспечивает гигиену; `tt` munching даёт рекурсивное сопоставление с образцом
 
-> **See also:** [Ch 2 — Traits](ch02-traits-in-depth.md) for when traits/generics beat macros. [Ch 13 — Testing](ch13-testing-and-benchmarking-patterns.md) for testing macro-generated code.
+> **См. также:** [гл. 2 — Трейты](ch02-traits-in-depth.md) о том, когда трейты и обобщения лучше макросов. [гл. 14 — Тестирование](ch14-testing-and-benchmarking-patterns.md) о тестировании кода, сгенерированного макросами.
 
 ```mermaid
 flowchart LR
-    A["Source code"] --> B["macro_rules!<br>pattern matching"]
-    A --> C["#[derive(MyMacro)]<br>proc macro"]
+    A["Исходный код"] --> B["macro_rules!<br>сопоставление с образцом"]
+    A --> C["#[derive(MyMacro)]<br>процедурный макрос"]
 
-    B --> D["Token expansion"]
-    C --> E["syn: parse AST"]
-    E --> F["Transform"]
-    F --> G["quote!: generate tokens"]
+    B --> D["Раскрытие токенов"]
+    C --> E["syn: разбор AST"]
+    E --> F["Преобразование"]
+    F --> G["quote!: генерация токенов"]
     G --> D
 
-    D --> H["Compiled code"]
+    D --> H["Скомпилированный код"]
 
     style A fill:#e8f4f8,stroke:#2980b9,color:#000
     style B fill:#d4efdf,stroke:#27ae60,color:#000
@@ -385,9 +371,9 @@ flowchart LR
 
 ---
 
-### Exercise: Declarative Macro — `map!` ★ (~15 min)
+### Упражнение: декларативный макрос `map!` ★ (~15 минут)
 
-Write a `map!` macro that creates a `HashMap` from key-value pairs:
+Напишите макрос `map!`, который создаёт `HashMap` из пар ключ-значение:
 
 ```rust,ignore
 let m = map! {
@@ -397,10 +383,10 @@ let m = map! {
 assert_eq!(m.get("host"), Some(&"localhost"));
 ```
 
-Requirements: support trailing comma and empty invocation `map!{}`.
+Требования: поддержите завершающую запятую и пустой вызов `map!{}`.
 
 <details>
-<summary>🔑 Solution</summary>
+<summary>🔑 Решение</summary>
 
 ```rust
 macro_rules! map {
@@ -432,4 +418,3 @@ fn main() {
 </details>
 
 ***
-
