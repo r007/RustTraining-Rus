@@ -1,62 +1,62 @@
-## Essential Crates for C# Developers
+## Основные крейты для разработчиков C#
 
-> **What you'll learn:** The Rust crate equivalents for common .NET libraries — serde (JSON.NET),
-> reqwest (HttpClient), tokio (Task/async), sqlx (Entity Framework), and a deep dive on serde's
-> attribute system compared to `System.Text.Json`.
+> **Что вы узнаете:** аналоги крейтов Rust для распространённых библиотек .NET — serde (JSON.NET),
+> reqwest (HttpClient), tokio (Task/async), sqlx (Entity Framework), а также подробный разбор системы атрибутов serde
+> в сравнении с `System.Text.Json`.
 >
-> **Difficulty:** 🟡 Intermediate
+> **Сложность:** 🟡 Средний
 
-### Core Functionality Equivalents
+### Аналоги основной функциональности
 
 ```rust
-// Cargo.toml dependencies for C# developers
+// Зависимости Cargo для разработчиков C#
 [dependencies]
-# Serialization (like Newtonsoft.Json or System.Text.Json)
+# Сериализация (как Newtonsoft.Json или System.Text.Json)
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
-# HTTP client (like HttpClient)
+# HTTP-клиент (как HttpClient)
 reqwest = { version = "0.11", features = ["json"] }
 
-# Async runtime (like Task.Run, async/await)
+# Асинхронный рантайм (как Task.Run, async/await)
 tokio = { version = "1.0", features = ["full"] }
 
-# Error handling (like custom exceptions)
+# Обработка ошибок (как собственные исключения)
 thiserror = "1.0"
 anyhow = "1.0"
 
-# Logging (like ILogger, Serilog)
+# Логирование (как ILogger, Serilog)
 log = "0.4"
 env_logger = "0.10"
 
-# Date/time (like DateTime)
+# Дата и время (как DateTime)
 chrono = { version = "0.4", features = ["serde"] }
 
-# UUID (like System.Guid)
+# UUID (как System.Guid)
 uuid = { version = "1.0", features = ["v4", "serde"] }
 
-# Collections (like List<T>, Dictionary<K,V>)
-# Built into std, but for advanced collections:
-indexmap = "2.0"  # Ordered HashMap
+# Коллекции (как List<T>, Dictionary<K,V>)
+# Встроены в std, но для продвинутых коллекций:
+indexmap = "2.0"  # HashMap с сохранением порядка
 
-# Configuration (like IConfiguration)
+# Конфигурация (как IConfiguration)
 config = "0.13"
 
-# Database (like Entity Framework)
+# База данных (как Entity Framework)
 sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono"] }
 
-# Testing (like xUnit, NUnit)
-# Built into std, but for more features:
-rstest = "0.18"  # Parameterized tests
+# Тестирование (как xUnit, NUnit)
+# Встроено в std, но для расширенных возможностей:
+rstest = "0.18"  # Параметризованные тесты
 
-# Mocking (like Moq)
+# Моки (как Moq)
 mockall = "0.11"
 
-# Parallel processing (like Parallel.ForEach)
+# Параллельная обработка (как Parallel.ForEach)
 rayon = "1.7"
 ```
 
-### Example Usage Patterns
+### Примеры использования
 
 ```rust
 use serde::{Deserialize, Serialize};
@@ -66,7 +66,7 @@ use thiserror::Error;
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
-// Data models (like C# POCOs with attributes)
+// Модели данных (как POCO с атрибутами в C#)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {
     pub id: Uuid,
@@ -76,7 +76,7 @@ pub struct User {
     pub created_at: DateTime<Utc>,
 }
 
-// Custom error types (like custom exceptions)
+// Собственные типы ошибок (как собственные исключения)
 #[derive(Error, Debug)]
 pub enum ApiError {
     #[error("HTTP request failed: {0}")]
@@ -92,7 +92,7 @@ pub enum ApiError {
     Validation { message: String },
 }
 
-// Service class equivalent
+// Аналог класса сервиса
 pub struct UserService {
     client: reqwest::Client,
     base_url: String,
@@ -108,7 +108,7 @@ impl UserService {
         UserService { client, base_url }
     }
     
-    // Async method (like C# async Task<User>)
+    // Асинхронный метод (как async Task<User> в C#)
     pub async fn get_user(&self, id: Uuid) -> Result<User, ApiError> {
         let url = format!("{}/users/{}", self.base_url, id);
         
@@ -125,7 +125,7 @@ impl UserService {
         Ok(user)
     }
     
-    // Create user (like C# async Task<User>)
+    // Создание пользователя (как async Task<User> в C#)
     pub async fn create_user(&self, name: String, email: String) -> Result<User, ApiError> {
         if name.trim().is_empty() {
             return Err(ApiError::Validation {
@@ -151,15 +151,15 @@ impl UserService {
     }
 }
 
-// Usage example (like C# Main method)
+// Пример использования (как метод Main в C#)
 #[tokio::main]
 async fn main() -> Result<(), ApiError> {
-    // Initialize logging (like configuring ILogger)
+    // Инициализация логирования (как настройка ILogger)
     env_logger::init();
     
     let service = UserService::new("https://api.example.com".to_string());
     
-    // Create user
+    // Создание пользователя
     let user = service.create_user(
         "John Doe".to_string(),
         "john@example.com".to_string(),
@@ -167,7 +167,7 @@ async fn main() -> Result<(), ApiError> {
     
     println!("Created user: {:?}", user);
     
-    // Get user
+    // Получение пользователя
     let retrieved_user = service.get_user(user.id).await?;
     println!("Retrieved user: {:?}", retrieved_user);
     
@@ -178,7 +178,7 @@ async fn main() -> Result<(), ApiError> {
 mod tests {
     use super::*;
     
-    #[tokio::test]  // Like C# [Test] or [Fact]
+    #[tokio::test]  // Как [Test] или [Fact] в C#
     async fn test_user_creation() {
         let service = UserService::new("http://localhost:8080".to_string());
         
@@ -195,7 +195,7 @@ mod tests {
     
     #[test]
     fn test_validation() {
-        // Synchronous test
+        // Синхронный тест
         let error = ApiError::Validation {
             message: "Invalid input".to_string(),
         };
@@ -207,13 +207,12 @@ mod tests {
 
 ***
 
-
 <!-- ch15.1a: Serde Deep Dive for C# Developers -->
-## Serde Deep Dive: JSON Serialization for C# Developers
+## Глубокое погружение в serde: сериализация JSON для разработчиков C#
 
-C# developers rely heavily on `System.Text.Json` or `Newtonsoft.Json`. In Rust, **serde** (serialize/deserialize) is the universal framework — understanding its attribute system unlocks most data-handling scenarios.
+Разработчики C# активно используют `System.Text.Json` или `Newtonsoft.Json`. В Rust **serde** (serialize/deserialize) — универсальный фреймворк для этого. Понимание его системы атрибутов открывает большинство сценариев работы с данными.
 
-### Basic Derive: The Starting Point
+### Базовый derive: отправная точка
 ```rust
 use serde::{Deserialize, Serialize};
 
@@ -230,7 +229,7 @@ let parsed: User = serde_json::from_str(&json)?;
 ```
 
 ```csharp
-// C# equivalent
+// Аналог в C#
 public class User
 {
     public string Name { get; set; }
@@ -241,42 +240,42 @@ var json = JsonSerializer.Serialize(user, new JsonSerializerOptions { WriteInden
 var parsed = JsonSerializer.Deserialize<User>(json);
 ```
 
-### Field-Level Attributes (Like `[JsonProperty]`)
+### Атрибуты уровня полей (аналог `[JsonProperty]`)
 
 ```rust
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
 struct ApiResponse {
-    // Rename field in JSON output (like [JsonPropertyName("user_id")])
+    // Переименование поля в JSON (как [JsonPropertyName("user_id")])
     #[serde(rename = "user_id")]
     id: u64,
 
-    // Use different names for serialize vs deserialize
+    // Разные имена при сериализации и десериализации
     #[serde(rename(serialize = "userName", deserialize = "user_name"))]
     name: String,
 
-    // Skip this field entirely (like [JsonIgnore])
+    // Полностью пропустить поле (как [JsonIgnore])
     #[serde(skip)]
     internal_cache: Option<String>,
 
-    // Skip during serialization only
+    // Пропустить только при сериализации
     #[serde(skip_serializing)]
     password_hash: String,
 
-    // Default value if missing from JSON (like default constructor values)
+    // Значение по умолчанию, если поля нет в JSON (как значения в конструкторе по умолчанию)
     #[serde(default)]
     is_active: bool,
 
-    // Custom default
+    // Пользовательское значение по умолчанию
     #[serde(default = "default_role")]
     role: String,
 
-    // Flatten a nested struct into the parent (like [JsonExtensionData])
+    // Развернуть вложенную структуру в родительскую (как [JsonExtensionData])
     #[serde(flatten)]
     metadata: Metadata,
 
-    // Skip if the value is None (omit null fields)
+    // Пропустить, если значение None (не выводить null-поля)
     #[serde(skip_serializing_if = "Option::is_none")]
     nickname: Option<String>,
 }
@@ -291,7 +290,7 @@ struct Metadata {
 ```
 
 ```csharp
-// C# equivalent attributes
+// Эквивалентные атрибуты в C#
 public class ApiResponse
 {
     [JsonPropertyName("user_id")]
@@ -305,25 +304,25 @@ public class ApiResponse
 }
 ```
 
-### Enum Representations (Critical Difference from C#)
+### Представления перечислений (ключевое отличие от C#)
 
-Rust serde supports **four different JSON representations** for enums — a concept that has no direct C# equivalent because C# enums are always integers or strings.
+В serde для перечислений поддерживаются **четыре разных представления в JSON** — понятие, которому в C# нет прямого аналога, поскольку перечисления C# всегда целочисленные или строковые.
 
 ```rust
 use serde::{Deserialize, Serialize};
 
-// 1. Externally tagged (DEFAULT) — most common
+// 1. Внешне тегированное (ПО УМОЛЧАНИЮ) — самое распространённое
 #[derive(Serialize, Deserialize)]
 enum Message {
     Text(String),
     Image { url: String, width: u32 },
     Ping,
 }
-// Text variant:  {"Text": "hello"}
-// Image variant: {"Image": {"url": "...", "width": 100}}
-// Ping variant:  "Ping"
+// Вариант Text:  {"Text": "hello"}
+// Вариант Image: {"Image": {"url": "...", "width": 100}}
+// Вариант Ping:  "Ping"
 
-// 2. Internally tagged — like discriminated unions in other languages
+// 2. Внутренне тегированное — похоже на дискриминируемые объединения в других языках
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
 enum Event {
@@ -334,7 +333,7 @@ enum Event {
 // {"type": "Created", "id": 1, "name": "Alice"}
 // {"type": "Deleted", "id": 1}
 
-// 3. Adjacently tagged — tag and content in separate fields
+// 3. Смежно тегированное — тег и содержимое в отдельных полях
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "t", content = "c")]
 enum ApiResult {
@@ -344,7 +343,7 @@ enum ApiResult {
 // {"t": "Success", "c": {"name": "Alice"}}
 // {"t": "Error", "c": "not found"}
 
-// 4. Untagged — serde tries each variant in order
+// 4. Без тега — serde пробует варианты по порядку
 #[derive(Serialize, Deserialize)]
 #[serde(untagged)]
 enum FlexibleValue {
@@ -353,14 +352,14 @@ enum FlexibleValue {
     Text(String),
     Bool(bool),
 }
-// 42, 3.14, "hello", true — serde auto-detects the variant
+// 42, 3.14, "hello", true — serde сам определяет вариант
 ```
 
-### Custom Serialization (Like `JsonConverter`)
+### Пользовательская сериализация (аналог `JsonConverter`)
 ```rust
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-// Custom serialization for a specific field
+// Пользовательская сериализация для конкретного поля
 #[derive(Serialize, Deserialize)]
 struct Config {
     #[serde(serialize_with = "serialize_duration", deserialize_with = "deserialize_duration")]
@@ -378,11 +377,11 @@ fn deserialize_duration<'de, D: Deserializer<'de>>(d: D) -> Result<std::time::Du
 // JSON: {"timeout": 5000}  ↔  Config { timeout: Duration::from_millis(5000) }
 ```
 
-### Container-Level Attributes
+### Атрибуты уровня контейнера
 
 ```rust
 #[derive(Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]  // All fields become camelCase in JSON
+#[serde(rename_all = "camelCase")]  // Все поля в JSON становятся camelCase
 struct UserProfile {
     first_name: String,      // → "firstName"
     last_name: String,       // → "lastName"
@@ -390,7 +389,7 @@ struct UserProfile {
 }
 
 #[derive(Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]  // Reject JSON with extra fields (strict parsing)
+#[serde(deny_unknown_fields)]  // Отвергать JSON с лишними полями (строгий разбор)
 struct StrictConfig {
     port: u16,
     host: String,
@@ -399,33 +398,33 @@ struct StrictConfig {
 // → Error: unknown field `extra`
 ```
 
-### Quick Reference: Serde Attributes
+### Краткая справка по атрибутам serde
 
-| Attribute | Level | C# Equivalent | Purpose |
+| Атрибут | Уровень | Аналог в C# | Назначение |
 |-----------|-------|---------------|---------|
-| `#[serde(rename = "...")]` | Field | `[JsonPropertyName]` | Rename in JSON |
-| `#[serde(skip)]` | Field | `[JsonIgnore]` | Omit entirely |
-| `#[serde(default)]` | Field | Default value | Use `Default::default()` if missing |
-| `#[serde(flatten)]` | Field | `[JsonExtensionData]` | Merge nested struct into parent |
-| `#[serde(skip_serializing_if = "...")]` | Field | `JsonIgnoreCondition` | Conditional skip |
-| `#[serde(rename_all = "camelCase")]` | Container | `JsonSerializerOptions.PropertyNamingPolicy` | Naming convention |
-| `#[serde(deny_unknown_fields)]` | Container | — | Strict deserialization |
-| `#[serde(tag = "type")]` | Enum | Discriminator pattern | Internal tagging |
-| `#[serde(untagged)]` | Enum | — | Try variants in order |
-| `#[serde(with = "...")]` | Field | `[JsonConverter]` | Custom ser/de |
+| `#[serde(rename = "...")]` | Поле | `[JsonPropertyName]` | Переименование в JSON |
+| `#[serde(skip)]` | Поле | `[JsonIgnore]` | Полностью пропустить |
+| `#[serde(default)]` | Поле | Значение по умолчанию | Использовать `Default::default()`, если поля нет |
+| `#[serde(flatten)]` | Поле | `[JsonExtensionData]` | Слить вложенную структуру в родительскую |
+| `#[serde(skip_serializing_if = "...")]` | Поле | `JsonIgnoreCondition` | Условный пропуск |
+| `#[serde(rename_all = "camelCase")]` | Контейнер | `JsonSerializerOptions.PropertyNamingPolicy` | Соглашение об именовании |
+| `#[serde(deny_unknown_fields)]` | Контейнер | — | Строгая десериализация |
+| `#[serde(tag = "type")]` | Перечисление | Паттерн дискриминатора | Внутреннее тегирование |
+| `#[serde(untagged)]` | Перечисление | — | Пробовать варианты по порядку |
+| `#[serde(with = "...")]` | Поле | `[JsonConverter]` | Пользовательская сериализация и десериализация |
 
-### Beyond JSON: serde Works Everywhere
+### За пределами JSON: serde работает везде
 ```rust
-// The SAME derive works for ALL formats — just change the crate
+// ТОТ ЖЕ derive работает для ВСЕХ форматов — нужно лишь сменить крейт
 let user = User { name: "Alice".into(), age: 30, email: "a@b.com".into() };
 
 let json  = serde_json::to_string(&user)?;        // JSON
-let toml  = toml::to_string(&user)?;               // TOML (config files)
+let toml  = toml::to_string(&user)?;               // TOML (конфигурационные файлы)
 let yaml  = serde_yaml::to_string(&user)?;          // YAML
-let cbor  = serde_cbor::to_vec(&user)?;             // CBOR (binary, compact)
-let msgpk = rmp_serde::to_vec(&user)?;              // MessagePack (binary)
+let cbor  = serde_cbor::to_vec(&user)?;             // CBOR (бинарный, компактный)
+let msgpk = rmp_serde::to_vec(&user)?;              // MessagePack (бинарный)
 
-// One #[derive(Serialize, Deserialize)] — every format for free
+// Один #[derive(Serialize, Deserialize)] — каждый формат бесплатно
 ```
 
 ***

@@ -1,34 +1,34 @@
-## Common C# Patterns in Rust
+## Распространённые паттерны C# в Rust
 
-> **What you'll learn:** How to translate the Repository pattern, Builder pattern, dependency injection,
-> LINQ chains, Entity Framework queries, and configuration patterns from C# to idiomatic Rust.
+> **Что вы узнаете:** как переводить с C# на идиоматичный Rust паттерн Repository, паттерн Builder, внедрение зависимостей,
+> цепочки LINQ, запросы Entity Framework и паттерны конфигурации.
 >
-> **Difficulty:** 🟡 Intermediate
+> **Сложность:** 🟡 Средний
 
 ```mermaid
 graph LR
-    subgraph "C# Pattern"
-        I["interface IRepo&lt;T&gt;"] --> DI["DI Container"]
+    subgraph "Паттерн C#"
+        I["interface IRepo&lt;T&gt;"] --> DI["Контейнер DI"]
         EX["try / catch"] --> LOG["ILogger"]
         LINQ["LINQ .Where().Select()"] --> LIST["List&lt;T&gt;"]
     end
-    subgraph "Rust Equivalent"
+    subgraph "Аналог в Rust"
         TR["trait Repo&lt;T&gt;"] --> GEN["Generic&lt;R: Repo&gt;"]
         RES["Result&lt;T, E&gt; + ?"] --> THISERR["thiserror / anyhow"]
         ITER[".iter().filter().map()"] --> VEC["Vec&lt;T&gt;"]
     end
-    I -->|"becomes"| TR
-    EX -->|"becomes"| RES
-    LINQ -->|"becomes"| ITER
+    I -->|"становится"| TR
+    EX -->|"становится"| RES
+    LINQ -->|"становится"| ITER
 
     style TR fill:#c8e6c9,color:#000
     style RES fill:#c8e6c9,color:#000
     style ITER fill:#c8e6c9,color:#000
 ```
 
-### Repository Pattern
+### Паттерн Repository
 ```csharp
-// C# Repository Pattern
+// Паттерн Repository в C#
 public interface IRepository<T> where T : IEntity
 {
     Task<T> GetByIdAsync(int id);
@@ -52,12 +52,12 @@ public class UserRepository : IRepository<User>
         return await _context.Users.FindAsync(id);
     }
     
-    // ... other implementations
+    // ... остальные реализации
 }
 ```
 
 ```rust
-// Rust Repository Pattern with traits and generics
+// Паттерн Repository в Rust с трейтами и обобщениями
 use async_trait::async_trait;
 use std::fmt::Debug;
 
@@ -101,13 +101,13 @@ impl std::fmt::Display for RepositoryError {
 impl std::error::Error for RepositoryError {}
 
 pub struct UserRepository {
-    // database connection pool, etc.
+    // пул соединений с базой данных и т. д.
 }
 
 #[async_trait]
 impl Repository<User, RepositoryError> for UserRepository {
     async fn get_by_id(&self, id: u64) -> Result<Option<User>, RepositoryError> {
-        // Simulate database lookup
+        // Имитация поиска в базе данных
         if id == 0 {
             return Ok(None);
         }
@@ -120,12 +120,12 @@ impl Repository<User, RepositoryError> for UserRepository {
     }
     
     async fn get_all(&self) -> Result<Vec<User>, RepositoryError> {
-        // Implementation here
+        // Реализация здесь
         Ok(vec![])
     }
     
     async fn add(&self, entity: User) -> Result<User, RepositoryError> {
-        // Validation and database insertion
+        // Валидация и вставка в базу данных
         if entity.name.is_empty() {
             return Err(RepositoryError::ValidationError("Name cannot be empty".to_string()));
         }
@@ -133,20 +133,20 @@ impl Repository<User, RepositoryError> for UserRepository {
     }
     
     async fn update(&self, entity: User) -> Result<User, RepositoryError> {
-        // Implementation here
+        // Реализация здесь
         Ok(entity)
     }
     
     async fn delete(&self, id: u64) -> Result<(), RepositoryError> {
-        // Implementation here
+        // Реализация здесь
         Ok(())
     }
 }
 ```
 
-### Builder Pattern
+### Паттерн Builder
 ```csharp
-// C# Builder Pattern (fluent interface)
+// Паттерн Builder в C# (текучий интерфейс)
 public class HttpClientBuilder
 {
     private TimeSpan? _timeout;
@@ -184,7 +184,7 @@ public class HttpClientBuilder
     }
 }
 
-// Usage
+// Использование
 var client = new HttpClientBuilder()
     .WithTimeout(TimeSpan.FromSeconds(30))
     .WithBaseAddress("https://api.example.com")
@@ -193,7 +193,7 @@ var client = new HttpClientBuilder()
 ```
 
 ```rust
-// Rust Builder Pattern (consuming builder)
+// Паттерн Builder в Rust (потребляющий builder)
 use std::collections::HashMap;
 use std::time::Duration;
 
@@ -245,14 +245,14 @@ impl HttpClientBuilder {
     }
 }
 
-// Usage
+// Использование
 let client = HttpClientBuilder::new()
     .with_timeout(Duration::from_secs(30))
     .with_base_address("https://api.example.com")
     .with_header("Accept", "application/json")
     .build()?;
 
-// Alternative: Using Default trait for common cases
+// Альтернатива: трейт Default для типичных случаев
 impl Default for HttpClientBuilder {
     fn default() -> Self {
         Self::new()
@@ -262,11 +262,11 @@ impl Default for HttpClientBuilder {
 
 ***
 
-## C# to Rust Concept Mapping
+## Сопоставление концепций C# и Rust
 
-### Dependency Injection → Constructor Injection + Traits
+### Внедрение зависимостей → внедрение через конструктор и трейты
 ```csharp
-// C# with DI container
+// C# с контейнером DI
 services.AddScoped<IUserRepository, UserRepository>();
 services.AddScoped<IUserService, UserService>();
 
@@ -282,7 +282,7 @@ public class UserService
 ```
 
 ```rust
-// Rust: Constructor injection with traits
+// Rust: внедрение через конструктор с трейтами
 pub trait UserRepository {
     async fn find_by_id(&self, id: Uuid) -> Result<Option<User>, Error>;
     async fn save(&self, user: &User) -> Result<(), Error>;
@@ -308,14 +308,14 @@ where
     }
 }
 
-// Usage
+// Использование
 let repository = PostgresUserRepository::new(pool);
 let service = UserService::new(repository);
 ```
 
-### LINQ → Iterator Chains
+### LINQ → цепочки итераторов
 ```csharp
-// C# LINQ
+// LINQ в C#
 var result = users
     .Where(u => u.Age > 18)
     .Select(u => u.Name.ToUpper())
@@ -325,7 +325,7 @@ var result = users
 ```
 
 ```rust
-// Rust: Iterator chains (zero-cost!)
+// Rust: цепочки итераторов (с нулевой стоимостью!)
 let mut result: Vec<String> = users
     .iter()
     .filter(|u| u.age > 18)
@@ -334,7 +334,7 @@ let mut result: Vec<String> = users
 result.sort();
 result.truncate(10);
 
-// Or with itertools crate for more LINQ-like chaining
+// Или с крейтом itertools для более LINQ-подобной цепочки
 use itertools::Itertools;
 
 let result: Vec<String> = users
@@ -346,9 +346,9 @@ let result: Vec<String> = users
     .collect();
 ```
 
-### Entity Framework → SQLx + Migrations
+### Entity Framework → SQLx и миграции
 ```csharp
-// C# Entity Framework
+// Entity Framework в C#
 public class ApplicationDbContext : DbContext
 {
     public DbSet<User> Users { get; set; }
@@ -360,7 +360,7 @@ var user = await context.Users
 ```
 
 ```rust
-// Rust: SQLx with compile-time checked queries
+// Rust: SQLx с запросами, проверяемыми на этапе компиляции
 use sqlx::{PgPool, FromRow};
 
 #[derive(FromRow)]
@@ -370,7 +370,7 @@ struct User {
     name: String,
 }
 
-// Compile-time checked query
+// Запрос, проверяемый на этапе компиляции
 let user = sqlx::query_as!(
     User,
     "SELECT id, email, name FROM users WHERE email = $1",
@@ -379,7 +379,7 @@ let user = sqlx::query_as!(
 .fetch_optional(&pool)
 .await?;
 
-// Or with dynamic queries
+// Или динамический запрос
 let user = sqlx::query_as::<_, User>(
     "SELECT id, email, name FROM users WHERE email = $1"
 )
@@ -388,9 +388,9 @@ let user = sqlx::query_as::<_, User>(
 .await?;
 ```
 
-### Configuration → Config Crates
+### Конфигурация → крейты конфигурации
 ```csharp
-// C# Configuration
+// Конфигурация в C#
 public class AppSettings
 {
     public string DatabaseUrl { get; set; }
@@ -401,7 +401,7 @@ var config = builder.Configuration.Get<AppSettings>();
 ```
 
 ```rust
-// Rust: Config with serde
+// Rust: конфигурация через serde
 use config::{Config, ConfigError, Environment, File};
 use serde::Deserialize;
 
@@ -422,45 +422,45 @@ impl AppSettings {
     }
 }
 
-// Usage
+// Использование
 let settings = AppSettings::new()?;
 ```
 
 ---
 
-## Case Studies
+## Разборы случаев
 
-### Case Study 1: CLI Tool Migration (csvtool)
+### Случай 1: миграция CLI-утилиты (csvtool)
 
-**Background**: A team maintained a C# console app (`CsvProcessor`) that read large CSV files, applied transformations, and wrote output. At 500 MB files, memory usage spiked to 4 GB and GC pauses caused 30-second stalls.
+**Контекст**: команда поддерживала консольное приложение на C# (`CsvProcessor`), которое читало большие CSV-файлы, применяло преобразования и записывало результат. При файлах в 500 МБ потребление памяти подскакивало до 4 ГБ, а паузы GC вызывали зависания на 30 секунд.
 
-**Migration approach**: Rewrote in Rust over 2 weeks, one module at a time.
+**Подход к миграции**: переписали на Rust за 2 недели, по одному модулю за раз.
 
-| Step | What Changed | C# → Rust |
+| Шаг | Что изменилось | C# → Rust |
 |------|-------------|-----------|
-| 1 | CSV parsing | `CsvHelper` → `csv` crate (streaming `Reader`) |
-| 2 | Data model | `class Record` → `struct Record` (stack-allocated, `#[derive(Deserialize)]`) |
-| 3 | Transformations | LINQ `.Select().Where()` → `.iter().map().filter()` |
-| 4 | File I/O | `StreamReader` → `BufReader<File>` with `?` error propagation |
-| 5 | CLI args | `System.CommandLine` → `clap` with derive macros |
-| 6 | Parallel processing | `Parallel.ForEach` → `rayon`'s `.par_iter()` |
+| 1 | Разбор CSV | `CsvHelper` → крейт `csv` (потоковый `Reader`) |
+| 2 | Модель данных | `class Record` → `struct Record` (размещается на стеке, `#[derive(Deserialize)]`) |
+| 3 | Преобразования | LINQ `.Select().Where()` → `.iter().map().filter()` |
+| 4 | Файловый ввод-вывод | `StreamReader` → `BufReader<File>` с распространением ошибок через `?` |
+| 5 | Аргументы CLI | `System.CommandLine` → `clap` с derive-макросами |
+| 6 | Параллельная обработка | `Parallel.ForEach` → `.par_iter()` из `rayon` |
 
-**Results**:
-- Memory: 4 GB → 12 MB (streaming instead of loading entire file)
-- Speed: 45s → 3s for 500 MB file
-- Binary size: single 2 MB executable, no runtime dependency
+**Результаты**:
+- Память: 4 ГБ → 12 МБ (потоковая обработка вместо загрузки всего файла)
+- Скорость: 45 с → 3 с для файла в 500 МБ
+- Размер бинарника: один исполняемый файл 2 МБ, без зависимости от рантайма
 
-**Key lesson**: The biggest win wasn't Rust itself — it was that Rust's ownership model *forced* a streaming design. In C#, it was easy to `.ToList()` everything into memory. In Rust, the borrow checker naturally steered toward `Iterator`-based processing.
+**Главный урок**: основной выигрыш был не в самом Rust — а в том, что модель владения Rust *вынуждала* к потоковому дизайну. В C# было легко сделать `.ToList()` и загрузить всё в память. В Rust проверщик заимствований естественно подталкивал к обработке на основе `Iterator`.
 
-### Case Study 2: Microservice Replacement (auth-gateway)
+### Случай 2: замена микросервиса (auth-gateway)
 
-**Background**: A C# ASP.NET Core authentication gateway handled JWT validation and rate limiting for 50+ backend services. At 10K req/s, p99 latency hit 200ms with GC spikes.
+**Контекст**: шлюз аутентификации на C# ASP.NET Core отвечал за валидацию JWT и ограничение частоты запросов для более чем 50 бэкенд-сервисов. При 10 000 запросов в секунду p99-задержка достигала 200 мс из-за всплесков GC.
 
-**Migration approach**: Replaced with a Rust service using `axum` + `tower`, keeping the API contract identical.
+**Подход к миграции**: заменили на сервис на Rust с использованием `axum` + `tower`, сохранив тот же контракт API.
 
 ```rust
-// Before (C#):  services.AddAuthentication().AddJwtBearer(...)
-// After (Rust):  tower middleware layer
+// Было (C#):  services.AddAuthentication().AddJwtBearer(...)
+// Стало (Rust): слой middleware из tower
 
 use axum::{Router, middleware};
 use tower::ServiceBuilder;
@@ -474,28 +474,28 @@ let app = Router::new()
     );
 ```
 
-| Metric | C# (ASP.NET Core) | Rust (axum) |
+| Метрика | C# (ASP.NET Core) | Rust (axum) |
 |--------|-------------------|-------------|
-| p50 latency | 5ms | 0.8ms |
-| p99 latency | 200ms (GC spikes) | 4ms |
-| Memory | 300 MB | 8 MB |
-| Docker image | 210 MB (.NET runtime) | 12 MB (static binary) |
-| Cold start | 2.1s | 0.05s |
+| p50-задержка | 5 мс | 0,8 мс |
+| p99-задержка | 200 мс (всплески GC) | 4 мс |
+| Память | 300 МБ | 8 МБ |
+| Docker-образ | 210 МБ (рантайм .NET) | 12 МБ (статический бинарник) |
+| Холодный старт | 2,1 с | 0,05 с |
 
-**Key lessons**:
-1. **Keep the same API contract** — no client changes needed. Rust service was a drop-in replacement.
-2. **Start with the hot path** — JWT validation was the bottleneck. Migrating just that one middleware would have captured 80% of the win.
-3. **Use `tower` middleware** — it mirrors ASP.NET Core's middleware pipeline pattern, so C# developers found the Rust architecture familiar.
-4. **p99 latency improvement** came from eliminating GC pauses, not from faster code — Rust's steady-state throughput was only 2x faster, but the absence of GC made the tail latency predictable.
+**Ключевые уроки**:
+1. **Сохраните тот же контракт API** — изменения на стороне клиентов не нужны. Сервис на Rust стал прямой заменой.
+2. **Начните с горячего пути** — узким местом была валидация JWT. Миграция только этого middleware дала бы 80% выигрыша.
+3. **Используйте middleware `tower`** — он повторяет конвейер middleware ASP.NET Core, поэтому разработчикам C# архитектура на Rust показалась знакомой.
+4. **Улучшение p99-задержки** пришло от устранения пауз GC, а не от более быстрого кода — установившаяся пропускная способность Rust была лишь примерно в 2 раза выше, но отсутствие GC сделало «хвост» задержек предсказуемым.
 
 ---
 
-## Exercises
+## Упражнения
 
 <details>
-<summary><strong>🏋️ Exercise: Migrate a C# Service</strong> (click to expand)</summary>
+<summary><strong>🏋️ Упражнение: мигрируйте сервис на C#</strong> (нажмите, чтобы раскрыть)</summary>
 
-Translate this C# service to idiomatic Rust:
+Переведите этот сервис на C# на идиоматичный Rust:
 
 ```csharp
 public interface IUserService
@@ -522,10 +522,10 @@ public class UserService : IUserService
 }
 ```
 
-**Hints**: Use a trait, `Option<User>` instead of null, `Result` instead of try/catch, and fix the SQL injection vulnerability.
+**Подсказки**: используйте трейт, `Option<User>` вместо null, `Result` вместо try/catch, и устраните уязвимость SQL-инъекции.
 
 <details>
-<summary>🔑 Solution</summary>
+<summary>🔑 Решение</summary>
 
 ```rust
 use async_trait::async_trait;
@@ -546,29 +546,29 @@ trait UserService: Send + Sync {
 }
 
 struct UserServiceImpl<D: Database> {
-    db: D,  // No Arc needed — Rust's ownership handles it
+    db: D,  // Arc не нужен — владение Rust справляется с этим само
 }
 
 #[async_trait]
 impl<D: Database> UserService for UserServiceImpl<D> {
     async fn get_by_id(&self, id: i64) -> Result<Option<User>, AppError> {
-        // Option instead of null; Result instead of try/catch
+        // Option вместо null; Result вместо try/catch
         Ok(self.db.get_user(id).await?)
     }
 
     async fn search(&self, query: &str) -> Result<Vec<User>, AppError> {
-        // Parameterized query — NO SQL injection!
-        // (sqlx uses $1 placeholders, not string interpolation)
+        // Параметризованный запрос — НИКАКИХ SQL-инъекций!
+        // (sqlx использует плейсхолдеры $1, а не интерполяцию строк)
         self.db.search_users(query).await.map_err(Into::into)
     }
 }
 ```
 
-**Key changes from C#**:
-- `null` → `Option<User>` (compile-time null safety)
-- `try/catch` → `Result` + `?` (explicit error propagation)
-- SQL injection fixed: parameterized queries, not string interpolation
-- `IDatabase _db` → generic `D: Database` (static dispatch, no boxing)
+**Ключевые изменения по сравнению с C#**:
+- `null` → `Option<User>` (null-безопасность на этапе компиляции)
+- `try/catch` → `Result` + `?` (явное распространение ошибок)
+- SQL-инъекция устранена: параметризованные запросы вместо интерполяции строк
+- `IDatabase _db` → обобщение `D: Database` (статическая диспетчеризация, без упаковки)
 
 </details>
 </details>

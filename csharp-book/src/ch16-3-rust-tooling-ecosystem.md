@@ -1,125 +1,125 @@
-## Essential Rust Tooling for C# Developers
+## Основные инструменты Rust для разработчиков C#
 
-> **What you'll learn:** Rust's development tools mapped to their C# equivalents — Clippy (Roslyn analyzers),
-> rustfmt (dotnet format), cargo doc (XML docs), cargo watch (dotnet watch), and VS Code extensions.
+> **Что вы узнаете:** инструменты разработки Rust и их аналоги в C# — Clippy (анализаторы Roslyn),
+> rustfmt (dotnet format), cargo doc (XML-документация), cargo watch (dotnet watch) и расширения VS Code.
 >
-> **Difficulty:** 🟢 Beginner
+> **Сложность:** 🟢 Начальный
 
-### Tool Comparison
+### Сравнение инструментов
 
-| C# Tool | Rust Equivalent | Install | Purpose |
+| Инструмент C# | Аналог в Rust | Установка | Назначение |
 |---------|----------------|---------|---------|
-| Roslyn analyzers | **Clippy** | `rustup component add clippy` | Lint + style suggestions |
-| `dotnet format` | **rustfmt** | `rustup component add rustfmt` | Auto-formatting |
-| XML doc comments | **`cargo doc`** | Built-in | Generate HTML docs |
-| OmniSharp / Roslyn | **rust-analyzer** | VS Code extension | IDE support |
-| `dotnet watch` | **cargo-watch** | `cargo install cargo-watch` | Auto-rebuild on save |
-| — | **cargo-expand** | `cargo install cargo-expand` | See macro expansion |
-| `dotnet audit` | **cargo-audit** | `cargo install cargo-audit` | Security vulnerability scan |
+| Анализаторы Roslyn | **Clippy** | `rustup component add clippy` | Линтинг и подсказки по стилю |
+| `dotnet format` | **rustfmt** | `rustup component add rustfmt` | Автоматическое форматирование |
+| XML-комментарии к документации | **`cargo doc`** | Встроен | Генерация HTML-документации |
+| OmniSharp / Roslyn | **rust-analyzer** | Расширение VS Code | Поддержка в IDE |
+| `dotnet watch` | **cargo-watch** | `cargo install cargo-watch` | Автоматическая пересборка при сохранении |
+| — | **cargo-expand** | `cargo install cargo-expand` | Просмотр раскрытия макросов |
+| `dotnet audit` | **cargo-audit** | `cargo install cargo-audit` | Проверка уязвимостей безопасности |
 
-### Clippy: Your Automated Code Reviewer
+### Clippy: ваш автоматический код-ревьюер
 ```bash
-# Run Clippy on your project
+# Запуск Clippy для проекта
 cargo clippy
 
-# Treat warnings as errors (CI/CD)
+# Считать предупреждения ошибками (CI/CD)
 cargo clippy -- -D warnings
 
-# Auto-fix suggestions
+# Автоматическое применение подсказок
 cargo clippy --fix
 ```
 
 ```rust
-// Clippy catches hundreds of anti-patterns:
+// Clippy находит сотни антипаттернов:
 
-// Before Clippy:
-if x == true { }           // warning: equality check with bool
-let _ = vec.len() == 0;    // warning: use .is_empty() instead
-for i in 0..vec.len() { }  // warning: use .iter().enumerate()
+// До Clippy:
+if x == true { }           // предупреждение: проверка равенства с bool
+let _ = vec.len() == 0;    // предупреждение: используйте .is_empty()
+for i in 0..vec.len() { }  // предупреждение: используйте .iter().enumerate()
 
-// After Clippy suggestions:
+// После применения подсказок Clippy:
 if x { }
 let _ = vec.is_empty();
 for (i, item) in vec.iter().enumerate() { }
 ```
 
-### rustfmt: Consistent Formatting
+### rustfmt: единообразное форматирование
 ```bash
-# Format all files
+# Форматирование всех файлов
 cargo fmt
 
-# Check formatting without changing (CI/CD)
+# Проверка форматирования без изменений (CI/CD)
 cargo fmt -- --check
 ```
 
 ```toml
-# rustfmt.toml — customize formatting (like .editorconfig)
+# rustfmt.toml — настройка форматирования (как .editorconfig)
 max_width = 100
 tab_spaces = 4
 use_field_init_shorthand = true
 ```
 
-### cargo doc: Documentation Generation
+### cargo doc: генерация документации
 ```bash
-# Generate and open docs (including dependencies)
+# Генерация и открытие документации (включая зависимости)
 cargo doc --open
 
-# Run documentation tests
+# Запуск тестов документации
 cargo test --doc
 ```
 
 ```rust
-/// Calculate the area of a circle.
+/// Вычисляет площадь круга.
 ///
-/// # Arguments
-/// * `radius` - The radius of the circle (must be non-negative)
+/// # Аргументы
+/// * `radius` — радиус круга (должен быть неотрицательным)
 ///
-/// # Examples
+/// # Примеры
 /// ```
 /// let area = my_crate::circle_area(5.0);
 /// assert!((area - 78.54).abs() < 0.01);
 /// ```
 ///
-/// # Panics
-/// Panics if `radius` is negative.
+/// # Паника
+/// Паникует, если `radius` отрицательный.
 pub fn circle_area(radius: f64) -> f64 {
     assert!(radius >= 0.0, "radius must be non-negative");
     std::f64::consts::PI * radius * radius
 }
-// The code in /// ``` blocks is compiled and run during `cargo test`!
+// Код внутри блоков /// ``` компилируется и запускается во время `cargo test`!
 ```
 
-### cargo watch: Auto-Rebuild
+### cargo watch: автоматическая пересборка
 ```bash
-# Rebuild on file changes (like dotnet watch)
-cargo watch -x check          # Type-check only (fastest)
-cargo watch -x test           # Run tests on save
-cargo watch -x 'run -- args'  # Run program on save
-cargo watch -x clippy         # Lint on save
+# Пересборка при изменении файлов (как dotnet watch)
+cargo watch -x check          # Только проверка типов (самый быстрый)
+cargo watch -x test           # Запуск тестов при сохранении
+cargo watch -x 'run -- args'  # Запуск программы при сохранении
+cargo watch -x clippy         # Линтинг при сохранении
 ```
 
-### cargo expand: See What Macros Generate
+### cargo expand: просмотр того, что генерируют макросы
 ```bash
-# See the expanded output of derive macros
-cargo expand --lib            # Expand lib.rs
-cargo expand module_name      # Expand specific module
+# Просмотр раскрытого вывода производных макросов
+cargo expand --lib            # Раскрыть lib.rs
+cargo expand module_name      # Раскрыть конкретный модуль
 ```
 
-### Recommended VS Code Extensions
+### Рекомендуемые расширения VS Code
 
-| Extension | Purpose |
-|-----------|---------|
-| **rust-analyzer** | Code completion, inline errors, refactoring |
-| **CodeLLDB** | Debugger (like Visual Studio debugger) |
-| **Even Better TOML** | Cargo.toml syntax highlighting |
-| **crates** | Show latest crate versions in Cargo.toml |
-| **Error Lens** | Inline error/warning display |
+| Расширение | Назначение |
+|-----------|-----------|
+| **rust-analyzer** | Автодополнение кода, встроенные ошибки, рефакторинг |
+| **CodeLLDB** | Отладчик (как отладчик Visual Studio) |
+| **Even Better TOML** | Подсветка синтаксиса Cargo.toml |
+| **crates** | Показ последних версий крейтов в Cargo.toml |
+| **Error Lens** | Вывод ошибок и предупреждений прямо в строке |
 
 ***
 
-For deeper exploration of advanced topics mentioned in this guide, see the companion training documents:
+Для более глубокого изучения продвинутых тем, упомянутых в этом руководстве, см. сопутствующие учебные материалы:
 
-- **[Rust Patterns](../../rust-patterns-book/src/SUMMARY.md)** — Pin projections, custom allocators, arena patterns, lock-free data structures, and advanced unsafe patterns
-- **[Async Rust Training](../../async-book/src/SUMMARY.md)** — Deep dive into tokio, async cancellation safety, stream processing, and production async architectures
-- **[Rust Training for C++ Developers](../../c-cpp-book/src/SUMMARY.md)** — Useful if your team also has C++ experience; covers move semantics mapping, RAII differences, and template vs generics
-- **[Rust Training for C Developers](../../c-cpp-book/src/SUMMARY.md)** — Relevant for interop scenarios; covers FFI patterns, embedded Rust debugging, and `no_std` programming
+- **[Паттерны Rust](../../rust-patterns-book/src/SUMMARY.md)** — проекции Pin, пользовательские аллокаторы, арена-паттерны, структуры данных без блокировок и продвинутые паттерны unsafe
+- **[Async Rust Training](../../async-book/src/SUMMARY.md)** — подробно о tokio, безопасности отмены в асинхронном коде, обработке потоков и производственной архитектуре async
+- **[Rust для программистов C/C++](../../c-cpp-book/src/SUMMARY.md)** — полезно, если в команде есть опыт работы с C++; рассматривает соответствие семантики перемещения, различия RAII и шаблоны против обобщений
+- **[Rust для программистов C](../../c-cpp-book/src/SUMMARY.md)** — актуально для сценариев взаимодействия; рассматривает паттерны FFI, отладку встраиваемого Rust и программирование с `no_std`

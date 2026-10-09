@@ -1,77 +1,77 @@
 ## Unsafe Rust
 
-> **What you'll learn:** What `unsafe` permits (raw pointers, FFI, unchecked casts), safe wrapper patterns,
-> C# P/Invoke vs Rust FFI for calling native code, and the safety checklist for `unsafe` blocks.
+> **Что вы узнаете:** что разрешает `unsafe` (сырые указатели, FFI, непроверяемые приведения), паттерны безопасных обёрток,
+> P/Invoke в C# против FFI в Rust для вызова нативного кода, а также чек-лист безопасности для блоков `unsafe`.
 >
-> **Difficulty:** 🔴 Advanced
+> **Сложность:** 🔴 Продвинутый
 
-Unsafe Rust allows you to perform operations that the borrow checker cannot verify. Use it sparingly and with clear documentation.
+Unsafe Rust позволяет выполнять операции, которые проверщик заимствований не может верифицировать. Используйте его осторожно и с понятной документацией.
 
-> **Advanced coverage**: For safe abstraction patterns over unsafe code (arena allocators, lock-free structures, custom vtables), see [Rust Patterns](../../rust-patterns-book/src/summary.md).
+> **Расширенное описание**: о безопасных абстракциях поверх unsafe-кода (арена-аллокаторы, структуры без блокировок, пользовательские таблицы виртуальных методов) см. [Паттерны Rust](../../rust-patterns-book/src/summary.md).
 
-### When You Need Unsafe
+### Когда нужен unsafe
 
 ```rust
-// 1. Dereferencing raw pointers
+// 1. Разыменование сырых указателей
 let mut value = 42;
 let ptr = &mut value as *mut i32;
-// SAFETY: ptr points to a valid, live local variable.
+// SAFETY: ptr указывает на действительную, живую локальную переменную.
 unsafe {
-    *ptr = 100; // Must be in unsafe block
+    *ptr = 100; // Должно находиться в блоке unsafe
 }
 
-// 2. Calling unsafe functions
+// 2. Вызов небезопасных функций
 unsafe fn dangerous() {
-    // Internal implementation that requires caller to maintain invariants
+    // Внутренняя реализация, которая требует от вызывающего кода соблюдения инвариантов
 }
 
-// SAFETY: no invariants to uphold for this example function.
+// SAFETY: для этой примерной функции инвариантов нет.
 unsafe {
-    dangerous(); // Caller takes responsibility
+    dangerous(); // Ответственность берёт на себя вызывающий код
 }
 
-// 3. Accessing mutable static variables
+// 3. Доступ к изменяемым статическим переменным
 static mut COUNTER: u32 = 0;
-// SAFETY: single-threaded context; no concurrent access to COUNTER.
+// SAFETY: однопоточный контекст; параллельного доступа к COUNTER нет.
 unsafe {
-    COUNTER += 1; // Not thread-safe — caller must ensure synchronization
+    COUNTER += 1; // Не потокобезопасно — вызывающий код должен обеспечить синхронизацию
 }
 
-// 4. Implementing unsafe traits
+// 4. Реализация небезопасных трейтов
 unsafe trait UnsafeTrait {
     fn do_something(&self);
 }
 ```
 
-### C# Comparison: unsafe Keyword
+### Сравнение с C#: ключевое слово unsafe
 
 ```csharp
-// C# unsafe - similar concept, different scope
+// unsafe в C# — похожая идея, но другой масштаб
 unsafe void UnsafeExample()
 {
     int value = 42;
     int* ptr = &value;
     *ptr = 100;
     
-    // C# unsafe is about pointer arithmetic
-    // Rust unsafe is about ownership/borrow rule relaxation
+    // unsafe в C# — это про арифметику указателей
+    // unsafe в Rust — это про ослабление правил владения и заимствования
 }
 
-// C# fixed - pinning managed objects
+// fixed в C# — закрепление управляемых объектов
 unsafe void PinnedExample()
 {
     byte[] buffer = new byte[100];
     fixed (byte* ptr = buffer)
     {
-        // ptr is valid only within this block
+        // ptr действителен только внутри этого блока
     }
 }
 ```
 
-### Safe Wrappers
+### Безопасные обёртки
 
 ```rust
-/// The key pattern: wrap unsafe code in a safe API
+/// Ключевой паттерн: оборачиваем небезопасный код в безопасный API
 pub struct SafeBuffer {
     data: Vec<u8>,
 }
@@ -81,15 +81,15 @@ impl SafeBuffer {
         SafeBuffer { data: vec![0; size] }
     }
     
-    /// Safe API — bounds-checked access
+    /// Безопасный API — доступ с проверкой границ
     pub fn get(&self, index: usize) -> Option<u8> {
         self.data.get(index).copied()
     }
     
-    /// Fast unchecked access — unsafe but wrapped safely with bounds check
+    /// Быстрый доступ без проверки — небезопасный, но безопасно обёрнутый проверкой границ
     pub fn get_unchecked_safe(&self, index: usize) -> Option<u8> {
         if index < self.data.len() {
-            // SAFETY: we just checked that index is in bounds
+            // SAFETY: мы только что проверили, что index находится в границах
             Some(unsafe { *self.data.get_unchecked(index) })
         } else {
             None
@@ -100,19 +100,19 @@ impl SafeBuffer {
 
 ***
 
-## Interop with C# via FFI
+## Взаимодействие с C# через FFI
 
-Rust can expose C-compatible functions that C# can call via P/Invoke.
+Rust может экспортировать функции с C-совместимым интерфейсом, которые C# вызывает через P/Invoke.
 
 ```mermaid
 graph LR
-    subgraph "C# Process"
-        CS["C# Code"] -->|"P/Invoke"| MI["Marshal Layer<br/>UTF-16 → UTF-8<br/>struct layout"]
+    subgraph "Процесс C#"
+        CS["Код C#"] -->|"P/Invoke"| MI["Слой маршалинга<br/>UTF-16 → UTF-8<br/>раскладка структур"]
     end
-    MI -->|"C ABI call"| FFI["FFI Boundary"]
+    MI -->|"Вызов по C ABI"| FFI["Граница FFI"]
     subgraph "Rust cdylib (.so / .dll)"
         FFI --> RF["extern #quot;C#quot; fn<br/>#[no_mangle]"]
-        RF --> Safe["Safe Rust<br/>internals"]
+        RF --> Safe["Безопасные внутренности<br/>на Rust"]
     end
 
     style FFI fill:#fff9c4,color:#000
@@ -120,7 +120,7 @@ graph LR
     style Safe fill:#c8e6c9,color:#000
 ```
 
-### Rust Library (compiled as cdylib)
+### Библиотека Rust (собирается как cdylib)
 
 ```rust
 // src/lib.rs
@@ -131,7 +131,7 @@ pub extern "C" fn add_numbers(a: i32, b: i32) -> i32 {
 
 #[no_mangle]
 pub extern "C" fn process_string(input: *const std::os::raw::c_char) -> i32 {
-    // SAFETY: input is non-null (checked inside) and assumed null-terminated by caller.
+    // SAFETY: input проверяется на null внутри, а вызывающий код гарантирует null-терминированность.
     let c_str = unsafe {
         if input.is_null() {
             return -1;
@@ -152,7 +152,7 @@ pub extern "C" fn process_string(input: *const std::os::raw::c_char) -> i32 {
 crate-type = ["cdylib"]
 ```
 
-### C# Consumer (P/Invoke)
+### Потребитель на C# (P/Invoke)
 
 ```csharp
 using System.Runtime.InteropServices;
@@ -167,54 +167,54 @@ public static class RustInterop
         [MarshalAs(UnmanagedType.LPUTF8Str)] string input);
 }
 
-// Usage
+// Использование
 int sum = RustInterop.add_numbers(5, 3);  // 8
 int len = RustInterop.process_string("Hello from C#!");  // 15
 ```
 
-### FFI Safety Checklist
+### Чек-лист безопасности FFI
 
-When exposing Rust functions to C#, these rules prevent the most common bugs:
+При экспорте функций Rust в C# эти правила предотвращают большинство частых ошибок:
 
-1. **Always use `extern "C"`** — without it, Rust uses its own (unstable) calling convention. C# P/Invoke expects the C ABI.
+1. **Всегда используйте `extern "C"`** — без него Rust применяет собственное (нестабильное) соглашение о вызовах. P/Invoke в C# ожидает C ABI.
 
-2. **`#[no_mangle]`** — prevents the Rust compiler from mangling the function name. Without it, C# can't find the symbol.
+2. **`#[no_mangle]`** — не даёт компилятору Rust менять имя функции. Без него C# не сможет найти символ.
 
-3. **Never let a panic cross the FFI boundary** — a Rust panic unwinding into C# is **undefined behavior**. Catch panics at FFI entry points:
+3. **Никогда не пускайте панику через границу FFI** — раскрутка паники Rust внутрь C# является **неопределённым поведением**. Перехватывайте паники на входах в FFI:
 
     ```rust
     #[no_mangle]
     pub extern "C" fn safe_ffi_function() -> i32 {
         match std::panic::catch_unwind(|| {
-            // actual logic here
+            // реальная логика здесь
             42
         }) {
             Ok(result) => result,
-            Err(_) => -1,  // Return error code instead of panicking into C#
+            Err(_) => -1,  // Возвращаем код ошибки вместо паники внутрь C#
         }
     }
     ```
 
-4. **Opaque vs transparent structs** — if C# only holds a pointer (opaque handle), `#[repr(C)]` is not needed. If C# reads struct fields via `StructLayout`, you **must** use `#[repr(C)]`:
+4. **Непрозрачные и прозрачные структуры** — если C# хранит только указатель (непрозрачный дескриптор), `#[repr(C)]` не нужен. Если C# читает поля структуры через `StructLayout`, `#[repr(C)]` **обязателен**:
 
     ```rust
-    // Opaque — C# only holds IntPtr. No #[repr(C)] needed.
-    pub struct Connection { /* Rust-only fields */ }
+    // Непрозрачная — C# хранит только IntPtr. #[repr(C)] не нужен.
+    pub struct Connection { /* поля только для Rust */ }
 
-    // Transparent — C# marshals fields directly. MUST use #[repr(C)].
+    // Прозрачная — C# маршалирует поля напрямую. ОБЯЗАТЕЛЬНО #[repr(C)].
     #[repr(C)]
     pub struct Point { pub x: f64, pub y: f64 }
     ```
 
-5. **Null pointer checks** — always validate pointers before dereferencing. C# can pass `IntPtr.Zero`.
+5. **Проверки на null-указатели** — всегда проверяйте указатели перед разыменованием. C# может передать `IntPtr.Zero`.
 
-6. **String encoding** — C# uses UTF-16 internally. `MarshalAs(UnmanagedType.LPUTF8Str)` converts to UTF-8 for Rust's `CStr`. Document this contract explicitly.
+6. **Кодировка строк** — C# использует UTF-16 внутренне. `MarshalAs(UnmanagedType.LPUTF8Str)` конвертирует строку в UTF-8 для `CStr` в Rust. Этот контракт нужно явно документировать.
 
-### End-to-End Example: Opaque Handle with Lifecycle Management
+### Сквозной пример: непрозрачный дескриптор с управлением жизненным циклом
 
-This pattern is common in production: Rust owns an object, C# holds an opaque handle, and explicit create/destroy functions manage the lifecycle.
+Этот паттерн распространён в продакшене: Rust владеет объектом, C# хранит непрозрачный дескриптор, а явные функции создания и уничтожения управляют жизненным циклом.
 
-**Rust side** (`src/lib.rs`):
+**Сторона Rust** (`src/lib.rs`):
 
 ```rust
 use std::ffi::{c_char, CStr};
@@ -225,7 +225,7 @@ pub struct ImageProcessor {
     pixels: Vec<u8>,
 }
 
-/// Create a new processor. Returns null on invalid dimensions.
+/// Создаёт новый обработчик. Возвращает null при некорректных размерах.
 #[no_mangle]
 pub extern "C" fn processor_new(width: u32, height: u32) -> *mut ImageProcessor {
     if width == 0 || height == 0 {
@@ -236,13 +236,13 @@ pub extern "C" fn processor_new(width: u32, height: u32) -> *mut ImageProcessor 
         height,
         pixels: vec![0u8; (width * height * 4) as usize],
     };
-    Box::into_raw(Box::new(proc)) // Allocate on heap, return raw pointer
+    Box::into_raw(Box::new(proc)) // Выделяем в куче, возвращаем сырой указатель
 }
 
-/// Apply a grayscale filter. Returns 0 on success, -1 on null pointer.
+/// Применяет фильтр оттенков серого. Возвращает 0 при успехе, -1 при null-указателе.
 #[no_mangle]
 pub extern "C" fn processor_grayscale(ptr: *mut ImageProcessor) -> i32 {
-    // SAFETY: ptr was created by Box::into_raw (non-null), still valid.
+    // SAFETY: ptr был создан через Box::into_raw (не null), всё ещё действителен.
     let proc = match unsafe { ptr.as_mut() } {
         Some(p) => p,
         None => return -1,
@@ -258,17 +258,17 @@ pub extern "C" fn processor_grayscale(ptr: *mut ImageProcessor) -> i32 {
     0
 }
 
-/// Destroy the processor. Safe to call with null.
+/// Уничтожает обработчик. Безопасно вызывать с null.
 #[no_mangle]
 pub extern "C" fn processor_free(ptr: *mut ImageProcessor) {
     if !ptr.is_null() {
-        // SAFETY: ptr was created by processor_new via Box::into_raw
+        // SAFETY: ptr был создан через processor_new с помощью Box::into_raw
         unsafe { drop(Box::from_raw(ptr)); }
     }
 }
 ```
 
-**C# side**:
+**Сторона C#**:
 
 ```csharp
 using System.Runtime.InteropServices;
@@ -309,40 +309,40 @@ public sealed class ImageProcessor : IDisposable
     }
 }
 
-// Usage — IDisposable ensures Rust memory is freed
+// Использование — IDisposable гарантирует освобождение памяти Rust
 using var proc = new ImageProcessor(1920, 1080);
 proc.Grayscale();
-// proc.Dispose() called automatically → processor_free() → Rust drops the Vec
+// proc.Dispose() вызывается автоматически → processor_free() → Rust освобождает Vec
 ```
 
-> **Key insight**: This is the Rust equivalent of C#'s `SafeHandle` pattern. Rust's `Box::into_raw` / `Box::from_raw` transfers ownership across the FFI boundary, and the C# `IDisposable` wrapper ensures cleanup.
+> **Ключевая мысль**: это аналог паттерна `SafeHandle` в C#. `Box::into_raw` / `Box::from_raw` передают владение через границу FFI, а обёртка `IDisposable` в C# обеспечивает очистку.
 
 ---
 
-## Exercises
+## Упражнения
 
 <details>
-<summary><strong>🏋️ Exercise: Safe Wrapper for Raw Pointer</strong> (click to expand)</summary>
+<summary><strong>🏋️ Упражнение: безопасная обёртка над сырым указателем</strong> (нажмите, чтобы раскрыть)</summary>
 
-You receive a raw pointer from a C library. Write a safe Rust wrapper:
+Вы получаете сырой указатель из C-библиотеки. Напишите безопасную обёртку на Rust:
 
 ```rust
-// Simulated C API
+// Имитация C API
 extern "C" {
     fn lib_create_buffer(size: usize) -> *mut u8;
     fn lib_free_buffer(ptr: *mut u8);
 }
 ```
 
-Requirements:
+Требования:
 
-1. Create a `SafeBuffer` struct that wraps the raw pointer
-2. Implement `Drop` to call `lib_free_buffer`
-3. Provide a safe `&[u8]` view via `as_slice()`
-4. Ensure `SafeBuffer::new()` returns `None` if the pointer is null
+1. Создайте структуру `SafeBuffer`, которая оборачивает сырой указатель
+2. Реализуйте `Drop`, который вызывает `lib_free_buffer`
+3. Предоставьте безопасное представление `&[u8]` через `as_slice()`
+4. Убедитесь, что `SafeBuffer::new()` возвращает `None`, если указатель null
 
 <details>
-<summary>🔑 Solution</summary>
+<summary>🔑 Решение</summary>
 
 ```rust,ignore
 struct SafeBuffer {
@@ -352,7 +352,7 @@ struct SafeBuffer {
 
 impl SafeBuffer {
     fn new(size: usize) -> Option<Self> {
-        // SAFETY: lib_create_buffer returns a valid pointer or null (checked below).
+        // SAFETY: lib_create_buffer возвращает действительный указатель или null (проверяется ниже).
         let ptr = unsafe { lib_create_buffer(size) };
         if ptr.is_null() {
             None
@@ -362,29 +362,30 @@ impl SafeBuffer {
     }
 
     fn as_slice(&self) -> &[u8] {
-        // SAFETY: ptr is non-null (checked in new()), len is the
-        // allocated size, and we hold exclusive ownership.
+        // SAFETY: ptr не null (проверено в new()), len — это выделенный размер,
+        // и мы владеем буфером монопольно.
         unsafe { std::slice::from_raw_parts(self.ptr, self.len) }
     }
 }
 
 impl Drop for SafeBuffer {
     fn drop(&mut self) {
-        // SAFETY: ptr was allocated by lib_create_buffer
+        // SAFETY: ptr был выделен через lib_create_buffer
         unsafe { lib_free_buffer(self.ptr); }
     }
 }
 
-// Usage: all unsafe is contained in SafeBuffer
+// Использование: весь unsafe сосредоточен внутри SafeBuffer
 fn process(buf: &SafeBuffer) {
-    let data = buf.as_slice(); // completely safe API
+    let data = buf.as_slice(); // полностью безопасный API
     println!("First byte: {}", data[0]);
 }
 ```
 
-**Key pattern**: Encapsulate `unsafe` in a small module with `// SAFETY:` comments. Expose a 100% safe public API. This is how Rust's standard library works — `Vec`, `String`, `HashMap` all contain unsafe internally but present safe interfaces.
+**Ключевой паттерн**: инкапсулируйте `unsafe` в небольшом модуле с комментариями `// SAFETY:`. Открывайте наружу полностью безопасный публичный API. Так устроена стандартная библиотека Rust — `Vec`, `String`, `HashMap` внутри содержат unsafe-код, но предоставляют безопасные интерфейсы.
 
 </details>
 </details>
 
 ***
+

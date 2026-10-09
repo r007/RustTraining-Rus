@@ -1,20 +1,20 @@
-## Capstone Project: Build a CLI Weather Tool
+## Итоговый проект: CLI-утилита для погоды на Rust
 
-> **What you'll learn:** How to combine everything — structs, traits, error handling, async, modules,
-> serde, and CLI argument parsing — into a working Rust application. This mirrors the kind of tool
-> a C# developer would build with `HttpClient`, `System.Text.Json`, and `System.CommandLine`.
+> **Что вы узнаете:** как объединить всё изученное — структуры, трейты, обработку ошибок, асинхронность, модули,
+> serde и разбор аргументов командной строки — в работающее приложение на Rust. Это повторяет тот тип утилиты, который
+> разработчик C# написал бы с `HttpClient`, `System.Text.Json` и `System.CommandLine`.
 >
-> **Difficulty:** 🟡 Intermediate
+> **Сложность:** 🟡 Средний
 
-This capstone pulls together concepts from every part of the book. You'll build `weather-cli`, a command-line tool that fetches weather data from an API and displays it. The project is structured as a mini-crate with proper module layout, error types, and tests.
+Этот итоговый проект собирает концепции из всех частей книги. Вы создадите `weather-cli` — утилиту командной строки, которая получает данные о погоде из API и выводит их. Проект организован как мини-крейт с правильной структурой модулей, типами ошибок и тестами.
 
-### Project Overview
+### Обзор проекта
 
 ```mermaid
 graph TD
-    CLI["main.rs<br/>clap CLI parser"] --> Client["client.rs<br/>reqwest + tokio"]
-    Client -->|"HTTP GET"| API["Weather API"]
-    Client -->|"JSON → struct"| Model["weather.rs<br/>serde Deserialize"]
+    CLI["main.rs<br/>разбор CLI через clap"] --> Client["client.rs<br/>reqwest + tokio"]
+    Client -->|"HTTP GET"| API["Погодный API"]
+    Client -->|"JSON → структура"| Model["weather.rs<br/>serde Deserialize"]
     Model --> Display["display.rs<br/>fmt::Display"]
     CLI --> Err["error.rs<br/>thiserror"]
     Client --> Err
@@ -24,35 +24,35 @@ graph TD
     style Model fill:#c8e6c9,color:#000
 ```
 
-**What you'll build:**
+**Что вы создадите:**
 ```
 $ weather-cli --city "Seattle"
 🌧  Seattle: 12°C, Overcast clouds
-    Humidity: 82%  Wind: 5.4 m/s
+    Влажность: 82%  Ветер: 5.4 м/с
 ```
 
-**Concepts exercised:**
-| Book Chapter | Concept Used Here |
+**Используемые концепции:**
+| Глава книги | Концепция, используемая здесь |
 |---|---|
-| Ch05 (Structs) | `WeatherReport`, `Config` data types |
-| Ch08 (Modules) | `src/lib.rs`, `src/client.rs`, `src/display.rs` |
-| Ch09 (Errors) | Custom `WeatherError` with `thiserror` |
-| Ch10 (Traits) | `Display` impl for formatted output |
-| Ch11 (From/Into) | JSON deserialization via `serde` |
-| Ch12 (Iterators) | Processing API response arrays |
-| Ch13 (Async) | `reqwest` + `tokio` for HTTP calls |
-| Ch14-1 (Testing) | Unit tests + integration test |
+| Гл. 05 (Структуры) | Типы данных `WeatherReport`, `Config` |
+| Гл. 08 (Модули) | `src/lib.rs`, `src/client.rs`, `src/display.rs` |
+| Гл. 09 (Ошибки) | Собственный `WeatherError` с `thiserror` |
+| Гл. 10 (Трейты) | Реализация `Display` для форматированного вывода |
+| Гл. 11 (From/Into) | Десериализация JSON через `serde` |
+| Гл. 12 (Итераторы) | Обработка массивов из ответа API |
+| Гл. 13 (Async) | `reqwest` + `tokio` для HTTP-запросов |
+| Гл. 14-1 (Тестирование) | Модульные тесты и интеграционный тест |
 
 ---
 
-### Step 1: Project Setup
+### Шаг 1: настройка проекта
 
 ```bash
 cargo new weather-cli
 cd weather-cli
 ```
 
-Add dependencies to `Cargo.toml`:
+Добавьте зависимости в `Cargo.toml`:
 ```toml
 [package]
 name = "weather-cli"
@@ -60,28 +60,28 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-clap = { version = "4", features = ["derive"] }   # CLI args (like System.CommandLine)
-reqwest = { version = "0.12", features = ["json"] } # HTTP client (like HttpClient)
-serde = { version = "1", features = ["derive"] }    # Serialization (like System.Text.Json)
+clap = { version = "4", features = ["derive"] }   # Аргументы CLI (как System.CommandLine)
+reqwest = { version = "0.12", features = ["json"] } # HTTP-клиент (как HttpClient)
+serde = { version = "1", features = ["derive"] }    # Сериализация (как System.Text.Json)
 serde_json = "1"
-thiserror = "2"                                      # Error types
-tokio = { version = "1", features = ["full"] }       # Async runtime
+thiserror = "2"                                      # Типы ошибок
+tokio = { version = "1", features = ["full"] }       # Асинхронный рантайм
 ```
 
 ```csharp
-// C# equivalent dependencies:
+// Эквивалентные зависимости в C#:
 // dotnet add package System.CommandLine
 // dotnet add package System.Net.Http.Json
-// (System.Text.Json and HttpClient are built-in)
+// (System.Text.Json и HttpClient входят в состав платформы)
 ```
 
-### Step 2: Define Your Data Types
+### Шаг 2: определите типы данных
 
-Create `src/weather.rs`:
+Создайте `src/weather.rs`:
 ```rust
 use serde::Deserialize;
 
-/// Raw API response (matches JSON shape)
+/// Сырой ответ API (повторяет структуру JSON)
 #[derive(Deserialize, Debug)]
 pub struct ApiResponse {
     pub main: MainData,
@@ -107,7 +107,7 @@ pub struct WindData {
     pub speed: f64,
 }
 
-/// Our domain type (clean, decoupled from API)
+/// Наш доменный тип (чистый, отделённый от API)
 #[derive(Debug, Clone)]
 pub struct WeatherReport {
     pub city: String,
@@ -136,38 +136,38 @@ impl From<ApiResponse> for WeatherReport {
 ```
 
 ```csharp
-// C# equivalent:
+// Эквивалент в C#:
 // public record ApiResponse(MainData Main, List<WeatherCondition> Weather, ...);
 // public record WeatherReport(string City, double TempCelsius, ...);
-// Manual mapping or AutoMapper
+// Ручное маппирование или AutoMapper
 ```
 
-**Key difference:** `#[derive(Deserialize)]` + `From` impl replaces C#'s `JsonSerializer.Deserialize<T>()` + AutoMapper. Both happen at compile time in Rust — no reflection.
+**Ключевое отличие:** `#[derive(Deserialize)]` + реализация `From` заменяют `JsonSerializer.Deserialize<T>()` + AutoMapper. В Rust оба этих шага выполняются на этапе компиляции — без рефлексии.
 
-### Step 3: Error Type
+### Шаг 3: тип ошибок
 
-Create `src/error.rs`:
+Создайте `src/error.rs`:
 ```rust
 use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum WeatherError {
-    #[error("HTTP request failed: {0}")]
+    #[error("Ошибка HTTP-запроса: {0}")]
     Http(#[from] reqwest::Error),
 
-    #[error("City not found: {0}")]
+    #[error("Город не найден: {0}")]
     CityNotFound(String),
 
-    #[error("API key not set — export WEATHER_API_KEY")]
+    #[error("Ключ API не задан — выполните export WEATHER_API_KEY")]
     MissingApiKey,
 }
 
 pub type Result<T> = std::result::Result<T, WeatherError>;
 ```
 
-### Step 4: HTTP Client
+### Шаг 4: HTTP-клиент
 
-Create `src/client.rs`:
+Создайте `src/client.rs`:
 ```rust
 use crate::error::{WeatherError, Result};
 use crate::weather::{ApiResponse, WeatherReport};
@@ -204,21 +204,21 @@ impl WeatherClient {
 ```
 
 ```csharp
-// C# equivalent:
+// Эквивалент в C#:
 // var response = await _httpClient.GetAsync(url);
 // if (response.StatusCode == HttpStatusCode.NotFound)
 //     throw new CityNotFoundException(city);
 // var data = await response.Content.ReadFromJsonAsync<ApiResponse>();
 ```
 
-**Key differences:**
-- `?` operator replaces `try/catch` — errors propagate automatically via `Result`
-- `WeatherReport::from(api_data)` uses the `From` trait instead of AutoMapper
-- No `IHttpClientFactory` — `reqwest::Client` handles connection pooling internally
+**Ключевые отличия:**
+- Оператор `?` заменяет `try/catch` — ошибки распространяются автоматически через `Result`
+- `WeatherReport::from(api_data)` использует трейт `From` вместо AutoMapper
+- `IHttpClientFactory` не нужен — `reqwest::Client` сам управляет пулом соединений
 
-### Step 5: Display Formatting
+### Шаг 5: форматирование вывода
 
-Create `src/display.rs`:
+Создайте `src/display.rs`:
 ```rust
 use std::fmt;
 use crate::weather::WeatherReport;
@@ -228,7 +228,7 @@ impl fmt::Display for WeatherReport {
         let icon = weather_icon(&self.description);
         writeln!(f, "{}  {}: {:.0}°C, {}",
             icon, self.city, self.temp_celsius, self.description)?;
-        write!(f, "    Humidity: {}%  Wind: {:.1} m/s",
+        write!(f, "    Влажность: {}%  Ветер: {:.1} м/с",
             self.humidity, self.wind_speed)
     }
 }
@@ -244,7 +244,7 @@ fn weather_icon(description: &str) -> &str {
 }
 ```
 
-### Step 6: Wire It All Together
+### Шаг 6: собираем всё вместе
 
 `src/lib.rs`:
 ```rust
@@ -260,9 +260,9 @@ use clap::Parser;
 use weather_cli::{client::WeatherClient, error::WeatherError};
 
 #[derive(Parser)]
-#[command(name = "weather-cli", about = "Fetch weather from the command line")]
+#[command(name = "weather-cli", about = "Получение погоды из командной строки")]
 struct Cli {
-    /// City name to look up
+    /// Название города для поиска
     #[arg(short, long)]
     city: String,
 }
@@ -274,7 +274,7 @@ async fn main() {
     let api_key = match std::env::var("WEATHER_API_KEY") {
         Ok(key) => key,
         Err(_) => {
-            eprintln!("Error: {}", WeatherError::MissingApiKey);
+            eprintln!("Ошибка: {}", WeatherError::MissingApiKey);
             std::process::exit(1);
         }
     };
@@ -284,21 +284,21 @@ async fn main() {
     match client.get_weather(&cli.city).await {
         Ok(report) => println!("{report}"),
         Err(WeatherError::CityNotFound(city)) => {
-            eprintln!("City not found: {city}");
+            eprintln!("Город не найден: {city}");
             std::process::exit(1);
         }
         Err(e) => {
-            eprintln!("Error: {e}");
+            eprintln!("Ошибка: {e}");
             std::process::exit(1);
         }
     }
 }
 ```
 
-### Step 7: Tests
+### Шаг 7: тесты
 
 ```rust
-// In src/weather.rs or tests/weather_test.rs
+// В src/weather.rs или tests/weather_test.rs
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -351,23 +351,23 @@ mod tests {
 
 ---
 
-### Final File Layout
+### Итоговая структура файлов
 
 ```
 weather-cli/
 ├── Cargo.toml
 ├── src/
-│   ├── main.rs        # CLI entry point (clap)
-│   ├── lib.rs         # Module declarations
-│   ├── client.rs      # HTTP client (reqwest + tokio)
-│   ├── weather.rs     # Data types + From impl + tests
-│   ├── display.rs     # Display formatting
-│   └── error.rs       # WeatherError + Result alias
+│   ├── main.rs        # Точка входа CLI (clap)
+│   ├── lib.rs         # Объявления модулей
+│   ├── client.rs      # HTTP-клиент (reqwest + tokio)
+│   ├── weather.rs     # Типы данных + реализация From + тесты
+│   ├── display.rs     # Форматирование вывода
+│   └── error.rs       # WeatherError + псевдоним Result
 └── tests/
-    └── integration.rs # Integration tests
+    └── integration.rs # Интеграционные тесты
 ```
 
-Compare to the C# equivalent:
+Сравните с эквивалентом на C#:
 ```
 WeatherCli/
 ├── WeatherCli.csproj
@@ -381,15 +381,15 @@ WeatherCli/
     └── WeatherTests.cs
 ```
 
-**The Rust version is remarkably similar in structure.** The main differences are:
-- `mod` declarations instead of namespaces
-- `Result<T, E>` instead of exceptions
-- `From` trait instead of AutoMapper
-- Explicit `#[tokio::main]` instead of built-in async runtime
+**Версия на Rust удивительно похожа по структуре.** Основные различия:
+- Объявления `mod` вместо пространств имён
+- `Result<T, E>` вместо исключений
+- Трейт `From` вместо AutoMapper
+- Явный `#[tokio::main]` вместо встроенного асинхронного рантайма
 
-### Bonus: Integration Test Stub
+### Бонус: заготовка интеграционного теста
 
-Create `tests/integration.rs` to test the public API without hitting a real server:
+Создайте `tests/integration.rs`, чтобы проверить публичный API без обращения к настоящему серверу:
 
 ```rust
 // tests/integration.rs
@@ -412,20 +412,20 @@ fn weather_report_display_roundtrip() {
 }
 ```
 
-Run with `cargo test` — Rust discovers tests in both `src/` (`#[cfg(test)]` modules) and `tests/` (integration tests) automatically. No test framework configuration needed — compare that to setting up xUnit/NUnit in C#.
+Запустите `cargo test` — Rust автоматически находит тесты и в `src/` (модули `#[cfg(test)]`), и в `tests/` (интеграционные тесты). Никакой настройки тестового фреймворка не требуется — сравните с настройкой xUnit/NUnit в C#.
 
 ---
 
-### Extension Challenges
+### Задания для продолжения
 
-Once it works, try these to deepen your skills:
+Когда всё заработает, попробуйте эти задания, чтобы углубить навыки:
 
-1. **Add caching** — Store the last API response in a file. On startup, check if it's less than 10 minutes old and skip the HTTP call. This exercises `std::fs`, `serde_json::to_writer`, and `SystemTime`.
+1. **Добавьте кэширование** — сохраняйте последний ответ API в файл. При запуске проверяйте, не старше ли он 10 минут, и если нет — пропускайте HTTP-запрос. Это упражнение на `std::fs`, `serde_json::to_writer` и `SystemTime`.
 
-2. **Add multiple cities** — Accept `--city "Seattle,Portland,Vancouver"` and fetch all concurrently with `tokio::join!`. This exercises concurrent async.
+2. **Добавьте поддержку нескольких городов** — принимайте `--city "Seattle,Portland,Vancouver"` и загружайте все города конкурентно через `tokio::join!`. Это упражнение на конкурентное асинхронное программирование.
 
-3. **Add a `--format json` flag** — Output the report as JSON instead of human-readable text using `serde_json::to_string_pretty`. This exercises conditional formatting and `Serialize`.
+3. **Добавьте флаг `--format json`** — выводите отчёт в формате JSON вместо читаемого текста с помощью `serde_json::to_string_pretty`. Это упражнение на условное форматирование и `Serialize`.
 
-4. **Write an integration test** — Create `tests/integration.rs` that tests the full flow with a mock HTTP server using `wiremock`. This exercises the `tests/` directory pattern from ch14-1.
+4. **Напишите интеграционный тест** — создайте `tests/integration.rs`, который проверяет полный сценарий с имитацией HTTP-сервера через `wiremock`. Это упражнение на шаблон каталога `tests/` из главы 14-1.
 
 ***

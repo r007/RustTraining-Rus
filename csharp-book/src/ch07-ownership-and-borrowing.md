@@ -29,7 +29,7 @@ public void ProcessList(List<int> list)
 
 ### Правила владения в Rust
 1. **У каждого значения ровно один владелец** (если вы не выберете разделяемое владение через `Rc<T>`/`Arc<T>` — см. [Умные указатели](ch07-3-smart-pointers-beyond-single-ownership.md))
-2. **Когда владелец выходит из области видимости, значение уничтожается** (детерминированная очистка — см. [Drop](ch07-3-smart-pointers-beyond-single-ownership.md#drop-rusts-idisposable))
+2. **Когда владелец выходит из области видимости, значение уничтожается** (детерминированная очистка — см. [Drop](ch07-3-smart-pointers-beyond-single-ownership.md#drop-аналог-idisposable-в-rust))
 3. **Владение можно передать (переместить)**
 
 ```rust
