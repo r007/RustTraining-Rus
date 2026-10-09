@@ -1,66 +1,60 @@
-# Capability Mixins — Compile-Time Hardware Contracts 🟡
+# Capability-миксины: контракты с аппаратурой на этапе компиляции 🟡
 
-> **What you'll learn:** How ingredient traits (bus capabilities) combined with mixin traits and blanket impls eliminate diagnostic code duplication while guaranteeing every hardware dependency is satisfied at compile time.
+> **Что вы узнаете:** как трейты-ингредиенты (возможности шин) в сочетании с трейтами-миксинами и blanket impl устраняют дублирование диагностического кода и гарантируют на этапе компиляции, что каждая аппаратная зависимость выполнена.
 >
-> **Cross-references:** [ch04](ch04-capability-tokens-zero-cost-proof-of-aut.md) (capability tokens), [ch09](ch09-phantom-types-for-resource-tracking.md) (phantom types), [ch10](ch10-putting-it-all-together-a-complete-diagn.md) (integration)
+> **Перекрёстные ссылки:** [гл. 04](ch04-capability-tokens-zero-cost-proof-of-aut.md) (capability-токены), [гл. 09](ch09-phantom-types-for-resource-tracking.md) (phantom-типы), [гл. 10](ch10-putting-it-all-together-a-complete-diagn.md) (интеграция)
 
-## The Problem: Diagnostic Code Duplication
+## Проблема: дублирование диагностического кода
 
-Server platforms share diagnostic patterns across subsystems. Fan diagnostics,
-temperature monitoring, and power sequencing all follow similar workflows but
-operate on different hardware buses. Without abstraction, you get copy-paste:
+Серверные платформы используют общие диагностические паттерны в разных подсистемах. Диагностика вентиляторов, мониторинг температуры и последовательность подачи питания следуют похожим сценариям, но работают с разными аппаратными шинами. Без абстракций возникает copy-paste:
 
 ```c
-// C — duplicated logic across subsystems
+// C — дублирующаяся логика в разных подсистемах
 int run_fan_diag(spi_bus_t *spi, i2c_bus_t *i2c) {
-    // ... 50 lines of SPI sensor read ...
-    // ... 30 lines of I2C register check ...
-    // ... 20 lines of threshold comparison (same as CPU diag) ...
+    // ... 50 строк чтения датчика по SPI ...
+    // ... 30 строк проверки регистров I2C ...
+    // ... 20 строк сравнения с порогами (как в диагностике CPU) ...
 }
 
 int run_cpu_temp_diag(i2c_bus_t *i2c, gpio_t *gpio) {
-    // ... 30 lines of I2C register check (same as fan diag) ...
-    // ... 15 lines of GPIO alert check ...
-    // ... 20 lines of threshold comparison (same as fan diag) ...
+    // ... 30 строк проверки регистров I2C (как в диагностике вентиляторов) ...
+    // ... 15 строк проверки сигнала тревоги GPIO ...
+    // ... 20 строк сравнения с порогами (как в диагностике вентиляторов) ...
 }
 ```
 
-The threshold comparison logic is identical, but you can't extract it because the
-bus types differ. With capability mixins, each hardware bus is an **ingredient
-trait**, and diagnostic behaviors are automatically provided when the right
-ingredients are present.
+Логика сравнения с порогами одинакова, но вынести её нельзя, потому что типы шин различаются. С capability-миксинами каждая аппаратная шина становится **трейтом-ингредиентом**, а диагностические поведения предоставляются автоматически, когда есть нужные ингредиенты.
 
-## Ingredient Traits (Hardware Capabilities)
+## Трейты-ингредиенты (аппаратные возможности)
 
-Each bus or peripheral is an associated type on a trait. A diagnostic controller
-declares which buses it has:
+Каждая шина или периферийное устройство — это ассоциированный тип трейта. Диагностический контроллер объявляет, какие шины у него есть:
 
 ```rust,ignore
-/// SPI bus capability.
+/// Возможность шины SPI.
 pub trait HasSpi {
     type Spi: SpiBus;
     fn spi(&self) -> &Self::Spi;
 }
 
-/// I2C bus capability.
+/// Возможность шины I2C.
 pub trait HasI2c {
     type I2c: I2cBus;
     fn i2c(&self) -> &Self::I2c;
 }
 
-/// GPIO pin access capability.
+/// Возможность доступа к пинам GPIO.
 pub trait HasGpio {
     type Gpio: GpioController;
     fn gpio(&self) -> &Self::Gpio;
 }
 
-/// IPMI access capability.
+/// Возможность доступа к IPMI.
 pub trait HasIpmi {
     type Ipmi: IpmiClient;
     fn ipmi(&self) -> &Self::Ipmi;
 }
 
-// Bus trait definitions:
+// Определения трейтов шин:
 pub trait SpiBus {
     fn transfer(&self, data: &[u8]) -> Vec<u8>;
 }
@@ -80,10 +74,9 @@ pub trait IpmiClient {
 }
 ```
 
-## Mixin Traits (Diagnostic Behaviors)
+## Трейты-миксины (диагностические поведения)
 
-A mixin provides behavior **automatically** to any type that has the required
-capabilities:
+Миксин предоставляет поведение **автоматически** любому типу, у которого есть нужные возможности:
 
 ```rust,ignore
 # pub trait SpiBus { fn transfer(&self, data: &[u8]) -> Vec<u8>; }
@@ -98,26 +91,26 @@ capabilities:
 # pub trait HasGpio { type Gpio: GpioController; fn gpio(&self) -> &Self::Gpio; }
 # pub trait HasIpmi { type Ipmi: IpmiClient; fn ipmi(&self) -> &Self::Ipmi; }
 
-/// Fan diagnostic mixin — auto-implemented for anything with SPI + I2C.
+/// Миксин диагностики вентиляторов — реализуется автоматически для любого типа с SPI + I2C.
 pub trait FanDiagMixin: HasSpi + HasI2c {
     fn read_fan_speed(&self, fan_id: u8) -> u32 {
-        // Read tachometer via SPI
+        // Считываем тахометр через SPI
         let cmd = [0x80 | fan_id, 0x00];
         let response = self.spi().transfer(&cmd);
         u32::from_be_bytes([0, 0, response[0], response[1]])
     }
 
     fn set_fan_pwm(&self, fan_id: u8, duty_percent: u8) {
-        // Set PWM via I2C controller
+        // Устанавливаем PWM через контроллер I2C
         self.i2c().write_register(0x2E, fan_id, duty_percent);
     }
 
     fn run_fan_diagnostic(&self) -> bool {
-        // Full diagnostic: read all fans, check thresholds
+        // Полная диагностика: читаем все вентиляторы, проверяем пороги
         for fan_id in 0..6 {
             let speed = self.read_fan_speed(fan_id);
             if speed < 1000 || speed > 20000 {
-                println!("Fan {fan_id}: FAIL ({speed} RPM)");
+                println!("Вентилятор {fan_id}: ОШИБКА ({speed} об/мин)");
                 return false;
             }
         }
@@ -125,14 +118,14 @@ pub trait FanDiagMixin: HasSpi + HasI2c {
     }
 }
 
-// Blanket implementation — ANY type with SPI + I2C gets FanDiagMixin for free
+// Blanket-реализация — ЛЮБОЙ тип с SPI + I2C получает FanDiagMixin бесплатно
 impl<T: HasSpi + HasI2c> FanDiagMixin for T {}
 
-/// Temperature monitoring mixin — requires I2C + GPIO.
+/// Миксин мониторинга температуры — требует I2C + GPIO.
 pub trait TempMonitorMixin: HasI2c + HasGpio {
     fn read_temperature(&self, sensor_addr: u8) -> f64 {
         let raw = self.i2c().read_register(sensor_addr, 0x00);
-        raw as f64 * 0.5  // 0.5°C per LSB
+        raw as f64 * 0.5  // 0.5°C на младший разряд (LSB)
     }
 
     fn check_thermal_alert(&self, alert_pin: u32) -> bool {
@@ -143,11 +136,11 @@ pub trait TempMonitorMixin: HasI2c + HasGpio {
         for addr in [0x48, 0x49, 0x4A] {
             let temp = self.read_temperature(addr);
             if temp > 95.0 {
-                println!("Sensor 0x{addr:02X}: CRITICAL ({temp}°C)");
+                println!("Датчик 0x{addr:02X}: КРИТИЧНО ({temp}°C)");
                 return false;
             }
             if self.check_thermal_alert(addr as u32) {
-                println!("Sensor 0x{addr:02X}: ALERT pin asserted");
+                println!("Датчик 0x{addr:02X}: сработал сигнал ALERT");
                 return false;
             }
         }
@@ -157,11 +150,11 @@ pub trait TempMonitorMixin: HasI2c + HasGpio {
 
 impl<T: HasI2c + HasGpio> TempMonitorMixin for T {}
 
-/// Power sequencing mixin — requires I2C + IPMI.
+/// Миксин последовательности подачи питания — требует I2C + IPMI.
 pub trait PowerSeqMixin: HasI2c + HasIpmi {
     fn read_voltage_rail(&self, rail: u8) -> f64 {
         let raw = self.i2c().read_register(0x40, rail);
-        raw as f64 * 0.01  // 10mV per LSB
+        raw as f64 * 0.01  // 10 мВ на младший разряд (LSB)
     }
 
     fn check_power_good(&self) -> bool {
@@ -173,10 +166,9 @@ pub trait PowerSeqMixin: HasI2c + HasIpmi {
 impl<T: HasI2c + HasIpmi> PowerSeqMixin for T {}
 ```
 
-## Concrete Controller — Mix and Match
+## Конкретный контроллер: комбинирование
 
-A concrete diagnostic controller declares its capabilities, and **automatically
-inherits** all matching mixins:
+Конкретный диагностический контроллер объявляет свои возможности и **автоматически наследует** все подходящие миксины:
 
 ```rust,ignore
 # pub trait SpiBus { fn transfer(&self, data: &[u8]) -> Vec<u8>; }
@@ -200,7 +192,7 @@ inherits** all matching mixins:
 # pub trait PowerSeqMixin: HasI2c + HasIpmi {}
 # impl<T: HasI2c + HasIpmi> PowerSeqMixin for T {}
 
-// Concrete bus implementations (stubs for illustration)
+// Конкретные реализации шин (заглушки для иллюстрации)
 pub struct LinuxSpi { bus: u8 }
 impl SpiBus for LinuxSpi {
     fn transfer(&self, data: &[u8]) -> Vec<u8> { vec![0; data.len()] }
@@ -223,7 +215,7 @@ impl IpmiClient for IpmiToolClient {
     fn send_raw(&self, _netfn: u8, _cmd: u8, _data: &[u8]) -> Vec<u8> { vec![0x00] }
 }
 
-/// BaseBoardController has ALL buses → gets ALL mixins.
+/// BaseBoardController имеет ВСЕ шины → получает ВСЕ миксины.
 pub struct BaseBoardController {
     spi: LinuxSpi,
     i2c: LinuxI2c,
@@ -251,52 +243,48 @@ impl HasIpmi for BaseBoardController {
     fn ipmi(&self) -> &IpmiToolClient { &self.ipmi }
 }
 
-// BaseBoardController now automatically has:
-// - FanDiagMixin    (because it HasSpi + HasI2c)
-// - TempMonitorMixin (because it HasI2c + HasGpio)
-// - PowerSeqMixin   (because it HasI2c + HasIpmi)
-// No manual implementation needed — blanket impls do it all.
+// BaseBoardController теперь автоматически имеет:
+// - FanDiagMixin     (потому что у него есть HasSpi + HasI2c)
+// - TempMonitorMixin (потому что у него есть HasI2c + HasGpio)
+// - PowerSeqMixin    (потому что у него есть HasI2c + HasIpmi)
+// Ручная реализация не нужна: blanket impl делает всё сам.
 ```
 
-## Correct-by-Construction Aspect
+## Аспект корректности по построению
 
-The mixin pattern is correct-by-construction because:
+Паттерн миксинов корректен по построению, потому что:
 
-1. **You can't call `read_fan_speed()` without SPI** — the method only exists on
-   types that implement `HasSpi + HasI2c`
-2. **You can't forget a bus** — if you remove `HasSpi` from `BaseBoardController`,
-   `FanDiagMixin` methods disappear at compile time
-3. **Mock testing is automatic** — replace `LinuxSpi` with `MockSpi` and
-   all mixin logic works with the mock
-4. **New platforms just declare capabilities** — a GPU daughter card with only I2C
-   gets `TempMonitorMixin` (if it also has GPIO) but not `FanDiagMixin` (no SPI)
+1. **Нельзя вызвать `read_fan_speed()` без SPI**: метод существует только у типов, которые реализуют `HasSpi + HasI2c`
+2. **Нельзя забыть шину**: если убрать `HasSpi` у `BaseBoardController`, методы `FanDiagMixin` исчезнут на этапе компиляции
+3. **Тестирование с моками автоматическое**: замените `LinuxSpi` на `MockSpi`, и вся логика миксинов будет работать с моком
+4. **Новые платформы просто объявляют возможности**: дочерняя плата GPU только с I2C получит `TempMonitorMixin` (если есть ещё и GPIO), но не `FanDiagMixin` (нет SPI)
 
-### When to Use Capability Mixins
+### Когда использовать capability-миксины
 
-| Scenario | Use mixins? |
+| Сценарий | Использовать миксины? |
 |----------|:------:|
-| Cross-cutting diagnostic behaviors | ✅ Yes — prevent copy-paste |
-| Multi-bus hardware controllers | ✅ Yes — declare capabilities, get behaviors |
-| Platform-specific test harnesses | ✅ Yes — mock capabilities for testing |
-| Single-bus simple peripherals | ⚠️ Overhead may not be worth it |
-| Pure business logic (no hardware) | ❌ Simpler patterns suffice |
+| Сквозные диагностические поведения | ✅ Да: устраняют copy-paste |
+| Контроллеры аппаратуры с несколькими шинами | ✅ Да: объявляете возможности, получаете поведения |
+| Специализированные тестовые стенды для платформ | ✅ Да: мокайте возможности для тестов |
+| Простые периферийные устройства с одной шиной | ⚠️ Накладные расходы могут не окупиться |
+| Чистая бизнес-логика (без аппаратуры) | ❌ Простых паттернов достаточно |
 
-## Mixin Trait Architecture
+## Архитектура трейтов-миксинов
 
 ```mermaid
 flowchart TD
-    subgraph "Ingredient Traits"
+    subgraph "Трейты-ингредиенты"
         SPI["HasSpi"]
         I2C["HasI2c"]
         GPIO["HasGpio"]
     end
-    subgraph "Mixin Traits (blanket impls)"
+    subgraph "Трейты-миксины (blanket impl)"
         FAN["FanDiagMixin"]
         TEMP["TempMonitorMixin"]
     end
-    SPI & I2C -->|"requires both"| FAN
-    I2C & GPIO -->|"requires both"| TEMP
-    subgraph "Concrete Types"
+    SPI & I2C -->|"нужны оба"| FAN
+    I2C & GPIO -->|"нужны оба"| TEMP
+    subgraph "Конкретные типы"
         BBC["BaseBoardController"]
     end
     BBC -->|"impl HasSpi + HasI2c + HasGpio"| FAN & TEMP
@@ -308,16 +296,16 @@ flowchart TD
     style BBC fill:#fff3e0,color:#000
 ```
 
-## Exercise: Network Diagnostic Mixins
+## Упражнение: сетевые диагностические миксины
 
-Design a mixin system for network diagnostics:
-- Ingredient traits: `HasEthernet`, `HasIpmi`
-- Mixin: `LinkHealthMixin` (requires `HasEthernet`) with `check_link_status(&self)`
-- Mixin: `RemoteDiagMixin` (requires `HasEthernet + HasIpmi`) with `remote_health_check(&self)`
-- Concrete type: `NicController` that implements both ingredients.
+Спроектируйте систему миксинов для сетевой диагностики:
+- Трейты-ингредиенты: `HasEthernet`, `HasIpmi`
+- Миксин: `LinkHealthMixin` (требует `HasEthernet`) с методом `check_link_status(&self)`
+- Миксин: `RemoteDiagMixin` (требует `HasEthernet + HasIpmi`) с методом `remote_health_check(&self)`
+- Конкретный тип: `NicController`, который реализует оба ингредиента.
 
 <details>
-<summary>Solution</summary>
+<summary>Решение</summary>
 
 ```rust,ignore
 pub trait HasEthernet {
@@ -330,7 +318,7 @@ pub trait HasIpmi {
 
 pub trait LinkHealthMixin: HasEthernet {
     fn check_link_status(&self) -> &'static str {
-        if self.eth_link_up() { "link: UP" } else { "link: DOWN" }
+        if self.eth_link_up() { "канал: UP" } else { "канал: DOWN" }
     }
 }
 impl<T: HasEthernet> LinkHealthMixin for T {}
@@ -338,9 +326,9 @@ impl<T: HasEthernet> LinkHealthMixin for T {}
 pub trait RemoteDiagMixin: HasEthernet + HasIpmi {
     fn remote_health_check(&self) -> &'static str {
         if self.eth_link_up() && self.ipmi_ping() {
-            "remote: HEALTHY"
+            "удалённо: HEALTHY"
         } else {
-            "remote: DEGRADED"
+            "удалённо: DEGRADED"
         }
     }
 }
@@ -353,18 +341,17 @@ impl HasEthernet for NicController {
 impl HasIpmi for NicController {
     fn ipmi_ping(&self) -> bool { true }
 }
-// NicController automatically gets both mixin methods
+// NicController автоматически получает оба метода миксинов
 ```
 
 </details>
 
-## Key Takeaways
+## Ключевые выводы
 
-1. **Ingredient traits declare hardware capabilities** — `HasSpi`, `HasI2c`, `HasGpio` are associated-type traits.
-2. **Mixin traits provide behaviour via blanket impls** — `impl<T: HasSpi + HasI2c> FanDiagMixin for T {}`.
-3. **Adding a new platform = listing its capabilities** — the compiler provides all matching mixin methods.
-4. **Removing a bus = compile errors everywhere it's used** — you can't forget to update downstream code.
-5. **Mock testing is free** — swap `LinuxSpi` for `MockSpi`; all mixin logic works unchanged.
+1. **Трейты-ингредиенты объявляют аппаратные возможности**: `HasSpi`, `HasI2c`, `HasGpio` — это трейты с ассоциированными типами.
+2. **Трейты-миксины предоставляют поведение через blanket impl**: `impl<T: HasSpi + HasI2c> FanDiagMixin for T {}`.
+3. **Новая платформа = перечисление её возможностей**: компилятор предоставляет все подходящие методы миксинов.
+4. **Удаление шины = ошибки компиляции везде, где она используется**: нельзя забыть обновить нижележащий код.
+5. **Тестирование с моками бесплатно**: замените `LinuxSpi` на `MockSpi`, и вся логика миксинов работает без изменений.
 
 ---
-

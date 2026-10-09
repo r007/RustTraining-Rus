@@ -1,50 +1,48 @@
-# Validated Boundaries — Parse, Don't Validate 🟡
+# Проверенные границы: parse, don't validate 🟡
 
-> **What you'll learn:** How to validate data exactly once at the system boundary, carry the proof of validity in a dedicated type, and never re-check — applied to IPMI FRU records (flat bytes), Redfish JSON (structured documents), and IPMI SEL records (polymorphic binary with nested dispatch), with a complete end-to-end walkthrough.
+> **Что вы узнаете:** как проверить данные ровно один раз на границе системы, хранить доказательство их корректности в отдельном типе и никогда не проверять повторно. Применяем к записям IPMI FRU (плоские байты), JSON Redfish (структурированные документы) и записям IPMI SEL (полиморфные бинарные данные с вложенной диспетчеризацией) со сквозным пошаговым разбором.
 >
-> **Cross-references:** [ch02](ch02-typed-command-interfaces-request-determi.md) (typed commands), [ch06](ch06-dimensional-analysis-making-the-compiler.md) (dimensional types), [ch11](ch11-fourteen-tricks-from-the-trenches.md) (trick 2 — sealed traits, trick 3 — `#[non_exhaustive]`, trick 5 — FromStr), [ch14](ch14-testing-type-level-guarantees.md) (proptest)
+> **Перекрёстные ссылки:** [гл. 02](ch02-typed-command-interfaces-request-determi.md) (типизированные команды), [гл. 06](ch06-dimensional-analysis-making-the-compiler.md) (размерные типы), [гл. 11](ch11-fourteen-tricks-from-the-trenches.md) (приём 2: sealed-трейты, приём 3: `#[non_exhaustive]`, приём 5: FromStr), [гл. 14](ch14-testing-type-level-guarantees.md) (proptest)
 
-## The Problem: Shotgun Validation
+## Проблема: разбросанная валидация
 
-In typical code, validation is scattered everywhere. Every function that receives
-data re-checks it "just in case":
+В типичном коде проверки разбросаны повсюду. Каждая функция, которая получает данные, перепроверяет их «на всякий случай»:
 
 ```c
-// C — validation scattered across the codebase
+// C — проверки разбросаны по всей кодовой базе
 int process_fru_data(uint8_t *data, int len) {
-    if (data == NULL) return -1;          // check: non-null
-    if (len < 8) return -1;              // check: minimum length
-    if (data[0] != 0x01) return -1;      // check: format version
-    if (checksum(data, len) != 0) return -1; // check: checksum
+    if (data == NULL) return -1;          // проверка: не NULL
+    if (len < 8) return -1;              // проверка: минимальная длина
+    if (data[0] != 0x01) return -1;      // проверка: версия формата
+    if (checksum(data, len) != 0) return -1; // проверка: контрольная сумма
 
-    // ... 10 more functions that repeat the same checks ...
+    // ... ещё 10 функций, которые повторяют те же проверки ...
 }
 ```
 
-This pattern ("shotgun validation") has two problems:
-1. **Redundancy** — the same checks appear in dozens of places
-2. **Incompleteness** — forget one check in one function and you have a bug
+Этот паттерн («дробовик» проверок) имеет две проблемы:
+1. **Избыточность**: одни и те же проверки встречаются в десятках мест
+2. **Неполнота**: забудете одну проверку в одной функции — и получите ошибку
 
-## Parse, Don't Validate
+## Parse, Don't Validate: разбирай, а не проверяй
 
-The correct-by-construction approach: **validate once at the boundary, then carry
-the proof of validity in the type**.
+Корректный по построению подход: **проверить один раз на границе, а затем хранить доказательство корректности в типе**.
 
 ```rust,ignore
-/// Raw bytes from the wire — not yet validated.
+/// Сырые байты из линии — ещё не проверены.
 #[derive(Debug)]
 pub struct RawFruData(Vec<u8>);
 ```
 
-### Case Study: IPMI FRU Data
+### Разбор: данные IPMI FRU
 
 ```rust,ignore
 # #[derive(Debug)]
 # pub struct RawFruData(Vec<u8>);
 
-/// Validated IPMI FRU data. Can only be created via TryFrom,
-/// which enforces all invariants. Once you have a ValidFru,
-/// all data is guaranteed correct.
+/// Проверенные данные IPMI FRU. Создать можно только через TryFrom,
+/// который обеспечивает все инварианты. Имея ValidFru, вы гарантированно
+/// имеете корректные данные.
 #[derive(Debug)]
 pub struct ValidFru {
     format_version: u8,
@@ -67,13 +65,13 @@ impl std::fmt::Display for FruError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::TooShort { actual, minimum } =>
-                write!(f, "FRU data too short: {actual} bytes (minimum {minimum})"),
+                write!(f, "данные FRU слишком короткие: {actual} байт (минимум {minimum})"),
             Self::BadFormatVersion(v) =>
-                write!(f, "unsupported FRU format version: {v}"),
+                write!(f, "неподдерживаемая версия формата FRU: {v}"),
             Self::ChecksumMismatch { expected, actual } =>
-                write!(f, "checksum mismatch: expected 0x{expected:02X}, got 0x{actual:02X}"),
+                write!(f, "контрольная сумма не совпадает: ожидалось 0x{expected:02X}, получено 0x{actual:02X}"),
             Self::InvalidAreaOffset { area, offset } =>
-                write!(f, "invalid {area} area offset: {offset}"),
+                write!(f, "некорректное смещение области {area}: {offset}"),
         }
     }
 }
@@ -84,7 +82,7 @@ impl TryFrom<RawFruData> for ValidFru {
     fn try_from(raw: RawFruData) -> Result<Self, FruError> {
         let data = raw.0;
 
-        // 1. Length check
+        // 1. Проверка длины
         if data.len() < 8 {
             return Err(FruError::TooShort {
                 actual: data.len(),
@@ -92,12 +90,12 @@ impl TryFrom<RawFruData> for ValidFru {
             });
         }
 
-        // 2. Format version
+        // 2. Версия формата
         if data[0] != 0x01 {
             return Err(FruError::BadFormatVersion(data[0]));
         }
 
-        // 3. Checksum (header is first 8 bytes, checksum at byte 7)
+        // 3. Контрольная сумма (заголовок — первые 8 байт, контрольная сумма в байте 7)
         let checksum: u8 = data[..8].iter().fold(0u8, |acc, &b| acc.wrapping_add(b));
         if checksum != 0 {
             return Err(FruError::ChecksumMismatch {
@@ -106,7 +104,7 @@ impl TryFrom<RawFruData> for ValidFru {
             });
         }
 
-        // 4. Area offsets must be within bounds
+        // 4. Смещения областей должны быть в пределах данных
         for (name, idx) in [
             ("internal", 1), ("chassis", 2),
             ("board", 3), ("product", 4),
@@ -120,7 +118,7 @@ impl TryFrom<RawFruData> for ValidFru {
             }
         }
 
-        // All checks passed — construct the validated type
+        // Все проверки пройдены — создаём проверенный тип
         Ok(ValidFru {
             format_version: data[0],
             internal_area_offset: data[1],
@@ -133,13 +131,13 @@ impl TryFrom<RawFruData> for ValidFru {
 }
 
 impl ValidFru {
-    /// No validation needed — the type guarantees correctness.
+    /// Проверка не нужна: тип гарантирует корректность.
     pub fn board_area(&self) -> Option<&[u8]> {
         if self.board_area_offset == 0 {
             return None;
         }
         let start = self.board_area_offset as usize * 8;
-        Some(&self.data[start..])  // safe — bounds checked during parsing
+        Some(&self.data[start..])  // безопасно: границы проверены при разборе
     }
 
     pub fn product_area(&self) -> Option<&[u8]> {
@@ -156,7 +154,7 @@ impl ValidFru {
 }
 ```
 
-Any function that takes `&ValidFru` **knows** the data is well-formed. No re-checking:
+Любая функция, которая принимает `&ValidFru`, **знает**, что данные корректны. Повторных проверок не нужно:
 
 ```rust,ignore
 # pub struct ValidFru { board_area_offset: u8, data: Vec<u8> }
@@ -164,35 +162,34 @@ Any function that takes `&ValidFru` **knows** the data is well-formed. No re-che
 #     pub fn board_area(&self) -> Option<&[u8]> { None }
 # }
 
-/// This function does NOT need to validate the FRU data.
-/// The type signature guarantees it's already valid.
+/// Эта функция НЕ должна проверять данные FRU.
+/// Сигнатура типа гарантирует, что они уже корректны.
 fn extract_board_serial(fru: &ValidFru) -> Option<String> {
     let board = fru.board_area()?;
-    // ... parse serial from board area ...
-    // No bounds checks needed — ValidFru guarantees offsets are in range
-    Some("ABC123".to_string()) // stub
+    // ... разбираем серийный номер из области платы ...
+    // Проверки границ не нужны: ValidFru гарантирует, что смещения в пределах
+    Some("ABC123".to_string()) // заглушка
 }
 
 fn extract_board_manufacturer(fru: &ValidFru) -> Option<String> {
     let board = fru.board_area()?;
-    // Still no validation needed — same guarantee
-    Some("Acme Corp".to_string()) // stub
+    // Проверка здесь тоже не нужна: та же гарантия
+    Some("Acme Corp".to_string()) // заглушка
 }
 ```
 
-## Validated Redfish JSON
+## Проверенный JSON Redfish
 
-The same pattern applies to Redfish API responses. Parse once, carry validity in
-the type:
+Тот же паттерн применим к ответам API Redfish. Разбираем один раз, а валидность храним в типе:
 
 ```rust,ignore
 use std::collections::HashMap;
 
-/// Raw JSON string from a Redfish endpoint.
+/// Сырая JSON-строка из эндпоинта Redfish.
 pub struct RawRedfishResponse(pub String);
 
-/// A validated Redfish Thermal response.
-/// All required fields are guaranteed present and within range.
+/// Проверенный ответ Redfish Thermal.
+/// Все обязательные поля гарантированно присутствуют и находятся в допустимом диапазоне.
 #[derive(Debug)]
 pub struct ValidThermalResponse {
     pub temperatures: Vec<ValidTemperatureReading>,
@@ -202,7 +199,7 @@ pub struct ValidThermalResponse {
 #[derive(Debug)]
 pub struct ValidTemperatureReading {
     pub name: String,
-    pub reading_celsius: f64,     // guaranteed non-NaN, within sensor range
+    pub reading_celsius: f64,     // гарантированно не NaN, в пределах диапазона датчика
     pub upper_critical: f64,
     pub status: HealthStatus,
 }
@@ -210,7 +207,7 @@ pub struct ValidTemperatureReading {
 #[derive(Debug)]
 pub struct ValidFanReading {
     pub name: String,
-    pub reading_rpm: u32,        // guaranteed > 0 for present fans
+    pub reading_rpm: u32,        // гарантированно > 0 для установленных вентиляторов
     pub status: HealthStatus,
 }
 
@@ -231,18 +228,18 @@ pub enum RedfishValidationError {
 impl std::fmt::Display for RedfishValidationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::MissingField(name) => write!(f, "missing required field: {name}"),
+            Self::MissingField(name) => write!(f, "отсутствует обязательное поле: {name}"),
             Self::OutOfRange { field, value } =>
-                write!(f, "field {field} out of range: {value}"),
-            Self::InvalidStatus(s) => write!(f, "invalid health status: {s}"),
+                write!(f, "поле {field} вне диапазона: {value}"),
+            Self::InvalidStatus(s) => write!(f, "некорректный статус здоровья: {s}"),
         }
     }
 }
 
-// Once validated, downstream code never re-checks:
+// Имея проверенные данные, нижележащий код никогда не проверяет их повторно:
 fn check_thermal_health(thermal: &ValidThermalResponse) -> bool {
-    // No need to check for missing fields or NaN values.
-    // ValidThermalResponse guarantees all readings are sensible.
+    // Не нужно проверять отсутствие полей и значения NaN.
+    // ValidThermalResponse гарантирует, что все показания разумны.
     thermal.temperatures.iter().all(|t| {
         t.reading_celsius < t.upper_critical && t.status != HealthStatus::Critical
     }) && thermal.fans.iter().all(|f| {
@@ -251,72 +248,66 @@ fn check_thermal_health(thermal: &ValidThermalResponse) -> bool {
 }
 ```
 
-## Polymorphic Validation: IPMI SEL Records
+## Полиморфная валидация: записи SEL IPMI
 
-The first two case studies validated **flat** structures — a fixed byte layout (FRU)
-and a known JSON schema (Redfish). Real-world data is often **polymorphic**: the
-interpretation of later bytes depends on earlier bytes. IPMI System Event Log (SEL)
-records are the canonical example.
+В первых двух разобранных примерах проверялись **плоские** структуры: фиксированная раскладка байтов (FRU) и известная JSON-схема (Redfish). Реальные данные часто **полиморфны**: смысл последующих байтов зависит от предыдущих. Классический пример — записи журнала системных событий IPMI (System Event Log, SEL).
 
-### The Shape of the Problem
+### Суть проблемы
 
-Every SEL record is exactly 16 bytes. But what those bytes *mean* depends on a
-dispatch chain:
+Каждая запись SEL занимает ровно 16 байт. Но то, что означают эти байты, определяется цепочкой диспетчеризации:
 
 ```
-Byte 2: Record Type
-  ├─ 0x02 → System Event
-  │    Byte 10[6:4]: Event Type
-  │      ├─ 0x01       → Threshold event (reading + threshold in data bytes 2-3)
-  │      ├─ 0x02-0x0C  → Discrete event (bit in offset field)
-  │      └─ 0x6F       → Sensor-specific (meaning depends on Sensor Type in byte 7)
-  │           Byte 7: Sensor Type
-  │             ├─ 0x01 → Temperature events
-  │             ├─ 0x02 → Voltage events
-  │             ├─ 0x04 → Fan events
-  │             ├─ 0x07 → Processor events
-  │             ├─ 0x0C → Memory events
-  │             ├─ 0x08 → Power Supply events
-  │             └─ ...  → (42 sensor types in IPMI 2.0 Table 42-3)
-  ├─ 0xC0-0xDF → OEM Timestamped
-  └─ 0xE0-0xFF → OEM Non-Timestamped
+Байт 2: Тип записи
+  ├─ 0x02 → Системное событие
+  │    Байт 10[6:4]: Тип события
+  │      ├─ 0x01       → Событие порога (показание + порог в байтах данных 2–3)
+  │      ├─ 0x02-0x0C  → Дискретное событие (бит в поле смещения)
+  │      └─ 0x6F       → Специфичное для датчика (смысл зависит от типа датчика в байте 7)
+  │           Байт 7: Тип датчика
+  │             ├─ 0x01 → События температуры
+  │             ├─ 0x02 → События напряжения
+  │             ├─ 0x04 → События вентилятора
+  │             ├─ 0x07 → События процессора
+  │             ├─ 0x0C → События памяти
+  │             ├─ 0x08 → События блока питания
+  │             └─ ...  → (42 типа датчиков в IPMI 2.0, таблица 42-3)
+  ├─ 0xC0-0xDF → OEM с меткой времени
+  └─ 0xE0-0xFF → OEM без метки времени
 ```
 
-In C, this is a `switch` inside a `switch` inside a `switch`, with each level sharing
-the same `uint8_t *data` pointer. Forget one level, misread the spec table, or index
-the wrong byte — the bug is silent.
+В C это `switch` внутри `switch` внутри `switch`, и каждый уровень использует один и тот же указатель `uint8_t *data`. Забыли один уровень, неверно прочитали таблицу спецификации или взяли не тот байт — ошибка проходит незамеченной.
 
 ```c
-// C — the polymorphic parsing problem
+// C — проблема полиморфного разбора
 void process_sel_entry(uint8_t *data, int len) {
-    if (data[2] == 0x02) {  // system event
+    if (data[2] == 0x02) {  // системное событие
         uint8_t event_type = (data[10] >> 4) & 0x07;
-        if (event_type == 0x01) {  // threshold
-            uint8_t reading = data[11];   // 🐛 or is it data[13]?
-            uint8_t threshold = data[12]; // 🐛 spec says byte 12 is trigger, not threshold
-            printf("Temp: %d crossed %d\n", reading, threshold);
-        } else if (event_type == 0x6F) {  // sensor-specific
+        if (event_type == 0x01) {  // порог
+            uint8_t reading = data[11];   // 🐛 или всё-таки data[13]?
+            uint8_t threshold = data[12]; // 🐛 в спецификации байт 12 — это триггер, а не порог
+            printf("Температура: %d пересекла %d\n", reading, threshold);
+        } else if (event_type == 0x6F) {  // специфичное для датчика
             uint8_t sensor_type = data[7];
-            if (sensor_type == 0x0C) {  // memory
-                // 🐛 forgot to check event data 1 offset bits
-                printf("Memory ECC error\n");
+            if (sensor_type == 0x0C) {  // память
+                // 🐛 забыли проверить биты смещения event data 1
+                printf("Ошибка ECC памяти\n");
             }
-            // 🐛 no else — silently drops 30+ other sensor types
+            // 🐛 нет else — молча отбрасываются 30+ других типов датчиков
         }
     }
-    // 🐛 OEM record types silently ignored
+    // 🐛 записи OEM молча игнорируются
 }
 ```
 
-### Step 1 — Parse the Outer Frame
+### Шаг 1 — разбор внешнего уровня
 
-The first `TryFrom` dispatches on record type — the outermost layer of the union:
+Первый `TryFrom` диспетчеризует по типу записи — самому внешнему слою объединения:
 
 ```rust,ignore
-/// Raw 16-byte SEL record, straight from `Get SEL Entry` (IPMI cmd 0x43).
+/// Сырая 16-байтная запись SEL, прямо из `Get SEL Entry` (команда IPMI 0x43).
 pub struct RawSelRecord(pub [u8; 16]);
 
-/// Validated SEL record — record type dispatched, all fields checked.
+/// Проверенная запись SEL — тип записи продиспетчеризован, все поля проверены.
 pub enum ValidSelRecord {
     SystemEvent(SystemEventRecord),
     OemTimestamped(OemTimestampedRecord),
@@ -348,10 +339,10 @@ pub enum SelParseError {
 impl std::fmt::Display for SelParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::UnknownRecordType(t) => write!(f, "unknown record type: 0x{t:02X}"),
-            Self::UnknownSensorType(t) => write!(f, "unknown sensor type: 0x{t:02X}"),
-            Self::UnknownEventType(t) => write!(f, "unknown event type: 0x{t:02X}"),
-            Self::InvalidEventData { reason } => write!(f, "invalid event data: {reason}"),
+            Self::UnknownRecordType(t) => write!(f, "неизвестный тип записи: 0x{t:02X}"),
+            Self::UnknownSensorType(t) => write!(f, "неизвестный тип датчика: 0x{t:02X}"),
+            Self::UnknownEventType(t) => write!(f, "неизвестный тип события: 0x{t:02X}"),
+            Self::InvalidEventData { reason } => write!(f, "некорректные данные события: {reason}"),
         }
     }
 }
@@ -389,13 +380,11 @@ impl TryFrom<RawSelRecord> for ValidSelRecord {
 }
 ```
 
-After this boundary, every consumer matches on the enum. The compiler enforces
-handling all three record types — you can't "forget" OEM records.
+После этой границы каждый потребитель выполняет сопоставление с enum. Компилятор требует обработать все три типа записей: вы не можете «забыть» OEM-записи.
 
-### Step 2 — Parse the System Event: Sensor Type → Typed Event
+### Шаг 2 — разбор системного события: тип датчика → типизированное событие
 
-The inner dispatch turns the event data bytes into a sum type indexed by sensor
-type. This is where the C `switch`-in-a-`switch` becomes a nested enum:
+Внутренняя диспетчеризация превращает байты данных события в сумму типов, индексированную типом датчика. Вложенный `switch` из C здесь становится вложенным enum:
 
 ```rust,ignore
 #[derive(Debug)]
@@ -406,7 +395,7 @@ pub struct SystemEventRecord {
     pub sensor_type: SensorType,
     pub sensor_number: u8,
     pub event_direction: EventDirection,
-    pub event: TypedEvent,      // ← the key: event data is TYPED
+    pub event: TypedEvent,      // ← ключевое: данные события ТИПИЗИРОВАНЫ
 }
 
 #[derive(Debug)]
@@ -418,10 +407,10 @@ pub enum GeneratorId {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum EventDirection { Assertion, Deassertion }
 
-// ──── The Sensor/Event Type Hierarchy ────
+// ──── Иерархия типов датчиков и событий ────
 
-/// Sensor types from IPMI Table 42-3. Non-exhaustive because future
-/// IPMI revisions and OEM ranges will add variants (see ch11 trick 3).
+/// Типы датчиков из таблицы 42-3 IPMI. Non-exhaustive, потому что будущие версии IPMI
+/// и диапазоны OEM добавят варианты (см. приём 3 в гл. 11).
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum SensorType {
@@ -437,7 +426,7 @@ pub enum SensorType {
     Watchdog2,      // 0x23
 }
 
-/// The polymorphic payload — each variant carries its own typed data.
+/// Полиморфная полезная нагрузка: каждый вариант несёт собственные типизированные данные.
 #[derive(Debug)]
 pub enum TypedEvent {
     Threshold(ThresholdEvent),
@@ -445,9 +434,9 @@ pub enum TypedEvent {
     Discrete { offset: u8, event_data: [u8; 3] },
 }
 
-/// Threshold events carry the trigger reading and threshold value.
-/// Both are raw sensor values (pre-linearization), kept as u8.
-/// After SDR linearization, they become dimensional types (ch06).
+/// События порога несут значение триггера и пороговое значение.
+/// Оба — сырые значения датчика (до линеаризации), хранятся как u8.
+/// После линеаризации SDR они становятся размерными типами (гл. 06).
 #[derive(Debug)]
 pub struct ThresholdEvent {
     pub crossing: ThresholdCrossing,
@@ -471,8 +460,8 @@ pub enum ThresholdCrossing {
     UpperNonRecoverableHigh,
 }
 
-/// Sensor-specific events — each sensor type gets its own variant
-/// with an exhaustive enum of that sensor's defined events.
+/// Специфичные для датчика события: каждый тип датчика получает свой вариант
+/// с исчерпывающим enum событий этого датчика.
 #[derive(Debug)]
 pub enum SensorSpecificEvent {
     Temperature(TempEvent),
@@ -485,7 +474,7 @@ pub enum SensorSpecificEvent {
     Watchdog(WatchdogEvent),
 }
 
-// ──── Per-sensor-type event enums (from IPMI Table 42-3) ────
+// ──── Перечисления событий для каждого типа датчика (из таблицы 42-3 IPMI) ────
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum MemoryEvent {
@@ -582,7 +571,7 @@ pub enum WatchdogEvent {
 }
 ```
 
-### Step 3 — The Parser Wiring
+### Шаг 3 — связка парсера
 
 ```rust,ignore
 fn parse_system_event(record_id: u16, d: &[u8]) -> Result<SystemEventRecord, SelParseError> {
@@ -611,7 +600,7 @@ fn parse_system_event(record_id: u16, d: &[u8]) -> Result<SystemEventRecord, Sel
 
     let event = match event_type_code {
         0x01 => {
-            // Threshold — event data byte 2 is trigger reading, byte 3 is threshold
+            // Порог — байт 2 данных события это показание триггера, байт 3 — порог
             let offset = event_data[0] & 0x0F;
             TypedEvent::Threshold(ThresholdEvent {
                 crossing: parse_threshold_crossing(offset)?,
@@ -620,13 +609,13 @@ fn parse_system_event(record_id: u16, d: &[u8]) -> Result<SystemEventRecord, Sel
             })
         }
         0x6F => {
-            // Sensor-specific — dispatch on sensor type
+            // Специфичное для датчика — диспетчеризация по типу датчика
             let offset = event_data[0] & 0x0F;
             let specific = parse_sensor_specific(&sensor_type, offset)?;
             TypedEvent::SensorSpecific(specific)
         }
         0x02..=0x0C => {
-            // Generic discrete
+            // Дискретное общего вида
             TypedEvent::Discrete { offset: event_data[0] & 0x0F, event_data }
         }
         other => return Err(SelParseError::UnknownEventType(other)),
@@ -674,7 +663,7 @@ fn parse_threshold_crossing(offset: u8) -> Result<ThresholdCrossing, SelParseErr
         0x0A => Ok(ThresholdCrossing::UpperNonRecoverableLow),
         0x0B => Ok(ThresholdCrossing::UpperNonRecoverableHigh),
         _ => Err(SelParseError::InvalidEventData {
-            reason: "threshold offset out of range",
+            reason: "смещение порога вне диапазона",
         }),
     }
 }
@@ -698,7 +687,7 @@ fn parse_sensor_specific(
                 0x09 => MemoryEvent::Throttled,
                 0x0A => MemoryEvent::CriticalOvertemperature,
                 _ => return Err(SelParseError::InvalidEventData {
-                    reason: "unknown memory event offset",
+                    reason: "неизвестное смещение события памяти",
                 }),
             };
             Ok(SensorSpecificEvent::Memory(ev))
@@ -714,7 +703,7 @@ fn parse_sensor_specific(
                 0x06 => PowerSupplyEvent::ConfigurationError,
                 0x07 => PowerSupplyEvent::InactiveStandby,
                 _ => return Err(SelParseError::InvalidEventData {
-                    reason: "unknown power supply event offset",
+                    reason: "неизвестное смещение события блока питания",
                 }),
             };
             Ok(SensorSpecificEvent::PowerSupply(ev))
@@ -733,33 +722,32 @@ fn parse_sensor_specific(
                 0x09 => ProcessorEvent::TerminatorPresenceDetected,
                 0x0A => ProcessorEvent::Throttled,
                 _ => return Err(SelParseError::InvalidEventData {
-                    reason: "unknown processor event offset",
+                    reason: "неизвестное смещение события процессора",
                 }),
             };
             Ok(SensorSpecificEvent::Processor(ev))
         }
-        // Pattern repeats for Temperature, Voltage, Fan, etc.
-        // Each sensor type maps its offsets to a dedicated enum.
+        // Аналогично для Temperature, Voltage, Fan и других типов.
+        // Каждый тип датчика сопоставляет свои смещения с отдельным enum.
         _ => Err(SelParseError::InvalidEventData {
-            reason: "sensor-specific dispatch not implemented for this sensor type",
+            reason: "диспетчеризация специфичных событий не реализована для этого типа датчика",
         }),
     }
 }
 ```
 
-### Step 4 — Consuming Typed SEL Records
+### Шаг 4 — потребление типизированных записей SEL
 
-Once parsed, downstream code pattern-matches on the nested enums. The compiler
-enforces exhaustive handling — no silent fallthrough, no forgotten sensor type:
+После разбора нижележащий код выполняет сопоставление с образцом по вложенным enum. Компилятор требует исчерпывающей обработки: никаких тихих проваливаний и забытых типов датчиков:
 
 ```rust,ignore
-/// Determine whether a SEL event should trigger a hardware alert.
-/// The compiler ensures every variant is handled.
+/// Определяет, должно ли событие SEL вызывать аппаратное оповещение.
+/// Компилятор гарантирует, что обрабатывается каждый вариант.
 fn should_alert(record: &ValidSelRecord) -> bool {
     match record {
         ValidSelRecord::SystemEvent(sys) => match &sys.event {
             TypedEvent::Threshold(t) => {
-                // Any critical or non-recoverable threshold crossing → alert
+                // Любое критическое или невосстанавливаемое пересечение порога → оповещение
                 matches!(t.crossing,
                     ThresholdCrossing::UpperCriticalLow
                     | ThresholdCrossing::UpperCriticalHigh
@@ -786,92 +774,91 @@ fn should_alert(record: &ValidSelRecord) -> bool {
                     | ProcessorEvent::ThermalTrip
                     | ProcessorEvent::UncorrectableMachineCheck
                 ),
-                // New sensor type variant added in a future version?
-                // ❌ Compile error: non-exhaustive patterns
+                // Новый вариант типа датчика, добавленный в будущей версии?
+                // ❌ Ошибка компиляции: non-exhaustive patterns
                 _ => false,
             },
             TypedEvent::Discrete { .. } => false,
         },
-        // OEM records are not alertable in this policy
+        // Записи OEM в этой политике не вызывают оповещений
         ValidSelRecord::OemTimestamped(_) => false,
         ValidSelRecord::OemNonTimestamped(_) => false,
     }
 }
 
-/// Generate a human-readable description.
-/// Every branch produces a specific message — no "unknown event" fallback.
+/// Формирует понятное человеку описание.
+/// Каждая ветка даёт конкретное сообщение — без запасного варианта «неизвестное событие».
 fn describe(record: &ValidSelRecord) -> String {
     match record {
         ValidSelRecord::SystemEvent(sys) => {
-            let sensor = format!("{:?} sensor #{}", sys.sensor_type, sys.sensor_number);
+            let sensor = format!("датчик {:?} #{}", sys.sensor_type, sys.sensor_number);
             let dir = match sys.event_direction {
-                EventDirection::Assertion => "asserted",
-                EventDirection::Deassertion => "deasserted",
+                EventDirection::Assertion => "установлено",
+                EventDirection::Deassertion => "снято",
             };
             match &sys.event {
                 TypedEvent::Threshold(t) => {
-                    format!("{sensor}: {:?} {dir} (reading: 0x{:02X}, threshold: 0x{:02X})",
+                    format!("{sensor}: {:?} {dir} (показание: 0x{:02X}, порог: 0x{:02X})",
                         t.crossing, t.trigger_reading, t.threshold_value)
                 }
                 TypedEvent::SensorSpecific(ss) => {
                     format!("{sensor}: {ss:?} {dir}")
                 }
                 TypedEvent::Discrete { offset, .. } => {
-                    format!("{sensor}: discrete offset {offset:#x} {dir}")
+                    format!("{sensor}: дискретное смещение {offset:#x} {dir}")
                 }
             }
         }
         ValidSelRecord::OemTimestamped(oem) =>
-            format!("OEM record 0x{:04X} (mfr {:02X}{:02X}{:02X})",
+            format!("OEM-запись 0x{:04X} (производитель {:02X}{:02X}{:02X})",
                 oem.record_id,
                 oem.manufacturer_id[0], oem.manufacturer_id[1], oem.manufacturer_id[2]),
         ValidSelRecord::OemNonTimestamped(oem) =>
-            format!("OEM non-ts record 0x{:04X}", oem.record_id),
+            format!("OEM-запись без метки времени 0x{:04X}", oem.record_id),
     }
 }
 ```
 
-### Walkthrough: End-to-End SEL Processing
+### Пошаговый разбор: сквозная обработка SEL
 
-Here's a complete flow — from raw bytes off the wire to an alert decision —
-showing every typed handoff:
+Вот полный поток: от сырых байтов по линии до решения о тревоге, с каждой типизированной передачей:
 
 ```rust,ignore
-/// Process all SEL entries from a BMC, producing typed alerts.
+/// Обрабатывает все записи SEL от BMC, формируя типизированные тревоги.
 fn process_sel_log(raw_entries: &[[u8; 16]]) -> Vec<String> {
     let mut alerts = Vec::new();
 
     for (i, raw_bytes) in raw_entries.iter().enumerate() {
-        // ─── Boundary: raw bytes → validated record ───
+        // ─── Граница: сырые байты → проверенная запись ───
         let raw = RawSelRecord(*raw_bytes);
         let record = match ValidSelRecord::try_from(raw) {
             Ok(r) => r,
             Err(e) => {
-                eprintln!("SEL entry {i}: parse error: {e}");
+                eprintln!("Запись SEL {i}: ошибка разбора: {e}");
                 continue;
             }
         };
 
-        // ─── From here, everything is typed ───
+        // ─── Отсюда всё типизировано ───
 
-        // 1. Describe the event (exhaustive match — every variant covered)
+        // 1. Описываем событие (исчерпывающее сопоставление — покрыты все варианты)
         let description = describe(&record);
         println!("SEL[{i}]: {description}");
 
-        // 2. Check alert policy (exhaustive match — compiler proves completeness)
+        // 2. Проверяем политику тревог (исчерпывающее сопоставление — компилятор доказывает полноту)
         if should_alert(&record) {
             alerts.push(description);
         }
 
-        // 3. Extract dimensional readings from threshold events
+        // 3. Извлекаем размерные показания из событий порога
         if let ValidSelRecord::SystemEvent(sys) = &record {
             if let TypedEvent::Threshold(t) = &sys.event {
-                // The compiler knows t.trigger_reading is a threshold event reading,
-                // not an arbitrary byte. After SDR linearization (ch06), this becomes:
+                // Компилятор знает, что t.trigger_reading — это показание события порога,
+                // а не произвольный байт. После линеаризации SDR (гл. 06) это станет:
                 //   let temp: Celsius = linearize(t.trigger_reading, &sdr);
-                // And then Celsius can't be compared with Rpm.
+                // А затем Celsius нельзя сравнить с Rpm.
                 println!(
-                    "  → raw reading: 0x{:02X}, raw threshold: 0x{:02X}",
+                    "  → сырое показание: 0x{:02X}, сырой порог: 0x{:02X}",
                     t.trigger_reading, t.threshold_value
                 );
             }
@@ -882,102 +869,94 @@ fn process_sel_log(raw_entries: &[[u8; 16]]) -> Vec<String> {
 }
 
 fn main() {
-    // Example: two SEL entries (fabricated for illustration)
+    // Пример: две записи SEL (сфабрикованы для иллюстрации)
     let sel_data: Vec<[u8; 16]> = vec![
-        // Entry 1: System event, Memory sensor #3, sensor-specific,
-        //          offset 0x00 = CorrectableEcc, assertion
+        // Запись 1: системное событие, датчик памяти #3, специфичное для датчика,
+        //           смещение 0x00 = CorrectableEcc, установка
         [
-            0x01, 0x00,       // record ID: 1
-            0x02,             // record type: system event
-            0x00, 0x00, 0x00, 0x00, // timestamp (stub)
-            0x20,             // generator: IPMB slave addr 0x20
-            0x00,             // channel/lun
-            0x04,             // event message rev
-            0x0C,             // sensor type: Memory (0x0C)
-            0x03,             // sensor number: 3
-            0x6F,             // event dir: assertion, event type: sensor-specific
-            0x00,             // event data 1: offset 0x00 = CorrectableEcc
-            0x00, 0x00,       // event data 2-3
+            0x01, 0x00,       // ID записи: 1
+            0x02,             // тип записи: системное событие
+            0x00, 0x00, 0x00, 0x00, // метка времени (заглушка)
+            0x20,             // генератор: адрес ведомого IPMB 0x20
+            0x00,             // канал/LUN
+            0x04,             // версия сообщения события
+            0x0C,             // тип датчика: Memory (0x0C)
+            0x03,             // номер датчика: 3
+            0x6F,             // направление: установка, тип события: специфичное для датчика
+            0x00,             // данные события 1: смещение 0x00 = CorrectableEcc
+            0x00, 0x00,       // данные события 2–3
         ],
-        // Entry 2: System event, Temperature sensor #1, threshold,
-        //          offset 0x09 = UpperCriticalHigh, reading=95, threshold=90
+        // Запись 2: системное событие, датчик температуры #1, порог,
+        //           смещение 0x09 = UpperCriticalHigh, показание=95, порог=90
         [
-            0x02, 0x00,       // record ID: 2
-            0x02,             // record type: system event
-            0x00, 0x00, 0x00, 0x00, // timestamp (stub)
-            0x20,             // generator
-            0x00,             // channel/lun
-            0x04,             // event message rev
-            0x01,             // sensor type: Temperature (0x01)
-            0x01,             // sensor number: 1
-            0x01,             // event dir: assertion, event type: threshold (0x01)
-            0x09,             // event data 1: offset 0x09 = UpperCriticalHigh
-            0x5F,             // event data 2: trigger reading (95 raw)
-            0x5A,             // event data 3: threshold value (90 raw)
+            0x02, 0x00,       // ID записи: 2
+            0x02,             // тип записи: системное событие
+            0x00, 0x00, 0x00, 0x00, // метка времени (заглушка)
+            0x20,             // генератор
+            0x00,             // канал/LUN
+            0x04,             // версия сообщения события
+            0x01,             // тип датчика: Temperature (0x01)
+            0x01,             // номер датчика: 1
+            0x01,             // направление: установка, тип события: порог (0x01)
+            0x09,             // данные события 1: смещение 0x09 = UpperCriticalHigh
+            0x5F,             // данные события 2: значение триггера (95 в сыром виде)
+            0x5A,             // данные события 3: пороговое значение (90 в сыром виде)
         ],
     ];
 
     let alerts = process_sel_log(&sel_data);
-    println!("\n=== ALERTS ({}) ===", alerts.len());
+    println!("\n=== ТРЕВОГИ ({}) ===", alerts.len());
     for alert in &alerts {
         println!("  🚨 {alert}");
     }
 }
 ```
 
-**Expected output:**
+**Ожидаемый вывод:**
 
 ```text
-SEL[0]: Memory sensor #3: Memory(CorrectableEcc) asserted
-SEL[1]: Temperature sensor #1: UpperCriticalHigh asserted (reading: 0x5F, threshold: 0x5A)
-  → raw reading: 0x5F, raw threshold: 0x5A
+SEL[0]: датчик Memory #3: Memory(CorrectableEcc) установлено
+SEL[1]: датчик Temperature #1: UpperCriticalHigh установлено (показание: 0x5F, порог: 0x5A)
+  → сырое показание: 0x5F, сырой порог: 0x5A
 
-=== ALERTS (1) ===
-  🚨 Temperature sensor #1: UpperCriticalHigh asserted (reading: 0x5F, threshold: 0x5A)
+=== ТРЕВОГИ (1) ===
+  🚨 датчик Temperature #1: UpperCriticalHigh установлено (показание: 0x5F, порог: 0x5A)
 ```
 
-Entry 0 (correctable ECC) is logged but not alerted. Entry 1 (upper critical
-temperature) triggers an alert. Both decisions are enforced by exhaustive pattern
-matching — the compiler proves every sensor type and threshold crossing is handled.
+Запись 0 (корректируемая ошибка ECC) регистрируется, но тревоги не вызывает. Запись 1 (верхний критический порог температуры) вызывает тревогу. Оба решения обеспечены исчерпывающим сопоставлением с образцом: компилятор доказывает, что каждый тип датчика и каждое пересечение порога обработаны.
 
-### From Parsed Events to Redfish Health: The Consumer Pipeline
+### От разобранных событий к здоровью Redfish: конвейер потребителя
 
-The walkthrough above ends with alerts — but in a real BMC, parsed SEL records
-flow into the Redfish health rollup ([ch18](ch18-redfish-server-walkthrough.md)).
-The current handoff is a lossy `bool`:
+Пошаговый разбор выше заканчивается тревогами, но в реальном BMC разобранные записи SEL попадают в агрегацию состояния здоровья Redfish ([гл. 18](ch18-redfish-server-walkthrough.md)). Текущая передача данных — это `bool`, который теряет информацию:
 
 ```rust,ignore
-// ❌ Lossy — throws away per-subsystem detail
+// ❌ С потерями: отбрасываем детали по подсистемам
 pub struct SelSummary {
     pub has_critical_events: bool,
     pub total_entries: u32,
 }
 ```
 
-This loses everything the type system just gave us: which subsystem is affected,
-what severity level, and whether the reading carries dimensional data. Let's build
-the full pipeline.
+Это теряет всё, что дала система типов: какая подсистема затронута, уровень серьёзности и есть ли в показании размерные данные. Построим полный конвейер.
 
-#### Step 1 — SDR Linearization: Raw Bytes → Dimensional Types (ch06)
+#### Шаг 1 — линеаризация SDR: сырые байты → размерные типы (гл. 06)
 
-Threshold SEL events carry raw sensor readings in event data bytes 2-3. The IPMI
-SDR (Sensor Data Record) provides the linearization formula. After linearization,
-the raw byte becomes a dimensional type:
+События порога SEL несут сырые показания датчика в байтах данных 2–3. SDR (Sensor Data Record) IPMI задаёт формулу линеаризации. После линеаризации сырой байт становится размерным типом:
 
 ```rust,ignore
-/// SDR linearization coefficients for a single sensor.
-/// See IPMI spec section 36.3 for the full formula.
+/// Коэффициенты линеаризации SDR для одного датчика.
+/// См. раздел 36.3 спецификации IPMI для полной формулы.
 pub struct SdrLinearization {
     pub sensor_type: SensorType,
-    pub m: i16,        // multiplier
-    pub b: i16,        // offset
-    pub r_exp: i8,     // result exponent (power-of-10)
-    pub b_exp: i8,     // B exponent
+    pub m: i16,        // множитель
+    pub b: i16,        // смещение
+    pub r_exp: i8,     // экспонента результата (степень 10)
+    pub b_exp: i8,     // экспонента B
 }
 
-/// A linearized sensor reading with its unit attached.
-/// The return type depends on the sensor type — the compiler
-/// enforces that temperature sensors produce Celsius, not Rpm.
+/// Линеаризованное показание датчика с прикреплённой единицей измерения.
+/// Возвращаемый тип зависит от типа датчика: компилятор гарантирует, что датчики
+/// температуры возвращают Celsius, а не Rpm.
 #[derive(Debug, Clone)]
 pub enum LinearizedReading {
     Temperature(Celsius),
@@ -991,9 +970,9 @@ pub enum LinearizedReading {
 pub struct Amps(pub f64);
 
 impl SdrLinearization {
-    /// Apply the IPMI linearization formula:
+    /// Применяет формулу линеаризации IPMI:
     ///   y = (M × raw + B × 10^B_exp) × 10^R_exp
-    /// Returns a dimensional type based on the sensor type.
+    /// Возвращает размерный тип в зависимости от типа датчика.
     pub fn linearize(&self, raw: u8) -> LinearizedReading {
         let y = (self.m as f64 * raw as f64
                 + self.b as f64 * 10_f64.powi(self.b_exp as i32))
@@ -1005,23 +984,21 @@ impl SdrLinearization {
             SensorType::Fan         => LinearizedReading::Fan(Rpm(y as u32)),
             SensorType::Current     => LinearizedReading::Current(Amps(y)),
             SensorType::PowerSupply => LinearizedReading::Power(Watts(y)),
-            // Other sensor types — extend as needed
+            // Остальные типы датчиков — расширить при необходимости
             _ => LinearizedReading::Temperature(Celsius(y)),
         }
     }
 }
 ```
 
-With this, the raw byte `0x5F` (95 decimal) from our SEL walkthrough becomes
-`Celsius(95.0)` — and the compiler prevents comparing it with `Rpm` or `Watts`.
+Теперь сырой байт `0x5F` (95 в десятичной системе) из нашего пошагового разбора SEL становится `Celsius(95.0)`, и компилятор не даст сравнить его с `Rpm` или `Watts`.
 
-#### Step 2 — Per-Subsystem Health Classification
+#### Шаг 2 — классификация здоровья по подсистемам
 
-Instead of collapsing everything into `has_critical_events: bool`, classify each
-parsed SEL event into a per-subsystem health bucket:
+Вместо свёртывания всего в `has_critical_events: bool` классифицируем каждое разобранное событие SEL по корзине здоровья подсистемы:
 
 ```rust,ignore
-/// Health contribution from a single SEL event, classified by subsystem.
+/// Вклад одного события SEL в здоровье, классифицированный по подсистемам.
 #[derive(Debug, Clone)]
 pub enum SubsystemHealth {
     Processor(HealthValue),
@@ -1033,20 +1010,20 @@ pub enum SubsystemHealth {
     Security(HealthValue),
 }
 
-/// Classify a typed SEL event into per-subsystem health.
-/// Exhaustive matching ensures every sensor type contributes.
+/// Классифицирует типизированное событие SEL по подсистемам.
+/// Исчерпывающее сопоставление гарантирует, что каждый тип датчика вносит вклад.
 fn classify_event_health(record: &SystemEventRecord) -> SubsystemHealth {
     match &record.event {
         TypedEvent::Threshold(t) => {
-            // Threshold severity depends on the crossing level
+            // Серьёзность порога зависит от уровня пересечения
             let health = match t.crossing {
-                // Non-critical → Warning
+                // Некритичный → Warning
                 ThresholdCrossing::UpperNonCriticalLow
                 | ThresholdCrossing::UpperNonCriticalHigh
                 | ThresholdCrossing::LowerNonCriticalLow
                 | ThresholdCrossing::LowerNonCriticalHigh => HealthValue::Warning,
 
-                // Critical or Non-recoverable → Critical
+                // Критический или невосстанавливаемый → Critical
                 ThresholdCrossing::UpperCriticalLow
                 | ThresholdCrossing::UpperCriticalHigh
                 | ThresholdCrossing::LowerCriticalLow
@@ -1057,7 +1034,7 @@ fn classify_event_health(record: &SystemEventRecord) -> SubsystemHealth {
                 | ThresholdCrossing::LowerNonRecoverableHigh => HealthValue::Critical,
             };
 
-            // Route to the correct subsystem based on sensor type
+            // Направляем в нужную подсистему по типу датчика
             match record.sensor_type {
                 SensorType::Temperature => SubsystemHealth::Thermal(health),
                 SensorType::Voltage     => SubsystemHealth::PowerSupply(health),
@@ -1131,7 +1108,7 @@ fn classify_event_health(record: &SystemEventRecord) -> SubsystemHealth {
             SensorSpecificEvent::Watchdog(_) =>
                 SubsystemHealth::Processor(HealthValue::Warning),
 
-            // Temperature, Voltage, Fan sensor-specific events
+            // Специфичные для датчиков температуры, напряжения и вентилятора события
             SensorSpecificEvent::Temperature(_) =>
                 SubsystemHealth::Thermal(HealthValue::Warning),
             SensorSpecificEvent::Voltage(_) =>
@@ -1141,7 +1118,7 @@ fn classify_event_health(record: &SystemEventRecord) -> SubsystemHealth {
         },
 
         TypedEvent::Discrete { .. } => {
-            // Generic discrete — classify by sensor type with Warning
+            // Дискретное общего вида: классифицируем по типу датчика с Warning
             match record.sensor_type {
                 SensorType::Processor => SubsystemHealth::Processor(HealthValue::Warning),
                 SensorType::Memory    => SubsystemHealth::Memory(HealthValue::Warning),
@@ -1152,21 +1129,17 @@ fn classify_event_health(record: &SystemEventRecord) -> SubsystemHealth {
 }
 ```
 
-Every `match` arm is exhaustive — add a new `MemoryEvent` variant and the compiler
-forces you to decide its severity. Add a new `SensorSpecificEvent` variant and
-every consumer must classify it. This is the payoff of the enum tree from the
-parsing section.
+Каждая ветка `match` исчерпывающая: добавьте новый вариант `MemoryEvent`, и компилятор заставит вас определить его серьёзность. Добавьте новый вариант `SensorSpecificEvent`, и каждый потребитель должен будет его классифицировать. Это и есть выигрыш от дерева enum из раздела о разборе.
 
-#### Step 3 — Aggregate into a Typed SEL Summary
+#### Шаг 3 — агрегация в типизированную сводку SEL
 
-Replace the lossy `bool` with a structured summary that preserves per-subsystem
-health:
+Заменяем `bool`, который теряет информацию, структурированной сводкой, сохраняющей здоровье по подсистемам:
 
 ```rust,ignore
 use std::collections::HashMap;
 
-/// Rich SEL summary — per-subsystem health derived from typed events.
-/// This is what gets handed to the Redfish server (ch18) for health rollup.
+/// Расширенная сводка SEL: здоровье по подсистемам, выведенное из типизированных событий.
+/// Именно её получает сервер Redfish (гл. 18) для агрегации состояния здоровья.
 #[derive(Debug, Clone)]
 pub struct TypedSelSummary {
     pub total_entries: u32,
@@ -1177,11 +1150,11 @@ pub struct TypedSelSummary {
     pub fan_health: HealthValue,
     pub storage_health: HealthValue,
     pub security_health: HealthValue,
-    /// Dimensional readings from threshold events (post-linearization).
+    /// Размерные показания из событий порога (после линеаризации).
     pub threshold_readings: Vec<LinearizedThresholdEvent>,
 }
 
-/// A threshold event with linearized readings attached.
+/// Событие порога с прикреплёнными линеаризованными показаниями.
 #[derive(Debug, Clone)]
 pub struct LinearizedThresholdEvent {
     pub sensor_type: SensorType,
@@ -1191,8 +1164,8 @@ pub struct LinearizedThresholdEvent {
     pub threshold_value: LinearizedReading,
 }
 
-/// Build a TypedSelSummary from parsed SEL records.
-/// This is the consumer pipeline: parse (Step 0 above) → classify → aggregate.
+/// Строит TypedSelSummary из разобранных записей SEL.
+/// Это конвейер потребителя: разбор (шаг 0 выше) → классификация → агрегация.
 pub fn summarize_sel(
     records: &[ValidSelRecord],
     sdr_table: &HashMap<u8, SdrLinearization>,
@@ -1211,10 +1184,10 @@ pub fn summarize_sel(
         count += 1;
 
         let ValidSelRecord::SystemEvent(sys) = record else {
-            continue; // OEM records don't contribute to health
+            continue; // записи OEM не влияют на здоровье
         };
 
-        // ── Classify event → per-subsystem health ──
+        // ── Классифицируем событие → здоровье по подсистемам ──
         let health = classify_event_health(sys);
         match &health {
             SubsystemHealth::Processor(h) => processor = processor.max(*h),
@@ -1226,7 +1199,7 @@ pub fn summarize_sel(
             SubsystemHealth::Security(h)  => security = security.max(*h),
         }
 
-        // ── Linearize threshold readings if SDR is available ──
+        // ── Линеаризуем показания порога, если SDR доступен ──
         if let TypedEvent::Threshold(t) = &sys.event {
             if let Some(sdr) = sdr_table.get(&sys.sensor_number) {
                 threshold_readings.push(LinearizedThresholdEvent {
@@ -1254,23 +1227,22 @@ pub fn summarize_sel(
 }
 ```
 
-#### Step 4 — The Full Pipeline: Raw Bytes → Redfish Health
+#### Шаг 4 — полный конвейер: сырые байты → здоровье Redfish
 
-Here's the complete consumer pipeline, showing every typed handoff from raw SEL
-bytes to Redfish-ready health values:
+Вот полный конвейер потребителя, с каждой типизированной передачей от сырых байтов SEL до значений здоровья, готовых для Redfish:
 
 ```mermaid
 flowchart LR
-    RAW["Raw [u8; 16]\nSEL entries"]
-    PARSE["TryFrom:\nValidSelRecord\n(enum tree)"]
-    CLASSIFY["classify_event_health\n(exhaustive match)"]
-    LINEARIZE["SDR linearize\nraw → Celsius/Rpm/Watts"]
-    SUMMARY["TypedSelSummary\n(per-subsystem health\n+ dimensional readings)"]
-    REDFISH["ch18: health rollup\n→ Status.Health JSON"]
+    RAW["Сырые [u8; 16]\nзаписи SEL"]
+    PARSE["TryFrom:\nValidSelRecord\n(дерево enum)"]
+    CLASSIFY["classify_event_health\n(исчерпывающее match)"]
+    LINEARIZE["Линеаризация SDR\nсырое → Celsius/Rpm/Watts"]
+    SUMMARY["TypedSelSummary\n(здоровье по подсистемам\n+ размерные показания)"]
+    REDFISH["гл. 18: агрегация здоровья\n→ JSON Status.Health"]
 
-    RAW -->|"ch07 §Parse"| PARSE
-    PARSE -->|"typed events"| CLASSIFY
-    PARSE -->|"threshold bytes"| LINEARIZE
+    RAW -->|"гл. 07 §Разбор"| PARSE
+    PARSE -->|"типизированные события"| CLASSIFY
+    PARSE -->|"байты порога"| LINEARIZE
     CLASSIFY -->|"SubsystemHealth"| SUMMARY
     LINEARIZE -->|"LinearizedReading"| SUMMARY
     SUMMARY -->|"TypedSelSummary"| REDFISH
@@ -1287,127 +1259,121 @@ flowchart LR
 use std::collections::HashMap;
 
 fn full_sel_pipeline() {
-    // ── Raw SEL data from BMC ──
+    // ── Сырые данные SEL от BMC ──
     let raw_entries: Vec<[u8; 16]> = vec![
-        // Memory correctable ECC on sensor #3
+        // Корректируемая ошибка ECC памяти на датчике #3
         [0x01,0x00, 0x02, 0x00,0x00,0x00,0x00,
          0x20,0x00, 0x04, 0x0C, 0x03, 0x6F, 0x00, 0x00,0x00],
-        // Temperature upper critical on sensor #1, reading=95, threshold=90
+        // Верхний критический порог температуры на датчике #1, показание=95, порог=90
         [0x02,0x00, 0x02, 0x00,0x00,0x00,0x00,
          0x20,0x00, 0x04, 0x01, 0x01, 0x01, 0x09, 0x5F,0x5A],
-        // PSU failure on sensor #5
+        // Отказ блока питания на датчике #5
         [0x03,0x00, 0x02, 0x00,0x00,0x00,0x00,
          0x20,0x00, 0x04, 0x08, 0x05, 0x6F, 0x01, 0x00,0x00],
     ];
 
-    // ── Step 0: Parse at the boundary (ch07 TryFrom) ──
+    // ── Шаг 0: разбор на границе (TryFrom, гл. 07) ──
     let records: Vec<ValidSelRecord> = raw_entries.iter()
         .filter_map(|raw| ValidSelRecord::try_from(RawSelRecord(*raw)).ok())
         .collect();
 
-    // ── Step 1-3: Classify + linearize + aggregate ──
+    // ── Шаги 1–3: классификация, линеаризация, агрегация ──
     let mut sdr_table = HashMap::new();
     sdr_table.insert(1u8, SdrLinearization {
         sensor_type: SensorType::Temperature,
-        m: 1, b: 0, r_exp: 0, b_exp: 0,  // 1:1 mapping for this example
+        m: 1, b: 0, r_exp: 0, b_exp: 0,  // отображение 1:1 для этого примера
     });
 
     let summary = summarize_sel(&records, &sdr_table);
 
-    // ── Result: structured, typed, Redfish-ready ──
-    println!("SEL Summary:");
-    println!("  Total entries: {}", summary.total_entries);
-    println!("  Processor:  {:?}", summary.processor_health);  // OK
-    println!("  Memory:     {:?}", summary.memory_health);      // OK (correctable → OK)
-    println!("  Power:      {:?}", summary.power_health);       // Critical (PSU failure)
-    println!("  Thermal:    {:?}", summary.thermal_health);     // Critical (upper critical)
-    println!("  Fan:        {:?}", summary.fan_health);         // OK
-    println!("  Security:   {:?}", summary.security_health);    // OK
+    // ── Результат: структурированный, типизированный, готовый для Redfish ──
+    println!("Сводка SEL:");
+    println!("  Всего записей: {}", summary.total_entries);
+    println!("  Процессор:    {:?}", summary.processor_health);  // OK
+    println!("  Память:       {:?}", summary.memory_health);      // OK (корректируемая → OK)
+    println!("  Питание:      {:?}", summary.power_health);       // Critical (отказ БП)
+    println!("  Температура:  {:?}", summary.thermal_health);     // Critical (верхний критический)
+    println!("  Вентилятор:   {:?}", summary.fan_health);         // OK
+    println!("  Безопасность: {:?}", summary.security_health);    // OK
 
-    // Dimensional readings preserved from threshold events:
+    // Размерные показания, сохранённые из событий порога:
     for r in &summary.threshold_readings {
-        println!("  Threshold: sensor {:?} #{} — {:?} crossed {:?}",
+        println!("  Порог: датчик {:?} #{} — {:?} пересёк {:?}",
             r.sensor_type, r.sensor_number,
             r.trigger_reading, r.crossing);
-        // trigger_reading is LinearizedReading::Temperature(Celsius(95.0))
-        // — not a raw byte, not an untyped f64
+        // trigger_reading — это LinearizedReading::Temperature(Celsius(95.0)),
+        // а не сырой байт и не нетипизированный f64
     }
 
-    // ── This summary feeds directly into ch18's health rollup ──
-    // compute_system_health() can now use per-subsystem values
-    // instead of a single `has_critical_events: bool`
+    // ── Эта сводка напрямую поступает в агрегацию здоровья гл. 18 ──
+    // compute_system_health() теперь может использовать значения по подсистемам
+    // вместо одного `has_critical_events: bool`
 }
 ```
 
-**Expected output:**
+**Ожидаемый вывод:**
 
 ```text
-SEL Summary:
-  Total entries: 3
-  Processor:  OK
-  Memory:     OK
-  Power:      Critical
-  Thermal:    Critical
-  Fan:        OK
-  Security:   OK
-  Threshold: sensor Temperature #1 — Temperature(Celsius(95.0)) crossed UpperCriticalHigh
+Сводка SEL:
+  Всего записей: 3
+  Процессор:    OK
+  Память:       OK
+  Питание:      Critical
+  Температура:  Critical
+  Вентилятор:   OK
+  Безопасность: OK
+  Порог: датчик Temperature #1 — Temperature(Celsius(95.0)) пересёк UpperCriticalHigh
 ```
 
-#### What the Consumer Pipeline Proves
+#### Что доказывает конвейер потребителя
 
-| Stage | Pattern | What's Enforced |
-|-------|---------|-----------------|
-| Parse | Validated boundary (ch07) | Every consumer works with typed enums, never raw bytes |
-| Classify | Exhaustive matching | Every sensor type and event variant maps to a health value — can't forget one |
-| Linearize | Dimensional analysis (ch06) | Raw byte 0x5F becomes `Celsius(95.0)`, not `f64` — can't confuse with RPM |
-| Aggregate | Typed fold | Per-subsystem health uses `HealthValue::max()` — `Ord` guarantees correctness |
-| Handoff | Structured summary | ch18 receives `TypedSelSummary` with 7 subsystem health values, not a `bool` |
+| Этап | Паттерн | Что обеспечивается |
+|------|---------|--------------------|
+| Разбор | Проверенная граница (гл. 07) | Каждый потребитель работает с типизированными enum, а не с сырыми байтами |
+| Классификация | Исчерпывающее сопоставление | Каждый тип датчика и вариант события сопоставлен со значением здоровья: ничего не пропустить |
+| Линеаризация | Анализ размерностей (гл. 06) | Сырой байт 0x5F становится `Celsius(95.0)`, а не `f64`: нельзя перепутать с об/мин |
+| Агрегация | Типизированная свёртка | Здоровье по подсистемам использует `HealthValue::max()`: `Ord` гарантирует корректность |
+| Передача | Структурированная сводка | гл. 18 получает `TypedSelSummary` с 7 значениями здоровья подсистем, а не `bool` |
 
-Compare with the untyped C pipeline:
+Сравним с нетипизированным конвейером на C:
 
-| Step | C | Rust |
-|------|---|------|
-| Parse record type | `switch` with possible fallthrough | `match` on enum — exhaustive |
-| Classify severity | manual `if` chain, forgot PSU | exhaustive `match` — compiler error on missing variant |
-| Linearize reading | `double` — no unit | `Celsius` / `Rpm` / `Watts` — distinct types |
-| Aggregate health | `bool has_critical` | 7 typed subsystem fields |
-| Handoff to Redfish | untyped `json_object_set("Health", "OK")` | `TypedSelSummary` → typed health rollup (ch18) |
+| Шаг | C | Rust |
+|-----|---|------|
+| Разбор типа записи | `switch` с возможным проваливанием | `match` по enum: исчерпывающий |
+| Классификация серьёзности | ручная цепочка `if`, забыли БП | исчерпывающий `match`: ошибка компиляции при отсутствующем варианте |
+| Линеаризация показания | `double`: без единиц | `Celsius` / `Rpm` / `Watts`: разные типы |
+| Агрегация здоровья | `bool has_critical` | 7 типизированных полей подсистем |
+| Передача в Redfish | нетипизированный `json_object_set("Health", "OK")` | `TypedSelSummary` → типизированная агрегация здоровья (гл. 18) |
 
-The Rust pipeline doesn't just prevent more bugs — it **produces richer output**.
-The C pipeline loses information at every stage (polymorphic → flat, dimensional →
-untyped, per-subsystem → single bool). The Rust pipeline preserves it all, because
-the type system makes it **easier to keep the structure than to throw it away**.
+Конвейер на Rust не просто предотвращает больше ошибок: он **даёт более богатый результат**. Конвейер на C теряет информацию на каждом этапе (полиморфное → плоское, размерное → нетипизированное, по подсистемам → один `bool`). Конвейер на Rust сохраняет всё, потому что система типов делает **проще сохранить структуру, чем её выбросить**.
 
-### What the Compiler Proves
+### Что доказывает компилятор
 
-| Bug in C | How Rust prevents it |
-|----------|---------------------|
-| Forgot to check record type | `match` on `ValidSelRecord` — must handle all three variants |
-| Wrong byte index for trigger reading | Parsed once into `ThresholdEvent.trigger_reading` — consumers never touch raw bytes |
-| Missing `case` for a sensor type | `SensorSpecificEvent` match is exhaustive — compiler error on missing variant |
-| Silently dropped OEM records | Enum variant exists — must be handled or explicitly `_ =>` ignored |
-| Compared threshold reading (°C) with fan offset | After SDR linearization, `Celsius` ≠ `Rpm` (ch06) |
-| Added new sensor type, forgot alert logic | `#[non_exhaustive]` + exhaustive match → compiler error in downstream crates |
-| Event data parsed differently in two code paths | Single `parse_system_event()` boundary — one source of truth |
+| Ошибка в C | Как Rust её предотвращает |
+|------------|---------------------------|
+| Забыли проверить тип записи | `match` по `ValidSelRecord`: обязан обработать все три варианта |
+| Неверный индекс байта для показания триггера | Разбирается один раз в `ThresholdEvent.trigger_reading`: потребители никогда не трогают сырые байты |
+| Пропущен `case` для типа датчика | Сопоставление `SensorSpecificEvent` исчерпывающее: ошибка компиляции при отсутствующем варианте |
+| Тихо отброшенные записи OEM | Вариант enum существует: его нужно обработать или явно проигнорировать через `_ =>` |
+| Сравнили показание порога (°C) со смещением вентилятора | После линеаризации SDR `Celsius` ≠ `Rpm` (гл. 06) |
+| Добавили новый тип датчика и забыли логику тревог | `#[non_exhaustive]` + исчерпывающее сопоставление → ошибка компиляции в зависимых крейтах |
+| Событие разбирается по-разному в двух путях кода | Единая граница `parse_system_event()`: один источник истины |
 
-### The Three-Beat Pattern
+### Трёхэтапный паттерн
 
-Looking back at this chapter's three case studies, notice the **graduated arc**:
+Посмотрев на три кейс-стади этой главы, заметьте **постепенную дугу**:
 
-| Case Study | Input Shape | Parsing Complexity | Key Technique |
+| Кейс-стади | Форма входа | Сложность разбора | Ключевая техника |
 |---|---|---|---|
-| **FRU** (bytes) | Flat, fixed layout | One `TryFrom`, check fields | Validated boundary type |
-| **Redfish** (JSON) | Structured, known schema | One `TryFrom`, check fields + nesting | Same technique, different transport |
-| **SEL** (polymorphic bytes) | Nested discriminated union | Dispatch chain: record type → event type → sensor type | Enum tree + exhaustive matching |
+| **FRU** (байты) | Плоская, фиксированная раскладка | Один `TryFrom`, проверка полей | Тип проверенной границы |
+| **Redfish** (JSON) | Структурированная, известная схема | Один `TryFrom`, проверка полей и вложенности | Та же техника, другой транспорт |
+| **SEL** (полиморфные байты) | Вложенное тегированное объединение | Цепочка диспетчеризации: тип записи → тип события → тип датчика | Дерево enum + исчерпывающее сопоставление |
 
-The principle is identical in all three: **validate once at the boundary, carry
-the proof in the type, never re-check.** The SEL case study shows this principle
-scales to arbitrarily complex polymorphic data — the type system handles nested
-dispatch just as naturally as flat field validation.
+Принцип одинаков во всех трёх случаях: **проверяйте один раз на границе, храните доказательство в типе, никогда не проверяйте повторно.** Кейс SEL показывает, что этот принцип масштабируется на сколь угодно сложные полиморфные данные: система типов обрабатывает вложенную диспетчеризацию так же естественно, как проверку плоских полей.
 
-## Composing Validated Types
+## Композиция проверенных типов
 
-Validated types compose — a struct of validated fields is itself validated:
+Проверенные типы компонуются: структура из проверенных полей сама является проверенной:
 
 ```rust,ignore
 # #[derive(Debug)]
@@ -1415,50 +1381,49 @@ Validated types compose — a struct of validated fields is itself validated:
 # #[derive(Debug)]
 # pub struct ValidThermalResponse { }
 
-/// A fully validated system snapshot.
-/// Each field was validated independently; the composite is also valid.
+/// Полностью проверенный снимок системы.
+/// Каждое поле проверено независимо; составной объект тоже корректен.
 #[derive(Debug)]
 pub struct ValidSystemSnapshot {
     pub fru: ValidFru,
     pub thermal: ValidThermalResponse,
-    // Each field carries its own validity guarantee.
-    // No need for a "validate_snapshot()" function.
+    // Каждое поле несёт собственную гарантию корректности.
+    // Не нужна функция «validate_snapshot()».
 }
 
-/// Because ValidSystemSnapshot is composed of validated parts,
-/// any function that receives it can trust ALL the data.
+/// Поскольку ValidSystemSnapshot составлен из проверенных частей,
+/// любая функция, которая его получает, может доверять ВСЕМ данным.
 fn generate_health_report(snapshot: &ValidSystemSnapshot) {
-    println!("FRU version: {}", snapshot.fru.format_version);
-    // No validation needed — the type guarantees everything
+    println!("Версия FRU: {}", snapshot.fru.format_version);
+    // Проверка не нужна: тип гарантирует всё
 }
 ```
 
-### The Key Insight
+### Ключевая идея
 
-> **Validate at the boundary. Carry the proof in the type. Never re-check.**
+> **Проверяйте на границе. Храните доказательство в типе. Никогда не проверяйте повторно.**
 
-This eliminates an entire class of bugs: "forgot to validate in this one function."
-If a function takes `&ValidFru`, the data IS valid. Period.
+Это устраняет целый класс ошибок: «забыли проверить в этой одной функции». Если функция принимает `&ValidFru`, данные ЯВЛЯЮТСЯ корректными. Точка.
 
-### When to Use Validated Boundary Types
+### Когда использовать типы проверенных границ
 
-| Data Source | Use validated boundary type? |
-|------------|:------:|
-| IPMI FRU data from BMC | ✅ Always — complex binary format |
-| Redfish JSON responses | ✅ Always — many required fields |
-| PCIe configuration space | ✅ Always — register layout is strict |
-| SMBIOS tables | ✅ Always — versioned format with checksums |
-| User-provided test parameters | ✅ Always — prevent injection |
-| Internal function calls | ❌ Usually not — types already constrain |
-| Log messages | ❌ No — best-effort, not safety-critical |
+| Источник данных | Использовать тип проверенной границы? |
+|-----------------|:------:|
+| Данные IPMI FRU от BMC | ✅ Всегда: сложный бинарный формат |
+| Ответы JSON Redfish | ✅ Всегда: много обязательных полей |
+| Пространство конфигурации PCIe | ✅ Всегда: раскладка регистров строгая |
+| Таблицы SMBIOS | ✅ Всегда: версионированный формат с контрольными суммами |
+| Параметры тестов от пользователя | ✅ Всегда: предотвращает инъекции |
+| Внутренние вызовы функций | ❌ Обычно нет: типы уже ограничивают |
+| Сообщения журнала | ❌ Нет: best-effort, не критично для безопасности |
 
-## Validation Boundary Flow
+## Поток проверки на границе
 
 ```mermaid
 flowchart LR
-    RAW["Raw bytes / JSON"] -->|"TryFrom / serde"| V{"Valid?"}
-    V -->|Yes| VT["ValidFru / ValidRedfish"]
-    V -->|No| E["Err(ParseError)"]
+    RAW["Сырые байты / JSON"] -->|"TryFrom / serde"| V{"Корректно?"}
+    V -->|Да| VT["ValidFru / ValidRedfish"]
+    V -->|Нет| E["Err(ParseError)"]
     VT -->|"&ValidFru"| F1["fn process()"] & F2["fn report()"] & F3["fn store()"]
     style RAW fill:#fff3e0,color:#000
     style V fill:#e1f5fe,color:#000
@@ -1469,15 +1434,15 @@ flowchart LR
     style F3 fill:#e8f5e9,color:#000
 ```
 
-## Exercise: Validated SMBIOS Table
+## Упражнение: проверенная таблица SMBIOS
 
-Design a `ValidSmbiosType17` type for SMBIOS Type 17 (Memory Device) records:
-- Raw input is `&[u8]`; minimum length 21 bytes, byte 0 must be 0x11.
-- Fields: `handle: u16`, `size_mb: u16`, `speed_mhz: u16`.
-- Use `TryFrom<&[u8]>` so that all downstream functions take `&ValidSmbiosType17`.
+Спроектируйте тип `ValidSmbiosType17` для записей SMBIOS Type 17 (Memory Device):
+- Вход: `&[u8]`; минимальная длина 21 байт, байт 0 должен быть 0x11.
+- Поля: `handle: u16`, `size_mb: u16`, `speed_mhz: u16`.
+- Используйте `TryFrom<&[u8]>`, чтобы все нижележащие функции принимали `&ValidSmbiosType17`.
 
 <details>
-<summary>Solution</summary>
+<summary>Решение</summary>
 
 ```rust,ignore
 #[derive(Debug)]
@@ -1491,10 +1456,10 @@ impl TryFrom<&[u8]> for ValidSmbiosType17 {
     type Error = String;
     fn try_from(raw: &[u8]) -> Result<Self, Self::Error> {
         if raw.len() < 21 {
-            return Err(format!("too short: {} < 21", raw.len()));
+            return Err(format!("слишком короткий: {} < 21", raw.len()));
         }
         if raw[0] != 0x11 {
-            return Err(format!("wrong type: 0x{:02X} != 0x11", raw[0]));
+            return Err(format!("неверный тип: 0x{:02X} != 0x11", raw[0]));
         }
         Ok(ValidSmbiosType17 {
             handle: u16::from_le_bytes([raw[1], raw[2]]),
@@ -1504,26 +1469,25 @@ impl TryFrom<&[u8]> for ValidSmbiosType17 {
     }
 }
 
-// Downstream functions take the validated type — no re-checking
+// Нижележащие функции принимают проверенный тип: повторных проверок нет
 pub fn report_dimm(dimm: &ValidSmbiosType17) -> String {
-    format!("DIMM handle 0x{:04X}: {}MB @ {}MHz",
+    format!("DIMM, handle 0x{:04X}: {} МБ @ {} МГц",
         dimm.handle, dimm.size_mb, dimm.speed_mhz)
 }
 ```
 
 </details>
 
-## Key Takeaways
+## Ключевые выводы
 
-1. **Parse once at the boundary** — `TryFrom` validates raw data exactly once; all downstream code trusts the type.
-2. **Eliminate shotgun validation** — if a function takes `&ValidFru`, the data IS valid. Period.
-3. **The pattern scales from flat to polymorphic** — FRU (flat bytes), Redfish (structured JSON), and SEL (nested discriminated union) all use the same technique at increasing complexity.
-4. **Exhaustive matching is validation** — for polymorphic data like SEL, the compiler's enum exhaustiveness check prevents the "forgot a sensor type" class of bugs with zero runtime cost.
-5. **The consumer pipeline preserves structure** — parsing → classification → linearization → aggregation keeps per-subsystem health and dimensional readings intact, where C lossy-reduces to a single `bool`. The type system makes it easier to keep information than to throw it away.
-6. **`serde` is a natural boundary** — `#[derive(Deserialize)]` with `#[serde(try_from)]` validates JSON at parse time.
-7. **Compose validated types** — a `ValidServerHealth` can require `ValidFru` + `ValidThermal` + `ValidPower`.
-8. **Pair with proptest (ch14)** — fuzz the `TryFrom` boundary to ensure no valid input is rejected and no invalid input sneaks through.
-9. **These patterns compose into full Redfish workflows** — ch17 applies validated boundaries on the client side (parsing JSON responses into typed structs), while ch18 inverts the pattern on the server side (builder type-state ensures every required field is present before serialization). The SEL consumer pipeline built here feeds directly into ch18's `TypedSelSummary` health rollup.
+1. **Разбирайте один раз на границе**: `TryFrom` проверяет сырые данные ровно один раз, а весь нижележащий код доверяет типу.
+2. **Устраняйте разбросанную валидацию**: если функция принимает `&ValidFru`, данные ЯВЛЯЮТСЯ корректными. Точка.
+3. **Паттерн масштабируется от плоского к полиморфному**: FRU (плоские байты), Redfish (структурированный JSON) и SEL (вложенное тегированное объединение) используют одну технику с возрастающей сложностью.
+4. **Исчерпывающее сопоставление — это валидация**: для полиморфных данных вроде SEL проверка исчерпываемости enum компилятора предотвращает класс ошибок «забыли тип датчика» без накладных расходов во время выполнения.
+5. **Конвейер потребителя сохраняет структуру**: разбор → классификация → линеаризация → агрегация сохраняют здоровье по подсистемам и размерные показания, тогда как C сводит всё к одному `bool`. Система типов делает проще сохранить информацию, чем её выбросить.
+6. **`serde` — естественная граница**: `#[derive(Deserialize)]` с `#[serde(try_from)]` проверяет JSON на этапе разбора.
+7. **Компонуйте проверенные типы**: `ValidServerHealth` может требовать `ValidFru` + `ValidThermal` + `ValidPower`.
+8. **Дополняйте proptest (гл. 14)**: подавайте фаззинг на границу `TryFrom`, чтобы убедиться, что ни один корректный вход не отвергается и ни один некорректный не проходит.
+9. **Эти паттерны складываются в полные сценарии Redfish**: гл. 17 применяет проверенные границы на стороне клиента (разбор JSON-ответов в типизированные структуры), а гл. 18 переворачивает паттерн на стороне сервера (typestate билдера гарантирует наличие каждого обязательного поля до сериализации). Конвейер потребителя SEL, построенный здесь, напрямую передаёт `TypedSelSummary` в агрегацию здоровья гл. 18.
 
 ---
-

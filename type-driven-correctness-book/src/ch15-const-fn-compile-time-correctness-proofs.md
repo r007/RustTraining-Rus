@@ -1,15 +1,15 @@
-# Const Fn — Compile-Time Correctness Proofs 🟠
+# Const fn: доказательства корректности на этапе компиляции 🟠
 
-> **What you'll learn:** How `const fn` and `assert!` turn the compiler into a proof engine — verifying SRAM memory maps, register layouts, protocol frames, bitfield masks, clock trees, and lookup tables at compile time with zero runtime cost.
+> **Что вы узнаете:** как `const fn` и `assert!` превращают компилятор в движок доказательств: проверка карт памяти SRAM, раскладки регистров, кадров протокола, масок битовых полей, деревьев тактирования и таблиц поиска на этапе компиляции, без затрат во время выполнения.
 >
-> **Cross-references:** [ch04](ch04-capability-tokens-zero-cost-proof-of-aut.md) (capability tokens), [ch06](ch06-dimensional-analysis-making-the-compiler.md) (dimensional analysis), [ch09](ch09-phantom-types-for-resource-tracking.md) (phantom types)
+> **Перекрёстные ссылки:** [гл. 04](ch04-capability-tokens-zero-cost-proof-of-aut.md) (capability-токены), [гл. 06](ch06-dimensional-analysis-making-the-compiler.md) (анализ размерностей), [гл. 09](ch09-phantom-types-for-resource-tracking.md) (phantom-типы)
 
-## The Problem: Memory Maps That Lie
+## Проблема: карты памяти, которые лгут
 
-In embedded and systems programming, memory maps are the foundation of everything — they define where bootloaders, firmware, data sections, and stacks live. Get a boundary wrong, and two subsystems silently corrupt each other. In C, these maps are typically `#define` constants with no structural relationship:
+Во встраиваемом и системном программировании карты памяти лежат в основе всего: они определяют, где находятся загрузчик, прошивка, секции данных и стеки. Ошибся с границей, и две подсистемы тихо портят друг друга. В C такие карты обычно задаются `#define`-константами без структурной связи:
 
 ```c
-/* STM32F4 SRAM layout — 256 KB at 0x20000000 */
+/* Раскладка SRAM STM32F4: 256 KB по адресу 0x20000000 */
 #define SRAM_BASE       0x20000000
 #define SRAM_SIZE       (256 * 1024)
 
@@ -20,31 +20,31 @@ In embedded and systems programming, memory maps are the foundation of everythin
 #define FW_SIZE         (128 * 1024)
 
 #define DATA_BASE       0x20024000
-#define DATA_SIZE       (80 * 1024)     /* Someone bumped this from 64K to 80K */
+#define DATA_SIZE       (80 * 1024)     /* Кто-то поднял это значение с 64K до 80K */
 
 #define STACK_BASE      0x20038000
-#define STACK_SIZE      (48 * 1024)     /* 0x20038000 + 48K = 0x20044000 — past SRAM end! */
+#define STACK_SIZE      (48 * 1024)     /* 0x20038000 + 48K = 0x20044000 — за концом SRAM! */
 ```
 
-The bug: `16 + 128 + 80 + 48 = 272 KB`, but SRAM is only 256 KB. The stack extends 16 KB past the end of physical memory. No compiler warning, no linker error, no runtime check — just silent corruption when the stack grows into unmapped space.
+Ошибка: `16 + 128 + 80 + 48 = 272 KB`, а SRAM — всего 256 KB. Стек выходит за конец физической памяти на 16 KB. Ни предупреждения компилятора, ни ошибки линкера, ни проверки во время выполнения: только тихое повреждение, когда стек растёт в незанятое адресное пространство.
 
-**Every failure mode is discovered after deployment** — potentially as a mysterious crash that only happens under heavy stack usage, weeks after the data section was resized.
+**Каждый режим отказа обнаруживается только после развёртывания**: возможно, как загадочный сбой, который случается лишь при интенсивном использовании стека, через недели после того, как изменили размер секции данных.
 
-## Const Fn: Turning the Compiler into a Proof Engine
+## Const fn: превращаем компилятор в движок доказательств
 
-Rust's `const fn` functions can run at compile time. When a `const fn` panics during compile-time evaluation, the panic becomes a **compile error**. Combined with `assert!`, this turns the compiler into a theorem prover for your invariants:
+Функции `const fn` в Rust могут выполняться на этапе компиляции. Если `const fn` паникует во время такого вычисления, panic становится **ошибкой компиляции**. В сочетании с `assert!` это превращает компилятор в доказатель теорем для ваших инвариантов:
 
 ```rust
 pub const fn checked_add(a: u32, b: u32) -> u32 {
     let sum = a as u64 + b as u64;
-    assert!(sum <= u32::MAX as u64, "overflow");
+    assert!(sum <= u32::MAX as u64, "переполнение");
     sum as u32
 }
 
-// ✅ Compiles — 100 + 200 fits in u32
+// ✅ Компилируется: 100 + 200 помещается в u32
 const X: u32 = checked_add(100, 200);
 
-// ❌ Compile error: "overflow"
+// ❌ Ошибка компиляции: "переполнение"
 // const Y: u32 = checked_add(u32::MAX, 1);
 
 fn main() {
@@ -52,13 +52,13 @@ fn main() {
 }
 ```
 
-> **The key insight:** `const fn` + `assert!` = a proof obligation. Each assertion is a theorem that the compiler must verify. If the proof fails, the program does not compile. No test suite needed, no code review catch — the compiler itself is the auditor.
+> **Ключевая идея:** `const fn` + `assert!` = обязательство доказательства. Каждое утверждение — теорема, которую компилятор должен проверить. Если доказательство не сходится, программа не компилируется. Не нужен набор тестов, и код-ревью не нужно: сам компилятор выступает аудитором.
 
-## Building a Verified SRAM Memory Map
+## Построение проверенной карты памяти SRAM
 
-### The Region Type
+### Тип Region
 
-A `Region` represents a contiguous block of memory. Its constructor is a `const fn` that enforces basic validity:
+`Region` представляет непрерывный блок памяти. Его конструктор — `const fn`, который обеспечивает базовую корректность:
 
 ```rust
 #[derive(Debug, Clone, Copy)]
@@ -68,12 +68,12 @@ pub struct Region {
 }
 
 impl Region {
-    /// Create a region. Panics at compile time if invariants fail.
+    /// Создаёт регион. Паникует на этапе компиляции, если инварианты нарушены.
     pub const fn new(base: u32, size: u32) -> Self {
-        assert!(size > 0, "region size must be non-zero");
+        assert!(size > 0, "размер региона должен быть ненулевым");
         assert!(
             base as u64 + size as u64 <= u32::MAX as u64,
-            "region overflows 32-bit address space"
+            "регион выходит за пределы 32-битного адресного пространства"
         );
         Self { base, size }
     }
@@ -82,33 +82,33 @@ impl Region {
         self.base + self.size
     }
 
-    /// True if `inner` fits entirely within `self`.
+    /// Истина, если `inner` целиком помещается внутри `self`.
     pub const fn contains(&self, inner: &Region) -> bool {
         inner.base >= self.base && inner.end() <= self.end()
     }
 
-    /// True if two regions share any addresses.
+    /// Истина, если два региона имеют общие адреса.
     pub const fn overlaps(&self, other: &Region) -> bool {
         self.base < other.end() && other.base < self.end()
     }
 
-    /// True if `addr` falls within this region.
+    /// Истина, если `addr` попадает в этот регион.
     pub const fn contains_addr(&self, addr: u32) -> bool {
         addr >= self.base && addr < self.end()
     }
 }
 
-// Every Region is born valid — you cannot construct an invalid one
+// Регион рождается корректным: некорректный создать нельзя
 const R: Region = Region::new(0x2000_0000, 1024);
 
 fn main() {
-    println!("Region: {:#010X}..{:#010X}", R.base, R.end());
+    println!("Регион: {:#010X}..{:#010X}", R.base, R.end());
 }
 ```
 
-### The Verified Memory Map
+### Проверенная карта памяти
 
-Now we compose regions into a full SRAM map. The constructor proves six overlap-freedom invariants and four containment invariants — all at compile time:
+Теперь объединяем регионы в полную карту SRAM. Конструктор доказывает шесть инвариантов непересечения и четыре инварианта вложенности, всё на этапе компиляции:
 
 ```rust
 # #[derive(Debug, Clone, Copy)]
@@ -143,75 +143,75 @@ impl SramMap {
         data: Region,
         stack: Region,
     ) -> Self {
-        // ── Containment: every sub-region fits within total SRAM ──
-        assert!(total.contains(&bootloader), "bootloader exceeds SRAM");
-        assert!(total.contains(&firmware),   "firmware exceeds SRAM");
-        assert!(total.contains(&data),       "data section exceeds SRAM");
-        assert!(total.contains(&stack),      "stack exceeds SRAM");
+        // ── Вложенность: каждый подрегион помещается в общий объём SRAM ──
+        assert!(total.contains(&bootloader), "загрузчик выходит за пределы SRAM");
+        assert!(total.contains(&firmware),   "прошивка выходит за пределы SRAM");
+        assert!(total.contains(&data),       "секция данных выходит за пределы SRAM");
+        assert!(total.contains(&stack),      "стек выходит за пределы SRAM");
 
-        // ── Overlap freedom: no pair of sub-regions shares an address ──
-        assert!(!bootloader.overlaps(&firmware), "bootloader/firmware overlap");
-        assert!(!bootloader.overlaps(&data),     "bootloader/data overlap");
-        assert!(!bootloader.overlaps(&stack),    "bootloader/stack overlap");
-        assert!(!firmware.overlaps(&data),       "firmware/data overlap");
-        assert!(!firmware.overlaps(&stack),      "firmware/stack overlap");
-        assert!(!data.overlaps(&stack),          "data/stack overlap");
+        // ── Непересечение: никакие два подрегиона не делят адрес ──
+        assert!(!bootloader.overlaps(&firmware), "загрузчик/прошивка пересекаются");
+        assert!(!bootloader.overlaps(&data),     "загрузчик/данные пересекаются");
+        assert!(!bootloader.overlaps(&stack),    "загрузчик/стек пересекаются");
+        assert!(!firmware.overlaps(&data),       "прошивка/данные пересекаются");
+        assert!(!firmware.overlaps(&stack),      "прошивка/стек пересекаются");
+        assert!(!data.overlaps(&stack),          "данные/стек пересекаются");
 
         Self { total, bootloader, firmware, data, stack }
     }
 }
 
-// ✅ All 10 invariants verified at compile time — zero runtime cost
+// ✅ Все 10 инвариантов проверены на этапе компиляции — ноль затрат во время выполнения
 const SRAM: SramMap = SramMap::verified(
-    Region::new(0x2000_0000, 256 * 1024),   // 256 KB total SRAM
-    Region::new(0x2000_0000,  16 * 1024),   // bootloader: 16 KB
-    Region::new(0x2000_4000, 128 * 1024),   // firmware:  128 KB
-    Region::new(0x2002_4000,  64 * 1024),   // data:       64 KB
-    Region::new(0x2003_4000,  48 * 1024),   // stack:      48 KB
+    Region::new(0x2000_0000, 256 * 1024),   // 256 KB всего SRAM
+    Region::new(0x2000_0000,  16 * 1024),   // загрузчик: 16 KB
+    Region::new(0x2000_4000, 128 * 1024),   // прошивка: 128 KB
+    Region::new(0x2002_4000,  64 * 1024),   // данные: 64 KB
+    Region::new(0x2003_4000,  48 * 1024),   // стек: 48 KB
 );
 
 fn main() {
-    println!("SRAM:  {:#010X} — {} KB", SRAM.total.base, SRAM.total.size / 1024);
-    println!("Boot:  {:#010X} — {} KB", SRAM.bootloader.base, SRAM.bootloader.size / 1024);
-    println!("FW:    {:#010X} — {} KB", SRAM.firmware.base, SRAM.firmware.size / 1024);
-    println!("Data:  {:#010X} — {} KB", SRAM.data.base, SRAM.data.size / 1024);
-    println!("Stack: {:#010X} — {} KB", SRAM.stack.base, SRAM.stack.size / 1024);
+    println!("SRAM:       {:#010X} — {} KB", SRAM.total.base, SRAM.total.size / 1024);
+    println!("Загрузчик:  {:#010X} — {} KB", SRAM.bootloader.base, SRAM.bootloader.size / 1024);
+    println!("Прошивка:   {:#010X} — {} KB", SRAM.firmware.base, SRAM.firmware.size / 1024);
+    println!("Данные:     {:#010X} — {} KB", SRAM.data.base, SRAM.data.size / 1024);
+    println!("Стек:       {:#010X} — {} KB", SRAM.stack.base, SRAM.stack.size / 1024);
 }
 ```
 
-Ten compile-time checks, zero runtime instructions. The binary contains only the verified constants.
+Десять проверок на этапе компиляции, ноль инструкций во время выполнения. Бинарный файл содержит только проверенные константы.
 
-### Breaking the Map
+### Нарушаем карту
 
-Suppose someone increases the data section from 64 KB to 80 KB without adjusting anything else:
+Допустим, кто-то увеличил секцию данных с 64 KB до 80 KB, ничего больше не меняя:
 
 ```rust,ignore
-// ❌ Does not compile
+// ❌ Не компилируется
 const BAD_SRAM: SramMap = SramMap::verified(
     Region::new(0x2000_0000, 256 * 1024),
     Region::new(0x2000_0000,  16 * 1024),
     Region::new(0x2000_4000, 128 * 1024),
-    Region::new(0x2002_4000,  80 * 1024),   // 80 KB — 16 KB too large
-    Region::new(0x2003_8000,  48 * 1024),   // stack pushed past SRAM end
+    Region::new(0x2002_4000,  80 * 1024),   // 80 KB: на 16 KB больше, чем нужно
+    Region::new(0x2003_8000,  48 * 1024),   // стек сдвинут за конец SRAM
 );
 ```
 
-The compiler reports:
+Компилятор выдаёт:
 
 ```text
 error[E0080]: evaluation of constant value failed
   --> src/main.rs:38:9
    |
-38 |         assert!(total.contains(&stack), "stack exceeds SRAM");
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |         the evaluated program panicked at 'stack exceeds SRAM'
+38 |         assert!(total.contains(&stack), "стек выходит за пределы SRAM");
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |         the evaluated program panicked at 'стек выходит за пределы SRAM'
 ```
 
-> **The bug that would have been a mysterious field failure is now a compile error.** No unit test needed, no code review catch — the compiler proves it impossible. Compare this to C, where the same bug would ship silently and surface as a stack corruption months later in the field.
+> **Ошибка, которая стала бы загадочным сбоем в полевых условиях, теперь — ошибка компиляции.** Не нужен модульный тест и код-ревью: компилятор доказывает, что такого не может быть. Сравните с C, где та же ошибка тихо попала бы в продукт и через месяцы проявилась бы как повреждение стека в полевых условиях.
 
-## Layering Access Control with Phantom Types
+## Контроль доступа с phantom-типами
 
-Combine `const fn` verification with phantom-typed access permissions ([ch09](ch09-phantom-types-for-resource-tracking.md)) to enforce read/write constraints at the type level:
+Объедините проверку `const fn` с phantom-типами прав доступа ([гл. 09](ch09-phantom-types-for-resource-tracking.md)), чтобы обеспечивать ограничения чтения и записи на уровне типов:
 
 ```rust
 use std::marker::PhantomData;
@@ -227,41 +227,41 @@ pub struct TypedRegion<Access> {
 
 impl<A> TypedRegion<A> {
     pub const fn new(base: u32, size: u32) -> Self {
-        assert!(size > 0, "region size must be non-zero");
+        assert!(size > 0, "размер региона должен быть ненулевым");
         Self { base, size, _access: PhantomData }
     }
 }
 
-// Read is available for any access level
+// Чтение доступно для любого уровня доступа
 fn read_word<A>(region: &TypedRegion<A>, offset: u32) -> u32 {
-    assert!(offset + 4 <= region.size, "read out of bounds");
-    // In real firmware: unsafe { core::ptr::read_volatile((region.base + offset) as *const u32) }
-    0 // stub
+    assert!(offset + 4 <= region.size, "чтение за пределами");
+    // В реальной прошивке: unsafe { core::ptr::read_volatile((region.base + offset) as *const u32) }
+    0 // заглушка
 }
 
-// Write requires ReadWrite — the function signature enforces it
+// Запись требует ReadWrite: сигнатура функции это обеспечивает
 fn write_word(region: &TypedRegion<ReadWrite>, offset: u32, value: u32) {
-    assert!(offset + 4 <= region.size, "write out of bounds");
-    // In real firmware: unsafe { core::ptr::write_volatile(...) }
-    let _ = value; // stub
+    assert!(offset + 4 <= region.size, "запись за пределами");
+    // В реальной прошивке: unsafe { core::ptr::write_volatile(...) }
+    let _ = value; // заглушка
 }
 
 const BOOTLOADER: TypedRegion<ReadOnly>  = TypedRegion::new(0x2000_0000, 16 * 1024);
 const DATA:       TypedRegion<ReadWrite> = TypedRegion::new(0x2002_4000, 64 * 1024);
 
 fn main() {
-    read_word(&BOOTLOADER, 0);      // ✅ read from read-only region
-    read_word(&DATA, 0);            // ✅ read from read-write region
-    write_word(&DATA, 0, 42);       // ✅ write to read-write region
-    // write_word(&BOOTLOADER, 0, 42); // ❌ Compile error: expected ReadWrite, found ReadOnly
+    read_word(&BOOTLOADER, 0);      // ✅ чтение из региона только для чтения
+    read_word(&DATA, 0);            // ✅ чтение из региона чтения-записи
+    write_word(&DATA, 0, 42);       // ✅ запись в регион чтения-записи
+    // write_word(&BOOTLOADER, 0, 42); // ❌ Ошибка компиляции: ожидается ReadWrite, найден ReadOnly
 }
 ```
 
-The bootloader region is physically writeable (it's SRAM), but the type system prevents accidental writes. This distinction between **hardware capability** and **software permission** is exactly what correct-by-construction means.
+Регион загрузчика физически доступен для записи (это SRAM), но система типов предотвращает случайную запись. Именно это различие между **аппаратной возможностью** и **программным разрешением** и означает корректность по построению.
 
-## Pointer Provenance: Proving Addresses Belong to Regions
+## Происхождение указателя: доказываем, что адреса принадлежат регионам
 
-Taking it further, we can create verified addresses — values that are statically proven to lie within a specific region:
+Двигаясь дальше, можно создавать проверенные адреса: значения, которые статически доказаны как лежащие внутри конкретного региона:
 
 ```rust
 # #[derive(Debug, Clone, Copy)]
@@ -277,15 +277,15 @@ Taking it further, we can create verified addresses — values that are statical
 #         addr >= self.base && addr < self.end()
 #     }
 # }
-/// An address proven at compile time to lie within a Region.
+/// Адрес, доказанно лежащий внутри Region на этапе компиляции.
 pub struct VerifiedAddr {
-    addr: u32, // private — can only be created through the checked constructor
+    addr: u32, // приватное: создаётся только через проверяющий конструктор
 }
 
 impl VerifiedAddr {
-    /// Panics at compile time if `addr` is outside `region`.
+    /// Паникует на этапе компиляции, если `addr` вне `region`.
     pub const fn new(region: &Region, addr: u32) -> Self {
-        assert!(region.contains_addr(addr), "address outside region");
+        assert!(region.contains_addr(addr), "адрес вне региона");
         Self { addr }
     }
 
@@ -296,40 +296,40 @@ impl VerifiedAddr {
 
 const DATA: Region = Region::new(0x2002_4000, 64 * 1024);
 
-// ✅ Proven at compile time to be inside the data region
+// ✅ Доказано на этапе компиляции, что адрес внутри региона данных
 const STATUS_WORD: VerifiedAddr = VerifiedAddr::new(&DATA, 0x2002_4000);
 const CONFIG_WORD: VerifiedAddr = VerifiedAddr::new(&DATA, 0x2002_5000);
 
-// ❌ Would not compile: address is in the bootloader region, not data
+// ❌ Не скомпилируется: адрес лежит в регионе загрузчика, а не данных
 // const BAD_ADDR: VerifiedAddr = VerifiedAddr::new(&DATA, 0x2000_0000);
 
 fn main() {
-    println!("Status register at {:#010X}", STATUS_WORD.raw());
-    println!("Config register at {:#010X}", CONFIG_WORD.raw());
+    println!("Регистр статуса по адресу {:#010X}", STATUS_WORD.raw());
+    println!("Регистр конфигурации по адресу {:#010X}", CONFIG_WORD.raw());
 }
 ```
 
-**Provenance established at compile time** — no runtime bounds check needed when accessing these addresses. The constructor is private, so a `VerifiedAddr` can only exist if the compiler has proven it valid.
+**Происхождение доказано на этапе компиляции**: при доступе к этим адресам не нужна проверка границ во время выполнения. Конструктор приватный, поэтому `VerifiedAddr` может существовать только тогда, когда компилятор доказал его корректность.
 
-## Beyond Memory Maps
+## За пределами карт памяти
 
-The `const fn` proof pattern applies wherever you have **compile-time-known values with structural invariants**. The SRAM map above proved *inter-region* properties (containment, non-overlap). The same technique scales to increasingly fine-grained domains:
+Паттерн доказательства с `const fn` применим везде, где есть **известные на этапе компиляции значения со структурными инвариантами**. Карта SRAM выше доказала свойства *между регионами* (вложенность, непересечение). Та же техника масштабируется на всё более мелкие области:
 
 ```mermaid
 flowchart TD
-    subgraph coarse["Coarse-Grained"]
-        MEM["Memory Maps<br/>regions don't overlap"]
-        REG["Register Maps<br/>offsets are aligned & disjoint"]
+    subgraph coarse["Крупнозернистые"]
+        MEM["Карты памяти<br/>регионы не перекрываются"]
+        REG["Карты регистров<br/>смещения выровнены и не пересекаются"]
     end
 
-    subgraph fine["Fine-Grained"]
-        BIT["Bitfield Layouts<br/>masks are disjoint within a register"]
-        FRAME["Protocol Frames<br/>fields are contiguous, total ≤ max"]
+    subgraph fine["Мелкозернистые"]
+        BIT["Раскладка битовых полей<br/>маски не пересекаются внутри регистра"]
+        FRAME["Кадры протокола<br/>поля идут подряд, суммарно ≤ максимума"]
     end
 
-    subgraph derived["Derived-Value Chains"]
-        PLL["Clock Trees / PLL<br/>each intermediate freq in range"]
-        LUT["Lookup Tables<br/>computed & verified at compile time"]
+    subgraph derived["Цепочки производных значений"]
+        PLL["Деревья тактирования / PLL<br/>каждая промежуточная частота в диапазоне"]
+        LUT["Таблицы поиска<br/>вычисляются и проверяются на этапе компиляции"]
     end
 
     MEM --> REG --> BIT
@@ -345,11 +345,11 @@ flowchart TD
     style LUT fill:#fff3e0,color:#000
 ```
 
-Each subsection below follows the same pattern: define a type with a `const fn` constructor that encodes the invariants, then use `const _: () = { ... }` or a `const` binding to trigger verification.
+Каждый подраздел ниже следует одному шаблону: определяется тип с конструктором `const fn`, который кодирует инварианты, а затем используется `const _: () = { ... }` или `const`-привязка для запуска проверки.
 
-### Register Maps
+### Карты регистров
 
-Hardware register blocks have fixed offsets and widths. A misaligned or overlapping register definition is always a bug:
+Блоки аппаратных регистров имеют фиксированные смещения и ширины. Смещённое или перекрывающееся определение регистра всегда является ошибкой:
 
 ```rust
 #[derive(Debug, Clone, Copy)]
@@ -362,9 +362,9 @@ impl Register {
     pub const fn new(offset: u32, width: u32) -> Self {
         assert!(
             width == 1 || width == 2 || width == 4,
-            "register width must be 1, 2, or 4 bytes"
+            "ширина регистра должна быть 1, 2 или 4 байта"
         );
-        assert!(offset % width == 0, "register must be naturally aligned");
+        assert!(offset % width == 0, "регистр должен быть естественно выровнен");
         Self { offset, width }
     }
 
@@ -377,13 +377,13 @@ const fn disjoint(a: &Register, b: &Register) -> bool {
     a.end() <= b.offset || b.end() <= a.offset
 }
 
-// UART peripheral registers
+// Регистры периферии UART
 const DATA:   Register = Register::new(0x00, 4);
 const STATUS: Register = Register::new(0x04, 4);
 const CTRL:   Register = Register::new(0x08, 4);
 const BAUD:   Register = Register::new(0x0C, 4);
 
-// Compile-time proof: no register overlaps another
+// Доказательство на этапе компиляции: ни один регистр не перекрывает другой
 const _: () = {
     assert!(disjoint(&DATA,   &STATUS));
     assert!(disjoint(&DATA,   &CTRL));
@@ -399,25 +399,25 @@ fn main() {
 }
 ```
 
-Note the `const _: () = { ... };` idiom — an unnamed constant whose only purpose is to run compile-time assertions. If any assertion fails, the constant can't be evaluated and compilation stops.
+Обратите внимание на идиому `const _: () = { ... };`: безымянная константа, единственная цель которой — выполнить утверждения на этапе компиляции. Если хотя бы одно утверждение не выполняется, константа не может быть вычислена, и компиляция останавливается.
 
-#### Mini-Exercise: SPI Register Bank
+#### Мини-упражнение: банк регистров SPI
 
-Given these SPI controller registers, add const fn assertions proving:
-1. Every register is naturally aligned (offset % width == 0)
-2. No two registers overlap
-3. All registers fit within a 64-byte register block
+Дан набор регистров SPI-контроллера. Добавьте `const fn`-утверждения, которые доказывают:
+1. Каждый регистр естественно выровнен (offset % width == 0)
+2. Никакие два регистра не перекрываются
+3. Все регистры помещаются в блок регистров размером 64 байта
 
 <details>
-<summary>Hint</summary>
+<summary>Подсказка</summary>
 
-Reuse the `Register` and `disjoint` functions from the UART example above. Define three or four `const Register` values (e.g., `CTRL` at offset 0x00 width 4, `STATUS` at 0x04 width 4, `TX_DATA` at 0x08 width 1, `RX_DATA` at 0x0C width 1) and assert the three properties.
+Используйте повторно `Register` и `disjoint` из примера с UART выше. Определите три-четыре `const Register` (например, `CTRL` со смещением 0x00 и шириной 4, `STATUS` со смещением 0x04 и шириной 4, `TX_DATA` со смещением 0x08 и шириной 1, `RX_DATA` со смещением 0x0C и шириной 1) и проверьте три свойства.
 
 </details>
 
-### Protocol Frame Layouts
+### Раскладка кадров протокола
 
-Network or bus protocol frames have fields at specific offsets. The `then()` method makes contiguity structural — gaps and overlaps are impossible by construction:
+Кадры сетевых или шинных протоколов содержат поля по определённым смещениям. Метод `then()` делает непрерывность структурной: промежутки и перекрытия невозможны по построению:
 
 ```rust
 #[derive(Debug, Clone, Copy)]
@@ -428,7 +428,7 @@ pub struct Field {
 
 impl Field {
     pub const fn new(offset: usize, size: usize) -> Self {
-        assert!(size > 0, "field size must be non-zero");
+        assert!(size > 0, "размер поля должен быть ненулевым");
         Self { offset, size }
     }
 
@@ -436,7 +436,7 @@ impl Field {
         self.offset + self.size
     }
 
-    /// Create the next field immediately after this one.
+    /// Создаёт следующее поле сразу после этого.
     pub const fn then(&self, size: usize) -> Field {
         Field::new(self.end(), size)
     }
@@ -449,42 +449,42 @@ const SEQ_NUM: Field = HEADER.then(2);
 const PAYLOAD: Field = SEQ_NUM.then(246);
 const CRC:     Field = PAYLOAD.then(4);
 
-// Compile-time proof: frame fits within maximum size
-const _: () = assert!(CRC.end() <= MAX_FRAME, "frame exceeds maximum size");
+// Доказательство на этапе компиляции: кадр помещается в максимальный размер
+const _: () = assert!(CRC.end() <= MAX_FRAME, "кадр превышает максимальный размер");
 
 fn main() {
-    println!("Header:  [{}..{})", HEADER.offset, HEADER.end());
-    println!("SeqNum:  [{}..{})", SEQ_NUM.offset, SEQ_NUM.end());
-    println!("Payload: [{}..{})", PAYLOAD.offset, PAYLOAD.end());
-    println!("CRC:     [{}..{})", CRC.offset, CRC.end());
-    println!("Total:   {}/{} bytes", CRC.end(), MAX_FRAME);
+    println!("Заголовок:       [{}..{})", HEADER.offset, HEADER.end());
+    println!("Номер:           [{}..{})", SEQ_NUM.offset, SEQ_NUM.end());
+    println!("Полезные данные: [{}..{})", PAYLOAD.offset, PAYLOAD.end());
+    println!("CRC:             [{}..{})", CRC.offset, CRC.end());
+    println!("Итого:           {}/{} байт", CRC.end(), MAX_FRAME);
 }
 ```
 
-Fields are contiguous by construction — each starts exactly where the previous one ends. The final assertion proves the frame fits within the protocol's maximum size.
+Поля идут непрерывно по построению: каждое начинается ровно там, где заканчивается предыдущее. Последнее утверждение доказывает, что кадр помещается в максимальный размер протокола.
 
-### Inline Const Blocks for Generic Validation
+### Встроенные const-блоки для проверки обобщений
 
-Since Rust 1.79, `const { ... }` blocks let you validate const generic parameters at the point of use — perfect for DMA buffer size constraints or alignment requirements:
+Начиная с Rust 1.79, блоки `const { ... }` позволяют проверять параметры const-обобщений в месте использования. Это идеально для ограничений размера DMA-буферов и требований к выравниванию:
 
 ```rust,ignore
 fn dma_transfer<const N: usize>(buf: &[u8; N]) {
-    const { assert!(N % 4 == 0, "DMA buffer must be 4-byte aligned in size") };
-    const { assert!(N <= 65536, "DMA transfer exceeds maximum size") };
-    // ... initiate transfer ...
+    const { assert!(N % 4 == 0, "размер DMA-буфера должен быть кратен 4 байтам") };
+    const { assert!(N <= 65536, "DMA-передача превышает максимальный размер") };
+    // ... запускаем передачу ...
 }
 
-dma_transfer(&[0u8; 1024]);   // ✅ 1024 is divisible by 4 and ≤ 65536
-// dma_transfer(&[0u8; 1023]); // ❌ Compile error: not 4-byte aligned
+dma_transfer(&[0u8; 1024]);   // ✅ 1024 делится на 4 и ≤ 65536
+// dma_transfer(&[0u8; 1023]); // ❌ Ошибка компиляции: не выровнено по 4 байтам
 ```
 
-The assertions are evaluated when the function is monomorphized — each call site with a different `N` gets its own compile-time check.
+Утверждения вычисляются при мономорфизации функции: каждый вызов с другим `N` получает собственную проверку на этапе компиляции.
 
-### Bitfield Layouts Within a Register
+### Раскладка битовых полей внутри регистра
 
-Register maps prove that registers don't *overlap each other* — but what about the **bits within a single register**? Control registers pack multiple fields into one word. If two fields share a bit position, reads and writes silently corrupt each other. In C, this is typically caught (or not) by manual review of mask constants.
+Карты регистров доказывают, что регистры не *перекрываются друг с другом*. Но что насчёт **битов внутри одного регистра**? Управляющие регистры упаковывают несколько полей в одно слово. Если два поля занимают один и тот же бит, операции чтения и записи тихо портят друг друга. В C это обычно ловят (или не ловят) вручную, проверяя константы масок.
 
-A `const fn` can prove that every field's mask/shift pair is disjoint from every other field in the same register:
+`const fn` может доказать, что пара маска/сдвиг каждого поля не пересекается с парами всех остальных полей того же регистра:
 
 ```rust
 #[derive(Debug, Clone, Copy)]
@@ -495,9 +495,9 @@ pub struct BitField {
 
 impl BitField {
     pub const fn new(shift: u8, width: u8) -> Self {
-        assert!(width > 0, "bit field width must be non-zero");
-        assert!(shift as u32 + width as u32 <= 32, "bit field exceeds 32-bit register");
-        // Build mask: `width` ones starting at bit `shift`
+        assert!(width > 0, "ширина битового поля должна быть ненулевой");
+        assert!(shift as u32 + width as u32 <= 32, "битовое поле выходит за пределы 32-битного регистра");
+        // Строим маску: `width` единиц, начиная с бита `shift`
         let mask = ((1u64 << width as u64) - 1) as u32;
         Self { mask: mask << shift as u32, shift }
     }
@@ -507,7 +507,7 @@ impl BitField {
     }
 
     pub const fn encode(&self, value: u32) -> u32 {
-        assert!(value & !( self.mask >> self.shift as u32 ) == 0, "value exceeds field width");
+        assert!(value & !( self.mask >> self.shift as u32 ) == 0, "значение превышает ширину поля");
         value << self.shift as u32
     }
 }
@@ -516,13 +516,13 @@ const fn fields_disjoint(a: &BitField, b: &BitField) -> bool {
     a.positioned_mask() & b.positioned_mask() == 0
 }
 
-// SPI Control Register fields: enable[0], mode[1:2], clock_div[4:7], irq_en[8]
-const SPI_EN:     BitField = BitField::new(0, 1);   // bit 0
-const SPI_MODE:   BitField = BitField::new(1, 2);   // bits 1–2
-const SPI_CLKDIV: BitField = BitField::new(4, 4);   // bits 4–7
-const SPI_IRQ:    BitField = BitField::new(8, 1);   // bit 8
+// Поля управляющего регистра SPI: enable[0], mode[1:2], clock_div[4:7], irq_en[8]
+const SPI_EN:     BitField = BitField::new(0, 1);   // бит 0
+const SPI_MODE:   BitField = BitField::new(1, 2);   // биты 1–2
+const SPI_CLKDIV: BitField = BitField::new(4, 4);   // биты 4–7
+const SPI_IRQ:    BitField = BitField::new(8, 1);   // бит 8
 
-// Compile-time proof: no field shares a bit position
+// Доказательство на этапе компиляции: ни одно поле не занимает общий бит
 const _: () = {
     assert!(fields_disjoint(&SPI_EN,   &SPI_MODE));
     assert!(fields_disjoint(&SPI_EN,   &SPI_CLKDIV));
@@ -541,41 +541,41 @@ fn main() {
 }
 ```
 
-This complements the register map pattern above — register maps prove *inter-register* disjointness while bitfield layouts prove *intra-register* disjointness. Together they provide full coverage from the register block down to individual bits.
+Это дополняет паттерн карты регистров выше: карты регистров доказывают непересечение *между регистрами*, а раскладка битовых полей доказывает непересечение *внутри регистра*. Вместе они обеспечивают полное покрытие от блока регистров до отдельных битов.
 
-### Clock Tree / PLL Configuration
+### Конфигурация дерева тактирования / PLL
 
-Microcontrollers derive peripheral clocks through multiplier/divider chains. A PLL produces `f_vco = f_in × N / M`, and the VCO frequency must stay within a hardware-specified range. Get any parameter wrong for a specific board, and the chip outputs garbage clocks or refuses to lock. These constraints are perfect for `const fn`:
+Микроконтроллеры получают тактовые частоты периферии через цепочки умножителей и делителей. PLL выдаёт `f_vco = f_in × N / M`, и частота VCO должна оставаться в диапазоне, заданном аппаратурой. Ошибка в любом параметре для конкретной платы, и чип выдаёт некорректные тактовые сигналы или не может захватить частоту. Эти ограничения идеально подходят для `const fn`:
 
 ```rust
 #[derive(Debug, Clone, Copy)]
 pub struct PllConfig {
-    pub input_khz: u32,     // external oscillator
-    pub m: u32,             // input divider
-    pub n: u32,             // VCO multiplier
-    pub p: u32,             // system clock divider
+    pub input_khz: u32,     // внешний генератор
+    pub m: u32,             // входной делитель
+    pub n: u32,             // множитель VCO
+    pub p: u32,             // делитель системной частоты
 }
 
 impl PllConfig {
     pub const fn verified(input_khz: u32, m: u32, n: u32, p: u32) -> Self {
-        // Input divider produces the PLL input frequency
+        // Входной делитель даёт частоту на входе PLL
         let pll_input = input_khz / m;
         assert!(pll_input >= 1_000 && pll_input <= 2_000,
-            "PLL input must be 1–2 MHz");
+            "вход PLL должен быть 1–2 МГц");
 
-        // VCO frequency must be within hardware limits
+        // Частота VCO должна быть в пределах аппаратных ограничений
         let vco = pll_input as u64 * n as u64;
         assert!(vco >= 192_000 && vco <= 432_000,
-            "VCO must be 192–432 MHz");
+            "VCO должен быть в диапазоне 192–432 МГц");
 
-        // System clock divider must be even (hardware constraint)
+        // Делитель системной частоты должен быть чётным (аппаратное ограничение)
         assert!(p == 2 || p == 4 || p == 6 || p == 8,
-            "P must be 2, 4, 6, or 8");
+            "P должен быть 2, 4, 6 или 8");
 
-        // Final system clock
+        // Итоговая системная частота
         let sysclk = vco / p as u64;
         assert!(sysclk <= 168_000,
-            "system clock exceeds 168 MHz maximum");
+            "системная частота превышает максимум 168 МГц");
 
         Self { input_khz, m, n, p }
     }
@@ -589,19 +589,19 @@ impl PllConfig {
     }
 }
 
-// STM32F4 with 8 MHz HSE crystal → 168 MHz system clock
+// STM32F4 с кварцем HSE 8 МГц → системная частота 168 МГц
 const PLL: PllConfig = PllConfig::verified(8_000, 8, 336, 2);
 
-// ❌ Would not compile: VCO = 480 MHz exceeds 432 MHz limit
+// ❌ Не скомпилируется: VCO = 480 МГц превышает предел 432 МГц
 // const BAD: PllConfig = PllConfig::verified(8_000, 8, 480, 2);
 
 fn main() {
-    println!("VCO:    {} MHz", PLL.vco_khz() / 1_000);
-    println!("SYSCLK: {} MHz", PLL.sysclk_khz() / 1_000);
+    println!("VCO:    {} МГц", PLL.vco_khz() / 1_000);
+    println!("SYSCLK: {} МГц", PLL.sysclk_khz() / 1_000);
 }
 ```
 
-Uncommenting the `BAD` constant produces a compile-time error that pinpoints the violated constraint:
+Раскомментирование константы `BAD` даёт ошибку на этапе компиляции, которая точно указывает на нарушенное ограничение:
 
 ```text
 error[E0080]: evaluation of constant value failed
@@ -609,18 +609,18 @@ error[E0080]: evaluation of constant value failed
    |
 18 |         assert!(vco >= 192_000 && vco <= 432_000,
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |         the evaluated program panicked at 'VCO must be 192–432 MHz'
+   |         the evaluated program panicked at 'VCO должен быть в диапазоне 192–432 МГц'
 ```
 
-The compiler catches the constraint violation in the *middle* of the derivation chain — not at the end. If you had instead violated the system clock limit (`sysclk > 168 MHz`), the error message would point to that assertion instead.
+Компилятор ловит нарушение ограничения в *середине* цепочки вычислений, а не в конце. Если бы вместо этого было нарушено ограничение системной частоты (`sysclk > 168 МГц`), сообщение об ошибке указывало бы на другое утверждение.
 
-> **Derived-value constraint chains turn a single `const fn` into a multi-stage proof.** Each intermediate value has its own hardware-mandated range. Changing one parameter (e.g., swapping to a 25 MHz crystal) immediately surfaces any downstream violation.
+> **Цепочки ограничений производных значений превращают один `const fn` в многоступенчатое доказательство.** У каждого промежуточного значения свой диапазон, заданный аппаратурой. Изменение одного параметра (например, переход на кварц 25 МГц) сразу выявляет любое нарушение ниже по цепочке.
 
-**Derived-value constraint chains** — the VCO frequency depends on `input / m × n`, and the system clock depends on `vco / p`. Each intermediate value has its own hardware-mandated range. A single `const fn` verifies the entire chain, so changing one parameter (e.g., swapping to a 25 MHz crystal) immediately surfaces any downstream violation.
+**Цепочки ограничений производных значений:** частота VCO зависит от `input / m × n`, а системная частота зависит от `vco / p`. У каждого промежуточного значения свой диапазон, заданный аппаратурой. Один `const fn` проверяет всю цепочку, поэтому изменение одного параметра (например, переход на кварц 25 МГц) сразу выявляет любое нарушение ниже по цепочке.
 
-### Compile-Time Lookup Tables
+### Таблицы поиска на этапе компиляции
 
-`const fn` can compute entire lookup tables at compile time, placing them in `.rodata` with zero startup cost. This is especially valuable for CRC tables, trigonometry, encoding maps, and error-correction codes — anywhere you'd normally use a build script or code generation:
+`const fn` может вычислить целые таблицы поиска на этапе компиляции и поместить их в `.rodata` без затрат на инициализацию при запуске. Это особенно полезно для таблиц CRC, тригонометрии, таблиц кодирования и кодов коррекции ошибок, то есть везде, где обычно использовали бы build-скрипт или генерацию кода:
 
 ```rust
 const fn crc32_table() -> [u32; 256] {
@@ -631,7 +631,7 @@ const fn crc32_table() -> [u32; 256] {
         let mut j = 0;
         while j < 8 {
             if crc & 1 != 0 {
-                crc = (crc >> 1) ^ 0xEDB8_8320; // standard CRC-32 polynomial
+                crc = (crc >> 1) ^ 0xEDB8_8320; // стандартный полином CRC-32
             } else {
                 crc >>= 1;
             }
@@ -643,10 +643,10 @@ const fn crc32_table() -> [u32; 256] {
     table
 }
 
-/// Full CRC-32 table — computed at compile time, placed in .rodata
+/// Полная таблица CRC-32: вычисляется на этапе компиляции и размещается в .rodata
 const CRC32_TABLE: [u32; 256] = crc32_table();
 
-/// Compute CRC-32 over a byte slice at runtime using the precomputed table.
+/// Вычисляет CRC-32 для среза байтов во время выполнения, используя готовую таблицу.
 fn crc32(data: &[u8]) -> u32 {
     let mut crc: u32 = !0;
     for &byte in data {
@@ -656,65 +656,65 @@ fn crc32(data: &[u8]) -> u32 {
     !crc
 }
 
-// Smoke-test: well-known CRC-32 of "123456789"
+// Проверка: известный CRC-32 для «123456789»
 const _: () = {
-    // Verify a single table entry at compile time
+    // Проверяем отдельные элементы таблицы на этапе компиляции
     assert!(CRC32_TABLE[0] == 0x0000_0000);
     assert!(CRC32_TABLE[1] == 0x7707_3096);
 };
 
 fn main() {
     let check = crc32(b"123456789");
-    // Known CRC-32 of "123456789" is 0xCBF43926
+    // Известный CRC-32 для «123456789» — 0xCBF43926
     assert_eq!(check, 0xCBF4_3926);
-    println!("CRC-32 of '123456789' = {:#010X} ✓", check);
-    println!("Table size: {} entries × 4 bytes = {} bytes in .rodata",
+    println!("CRC-32 для '123456789' = {:#010X} ✓", check);
+    println!("Размер таблицы: {} элементов × 4 байта = {} байт в .rodata",
         CRC32_TABLE.len(), CRC32_TABLE.len() * 4);
 }
 ```
 
-The `crc32_table()` function runs entirely during compilation. The resulting 1 KB table is baked into the binary's read-only data section — no allocator, no initialization code, no startup cost. Compare this with a C approach that either uses a code generator or computes the table at startup. The Rust version is provably correct (the `const _` assertions verify known values) and provably complete (the compiler will reject the program if the function fails to produce a valid table).
+Функция `crc32_table()` выполняется целиком во время компиляции. Полученная таблица размером 1 KB записывается в секцию read-only данных бинарного файла: ни аллокатора, ни кода инициализации, ни затрат на запуск. Сравните с подходом C, где таблицу либо генерирует отдельный инструмент, либо вычисляют при запуске. Версия на Rust доказуемо корректна (утверждения `const _` проверяют известные значения) и доказуемо полна (компилятор отвергнет программу, если функция не сможет построить корректную таблицу).
 
-## When to Use Const Fn Proofs
+## Когда использовать доказательства на основе const fn
 
-| Scenario | Recommendation |
-|----------|:---:|
-| Memory maps, register offsets, partition tables | ✅ Always |
-| Protocol frame layouts with fixed fields | ✅ Always |
-| Bitfield masks within a register | ✅ Always |
-| Clock tree / PLL parameter chains | ✅ Always |
-| Lookup tables (CRC, trig, encoding) | ✅ Always — zero startup cost |
-| Constants with cross-value invariants (non-overlap, sum ≤ bound) | ✅ Always |
-| Configuration values with domain constraints | ✅ When values are known at compile time |
-| Values computed from user input or files | ❌ Use runtime validation |
-| Highly dynamic structures (trees, graphs) | ❌ Use property-based testing |
-| Single-value range checks | ⚠️  Consider newtype + `From` instead ([ch07](ch07-validated-boundaries-parse-dont-validate.md)) |
+| Сценарий | Рекомендация |
+|----------|:------------:|
+| Карты памяти, смещения регистров, таблицы разделов | ✅ Всегда |
+| Раскладка кадров протокола с фиксированными полями | ✅ Всегда |
+| Битовые маски внутри регистра | ✅ Всегда |
+| Дерево тактирования / параметры PLL | ✅ Всегда |
+| Таблицы поиска (CRC, тригонометрия, кодирование) | ✅ Всегда: ноль затрат на запуск |
+| Константы с перекрёстными инвариантами (непересечение, сумма ≤ границы) | ✅ Всегда |
+| Значения конфигурации с ограничениями предметной области | ✅ Когда значения известны на этапе компиляции |
+| Значения, вычисленные из пользовательского ввода или файлов | ❌ Используйте проверку во время выполнения |
+| Сильно динамические структуры (деревья, графы) | ❌ Используйте property-based тестирование |
+| Проверка диапазона одного значения | ⚠️ Лучше newtype + `From` ([гл. 07](ch07-validated-boundaries-parse-dont-validate.md)) |
 
-### Cost Summary
+### Сводка стоимости
 
-| What | Runtime cost |
-|------|:------:|
-| `const fn` assertions (`assert!`, `panic!`) | Compile time only — 0 instructions |
-| `const _: () = { ... }` validation blocks | Compile time only — not in binary |
-| `Region`, `Register`, `Field` structs | Plain data — same layout as raw integers |
-| Inline `const { }` generic validation | Monomorphised at compile time — 0 cost |
-| Lookup tables (`crc32_table()`) | Computed at compile time — placed in `.rodata` |
-| Phantom-typed access markers (`TypedRegion<RW>`) | Zero-sized — optimised away |
+| Что | Стоимость во время выполнения |
+|-----|:------------------------------:|
+| Утверждения `const fn` (`assert!`, `panic!`) | Только время компиляции: 0 инструкций |
+| Блоки проверки `const _: () = { ... }` | Только время компиляции: не попадают в бинарник |
+| Структуры `Region`, `Register`, `Field` | Обычные данные: та же раскладка, что у голых целых |
+| Встроенная проверка обобщений `const { }` | Мономорфизируется на этапе компиляции: 0 затрат |
+| Таблицы поиска (`crc32_table()`) | Вычисляются на этапе компиляции: размещаются в `.rodata` |
+| Маркеры доступа с phantom-типами (`TypedRegion<RW>`) | Нулевой размер: оптимизируются |
 
-Every row is **zero runtime cost** — the proofs exist only during compilation. The resulting binary contains only the verified constants and lookup tables, with no assertion-checking code.
+В каждой строке **ноль затрат во время выполнения**: доказательства существуют только во время компиляции. Итоговый бинарный файл содержит только проверенные константы и таблицы поиска, без кода проверки утверждений.
 
-## Exercise: Flash Partition Map
+## Упражнение: карта разделов флеш-памяти
 
-Design a verified flash partition map for a 1 MB NOR flash starting at `0x0800_0000`. Requirements:
+Спроектируйте проверенную карту разделов для NOR-флеш-памяти 1 MB, начинающейся с адреса `0x0800_0000`. Требования:
 
-1. Four partitions: **bootloader** (64 KB), **application** (640 KB), **config** (64 KB), **OTA staging** (256 KB)
-2. Every partition must be **4 KB aligned** (flash erase granularity): both base and size must be multiples of 4096
-3. No partition may overlap another
-4. All partitions must fit within flash
-5. Add a `const fn total_used()` that returns the sum of all partition sizes and assert it equals 1 MB
+1. Четыре раздела: **загрузчик** (64 KB), **приложение** (640 KB), **конфигурация** (64 KB), **промежуточный буфер OTA** (256 KB)
+2. Каждый раздел должен быть **выровнен по 4 KB** (гранулярность стирания флеш-памяти): и базовый адрес, и размер должны быть кратны 4096
+3. Ни один раздел не может пересекаться с другим
+4. Все разделы должны помещаться во флеш-памяти
+5. Добавьте `const fn total_used()`, которая возвращает сумму размеров всех разделов, и утверждение, что она равна 1 MB
 
 <details>
-<summary>Solution</summary>
+<summary>Пример решения</summary>
 
 ```rust
 #[derive(Debug, Clone, Copy)]
@@ -725,12 +725,12 @@ pub struct FlashRegion {
 
 impl FlashRegion {
     pub const fn new(base: u32, size: u32) -> Self {
-        assert!(size > 0, "partition size must be non-zero");
-        assert!(base % 4096 == 0, "partition base must be 4 KB aligned");
-        assert!(size % 4096 == 0, "partition size must be 4 KB aligned");
+        assert!(size > 0, "размер раздела должен быть ненулевым");
+        assert!(base % 4096 == 0, "базовый адрес раздела должен быть выровнен по 4 KB");
+        assert!(size % 4096 == 0, "размер раздела должен быть выровнен по 4 KB");
         assert!(
             base as u64 + size as u64 <= u32::MAX as u64,
-            "partition overflows address space"
+            "раздел выходит за пределы адресного пространства"
         );
         Self { base, size }
     }
@@ -762,17 +762,17 @@ impl FlashMap {
         config: FlashRegion,
         ota: FlashRegion,
     ) -> Self {
-        assert!(total.contains(&boot),   "bootloader exceeds flash");
-        assert!(total.contains(&app),    "application exceeds flash");
-        assert!(total.contains(&config), "config exceeds flash");
-        assert!(total.contains(&ota),    "OTA staging exceeds flash");
+        assert!(total.contains(&boot),   "загрузчик выходит за пределы флеш-памяти");
+        assert!(total.contains(&app),    "приложение выходит за пределы флеш-памяти");
+        assert!(total.contains(&config), "конфигурация выходит за пределы флеш-памяти");
+        assert!(total.contains(&ota),    "промежуточный буфер OTA выходит за пределы флеш-памяти");
 
-        assert!(!boot.overlaps(&app),    "boot/app overlap");
-        assert!(!boot.overlaps(&config), "boot/config overlap");
-        assert!(!boot.overlaps(&ota),    "boot/ota overlap");
-        assert!(!app.overlaps(&config),  "app/config overlap");
-        assert!(!app.overlaps(&ota),     "app/ota overlap");
-        assert!(!config.overlaps(&ota),  "config/ota overlap");
+        assert!(!boot.overlaps(&app),    "загрузчик/приложение пересекаются");
+        assert!(!boot.overlaps(&config), "загрузчик/конфигурация пересекаются");
+        assert!(!boot.overlaps(&ota),    "загрузчик/OTA пересекаются");
+        assert!(!app.overlaps(&config),  "приложение/конфигурация пересекаются");
+        assert!(!app.overlaps(&ota),     "приложение/OTA пересекаются");
+        assert!(!config.overlaps(&ota),  "конфигурация/OTA пересекаются");
 
         Self { total, boot, app, config, ota }
     }
@@ -783,21 +783,21 @@ impl FlashMap {
 }
 
 const FLASH: FlashMap = FlashMap::verified(
-    FlashRegion::new(0x0800_0000, 1024 * 1024),  // 1 MB total
-    FlashRegion::new(0x0800_0000,   64 * 1024),   // bootloader: 64 KB
-    FlashRegion::new(0x0801_0000,  640 * 1024),   // application: 640 KB
-    FlashRegion::new(0x080B_0000,   64 * 1024),   // config: 64 KB
-    FlashRegion::new(0x080C_0000,  256 * 1024),   // OTA staging: 256 KB
+    FlashRegion::new(0x0800_0000, 1024 * 1024),  // всего 1 MB
+    FlashRegion::new(0x0800_0000,   64 * 1024),   // загрузчик: 64 KB
+    FlashRegion::new(0x0801_0000,  640 * 1024),   // приложение: 640 KB
+    FlashRegion::new(0x080B_0000,   64 * 1024),   // конфигурация: 64 KB
+    FlashRegion::new(0x080C_0000,  256 * 1024),   // промежуточный буфер OTA: 256 KB
 );
 
-// Every byte of flash is accounted for
+// Каждый байт флеш-памяти учтён
 const _: () = assert!(
     FLASH.total_used() == 1024 * 1024,
-    "partitions must exactly fill flash"
+    "разделы должны точно заполнять флеш-память"
 );
 
 fn main() {
-    println!("Flash map: {} KB used / {} KB total",
+    println!("Карта флеш-памяти: {} KB используется / {} KB всего",
         FLASH.total_used() / 1024,
         FLASH.total.size / 1024);
 }
@@ -807,16 +807,16 @@ fn main() {
 
 ```mermaid
 flowchart LR
-    subgraph compile["Compile Time — zero runtime cost"]
+    subgraph compile["Этап компиляции — ноль затрат во время выполнения"]
         direction TB
-        RGN["Region::new()<br/>✅ size &gt; 0<br/>✅ no overflow"]
-        MAP["SramMap::verified()<br/>✅ containment<br/>✅ non-overlap"]
-        ACC["TypedRegion&lt;RW&gt;<br/>✅ access control"]
-        PROV["VerifiedAddr::new()<br/>✅ provenance"]
+        RGN["Region::new()<br/>✅ размер &gt; 0<br/>✅ нет переполнения"]
+        MAP["SramMap::verified()<br/>✅ вложенность<br/>✅ без пересечений"]
+        ACC["TypedRegion&lt;RW&gt;<br/>✅ контроль доступа"]
+        PROV["VerifiedAddr::new()<br/>✅ происхождение"]
     end
 
-    subgraph runtime["Runtime"]
-        HW["Hardware access<br/>No bounds checks<br/>No permission checks"]
+    subgraph runtime["Рантайм"]
+        HW["Доступ к аппаратуре<br/>Без проверки границ<br/>Без проверки прав"]
     end
 
     RGN --> MAP --> ACC --> PROV --> HW
@@ -828,20 +828,20 @@ flowchart LR
     style HW fill:#fff3e0,color:#000
 ```
 
-## Key Takeaways
+## Ключевые выводы
 
-1. **`const fn` + `assert!` = compile-time proof obligation** — if the assertion fails during const evaluation, the program does not compile. No test needed, no code review catch — the compiler proves it.
+1. **`const fn` + `assert!` = обязательство доказательства на этапе компиляции**: если утверждение не выполняется при вычислении константы, программа не компилируется. Не нужен тест и не нужен код-ревью: компилятор доказывает это сам.
 
-2. **Memory maps are ideal candidates** — sub-region containment, overlap freedom, total-size bounds, and alignment constraints are all expressible as const fn assertions. The C `#define` approach offers none of these guarantees.
+2. **Карты памяти — идеальные кандидаты**: вложенность подрегионов, непересечение, ограничения общего объёма и выравнивания выражаются утверждениями `const fn`. Подход с `#define` в C не даёт ни одной из этих гарантий.
 
-3. **Phantom types layer on top** — combine const fn (value verification) with phantom-typed access markers (permission verification) for defense in depth at zero runtime cost.
+3. **Phantom-типы добавляются сверху**: сочетайте const fn (проверку значений) с phantom-маркерами доступа (проверку прав), чтобы получить защиту в глубину без затрат во время выполнения.
 
-4. **Provenance can be established at compile time** — `VerifiedAddr` proves at compile time that an address belongs to a specific region, eliminating runtime bounds checks on every access.
+4. **Происхождение можно установить на этапе компиляции**: `VerifiedAddr` доказывает на этапе компиляции, что адрес принадлежит конкретному региону, устраняя проверки границ во время выполнения при каждом обращении.
 
-5. **The pattern generalizes beyond memory** — register maps, bitfield masks, protocol frames, clock trees, DMA parameters — anywhere you have compile-time-known values with structural invariants.
+5. **Паттерн обобщается за пределы памяти**: карты регистров, маски битовых полей, кадры протокола, деревья тактирования, параметры DMA. Всюду, где есть известные на этапе компиляции значения со структурными инвариантами.
 
-6. **Bitfields and clock trees are ideal candidates** — intra-register bit disjointness and derived-value constraint chains (VCO range, divider limits) are exactly the kind of invariant that `const fn` proves effortlessly.
+6. **Битовые поля и деревья тактирования — идеальные кандидаты**: непересечение битов внутри регистра и цепочки ограничений производных значений (диапазон VCO, пределы делителей) — ровно то, что `const fn` доказывает без усилий.
 
-7. **`const fn` replaces code generators and build scripts for lookup tables** — CRC tables, trigonometry, encoding maps — computed at compile time, placed in `.rodata`, with zero startup cost and no external tooling.
+7. **`const fn` заменяет генераторы кода и build-скрипты для таблиц поиска**: таблицы CRC, тригонометрия, таблицы кодирования вычисляются на этапе компиляции, размещаются в `.rodata` и не требуют затрат на запуск или внешних инструментов.
 
-8. **Inline `const { }` blocks validate generic parameters** — since Rust 1.79, you can enforce constraints on const generics at the call site, catching misuse before any code runs.
+8. **Встроенные блоки `const { }` проверяют параметры обобщений**: начиная с Rust 1.79, можно накладывать ограничения на const-обобщения прямо в месте вызова и ловить неправильное использование до запуска любого кода.

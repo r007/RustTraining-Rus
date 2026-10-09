@@ -1,31 +1,28 @@
-# Applied Walkthrough — Type-Safe Redfish Client 🟡
+# Пошаговый разбор: типобезопасный клиент Redfish 🟡
 
-> **What you'll learn:** How to compose type-state sessions, capability tokens, phantom-typed resource navigation, dimensional analysis, validated boundaries, builder type-state, and single-use types into a complete, zero-overhead Redfish client — where every protocol violation is a compile error.
+> **Что вы узнаете:** как скомпоновать typestate сессий, capability-токены, навигацию по ресурсам с phantom-типами, анализ размерностей, проверенные границы, typestate билдера и одноразовые типы в полноценный клиент Redfish с нулевыми накладными расходами, где каждое нарушение протокола становится ошибкой компиляции.
 >
-> **Cross-references:** [ch02](ch02-typed-command-interfaces-request-determi.md) (typed commands), [ch03](ch03-single-use-types-cryptographic-guarantee.md) (single-use types), [ch04](ch04-capability-tokens-zero-cost-proof-of-aut.md) (capability tokens), [ch05](ch05-protocol-state-machines-type-state-for-r.md) (type-state), [ch06](ch06-dimensional-analysis-making-the-compiler.md) (dimensional types), [ch07](ch07-validated-boundaries-parse-dont-validate.md) (validated boundaries), [ch09](ch09-phantom-types-for-resource-tracking.md) (phantom types), [ch10](ch10-putting-it-all-together-a-complete-diagn.md) (IPMI integration), [ch11](ch11-fourteen-tricks-from-the-trenches.md) (trick 4 — builder type-state)
+> **Перекрёстные ссылки:** [гл. 02](ch02-typed-command-interfaces-request-determi.md) (типизированные команды), [гл. 03](ch03-single-use-types-cryptographic-guarantee.md) (одноразовые типы), [гл. 04](ch04-capability-tokens-zero-cost-proof-of-aut.md) (capability-токены), [гл. 05](ch05-protocol-state-machines-type-state-for-r.md) (typestate), [гл. 06](ch06-dimensional-analysis-making-the-compiler.md) (размерные типы), [гл. 07](ch07-validated-boundaries-parse-dont-validate.md) (проверенные границы), [гл. 09](ch09-phantom-types-for-resource-tracking.md) (phantom-типы), [гл. 10](ch10-putting-it-all-together-a-complete-diagn.md) (интеграция с IPMI), [гл. 11](ch11-fourteen-tricks-from-the-trenches.md) (приём 4: билдер с typestate)
 
-## Why Redfish Deserves Its Own Chapter
+## Почему Redfish заслуживает отдельной главы
 
-Chapter 10 composes the core patterns around IPMI — a byte-level protocol. But
-most BMC platforms now expose a **Redfish** REST API alongside (or instead of)
-IPMI, and Redfish introduces its own category of correctness hazards:
+Глава 10 строит основные паттерны вокруг IPMI, протокола на уровне байтов. Но большинство платформ BMC сейчас предоставляют REST API **Redfish** наряду с IPMI (или вместо него), и Redfish приносит собственную категорию опасностей для корректности:
 
-| Hazard | Example | Consequence |
-|--------|---------|-------------|
-| Malformed URI | `GET /redfish/v1/Chassis/1/Processors` (wrong parent) | 404 or wrong data silently returned |
-| Action on wrong power state | `Reset(ForceOff)` on an already-off system | BMC returns error, or worse, races with another operation |
-| Missing privilege | Operator-level code calls `Manager.ResetToDefaults` | 403 in production, security audit finding |
-| Incomplete PATCH | Omit a required BIOS attribute from a PATCH body | Silent no-op or partial config corruption |
-| Unverified firmware apply | `SimpleUpdate` invoked before image integrity check | Bricked BMC |
-| Schema version mismatch | Access `LastResetTime` on a v1.5 BMC (added in v1.13) | `null` field → runtime panic |
-| Unit confusion in telemetry | Compare inlet temperature (°C) to power draw (W) | Nonsensical threshold decisions |
+| Опасность | Пример | Последствие |
+|-----------|--------|-------------|
+| Некорректный URI | `GET /redfish/v1/Chassis/1/Processors` (неверный родитель) | Тихо возвращается 404 или неверные данные |
+| Действие в неверном состоянии питания | `Reset(ForceOff)` для уже выключенной системы | BMC возвращает ошибку или, хуже, гонка с другой операцией |
+| Отсутствие привилегии | Код уровня оператора вызывает `Manager.ResetToDefaults` | 403 в продакшене, замечание службы безопасности |
+| Неполный PATCH | В теле PATCH пропущен обязательный атрибут BIOS | Тихий no-op или частичное повреждение конфигурации |
+| Непроверенное применение прошивки | `SimpleUpdate` вызван до проверки целостности образа | Превращённый в кирпич BMC |
+| Несоответствие версии схемы | Обращение к `LastResetTime` на BMC v1.5 (добавлено в v1.13) | Поле `null` → паника во время выполнения |
+| Путаница единиц в телеметрии | Сравнение температуры на входе (°C) с потреблением мощности (Вт) | Бессмысленные пороговые решения |
 
-In C, Python, or untyped Rust, every one of these is prevented by discipline and
-testing alone. This chapter makes them **compile errors**.
+В C, Python или нетипизированном Rust каждую из этих опасностей предотвращают только дисциплина и тестирование. Эта глава делает их **ошибками компиляции**.
 
-## The Untyped Redfish Client
+## Нетипизированный клиент Redfish
 
-A typical Redfish client looks like this:
+Типичный клиент Redfish выглядит так:
 
 ```rust,ignore
 use std::collections::HashMap;
@@ -38,36 +35,36 @@ struct RedfishClient {
 impl RedfishClient {
     fn get(&self, path: &str) -> Result<serde_json::Value, String> {
         // ... HTTP GET ...
-        Ok(serde_json::json!({})) // stub
+        Ok(serde_json::json!({})) // заглушка
     }
 
     fn patch(&self, path: &str, body: &serde_json::Value) -> Result<(), String> {
         // ... HTTP PATCH ...
-        Ok(()) // stub
+        Ok(()) // заглушка
     }
 
     fn post_action(&self, path: &str, body: &serde_json::Value) -> Result<(), String> {
         // ... HTTP POST ...
-        Ok(()) // stub
+        Ok(()) // заглушка
     }
 }
 
 fn check_thermal(client: &RedfishClient) -> Result<(), String> {
     let resp = client.get("/redfish/v1/Chassis/1/Thermal")?;
 
-    // 🐛 Is this field always present? What if the BMC returns null?
+    // 🐛 Это поле всегда присутствует? Что, если BMC вернёт null?
     let cpu_temp = resp["Temperatures"][0]["ReadingCelsius"]
         .as_f64().unwrap();
 
     let fan_rpm = resp["Fans"][0]["Reading"]
         .as_f64().unwrap();
 
-    // 🐛 Comparing °C to RPM — both are f64
+    // 🐛 Сравнение °C с об/мин: оба — f64
     if cpu_temp > fan_rpm {
-        println!("thermal issue");
+        println!("проблема с температурой");
     }
 
-    // 🐛 Is this the right path? No compile-time check.
+    // 🐛 Это правильный путь? Проверки на этапе компиляции нет.
     client.post_action(
         "/redfish/v1/Systems/1/Actions/ComputerSystem.Reset",
         &serde_json::json!({"ResetType": "ForceOff"})
@@ -77,15 +74,13 @@ fn check_thermal(client: &RedfishClient) -> Result<(), String> {
 }
 ```
 
-This "works" — until it doesn't. Every `unwrap()` is a potential panic, every
-string path is an unchecked assumption, and unit confusion is invisible.
+Это «работает», пока не перестаёт работать. Каждый `unwrap()` — потенциальная паника, каждый строковый путь — непроверенное допущение, а путаница единиц не видна.
 
 ---
 
-## Section 1 — Session Lifecycle (Type-State, ch05)
+## Раздел 1 — Жизненный цикл сессии (typestate, гл. 05)
 
-A Redfish session has a strict lifecycle: connect → authenticate → use → close.
-Encode each state as a distinct type.
+У сессии Redfish строгий жизненный цикл: подключение → аутентификация → использование → закрытие. Каждое состояние кодируем отдельным типом.
 
 ```mermaid
 stateDiagram-v2
@@ -96,14 +91,14 @@ stateDiagram-v2
     Authenticated --> Closed : logout()
     Closed --> [*]
 
-    note right of Authenticated : API calls only exist here
-    note right of Connected : get() → compile error
+    note right of Authenticated : вызовы API существуют только здесь
+    note right of Connected : get() → ошибка компиляции
 ```
 
 ```rust,ignore
 use std::marker::PhantomData;
 
-// ──── Session States ────
+// ──── Состояния сессии ────
 
 pub struct Disconnected;
 pub struct Connected;
@@ -124,11 +119,11 @@ impl RedfishSession<Disconnected> {
         }
     }
 
-    /// Transition: Disconnected → Connected.
-    /// Verifies the service root is reachable.
+    /// Переход: Disconnected → Connected.
+    /// Проверяет, что корневой сервис доступен.
     pub fn connect(self) -> Result<RedfishSession<Connected>, RedfishError> {
-        // GET /redfish/v1 — verify service root
-        println!("Connecting to {}/redfish/v1", self.base_url);
+        // GET /redfish/v1 — проверяем корневой сервис
+        println!("Подключение к {}/redfish/v1", self.base_url);
         Ok(RedfishSession {
             base_url: self.base_url,
             auth_token: None,
@@ -138,15 +133,15 @@ impl RedfishSession<Disconnected> {
 }
 
 impl RedfishSession<Connected> {
-    /// Transition: Connected → Authenticated.
-    /// Creates a session via POST /redfish/v1/SessionService/Sessions.
+    /// Переход: Connected → Authenticated.
+    /// Создаёт сессию через POST /redfish/v1/SessionService/Sessions.
     pub fn login(
         self,
         user: &str,
         _pass: &str,
     ) -> Result<(RedfishSession<Authenticated>, LoginToken), RedfishError> {
         // POST /redfish/v1/SessionService/Sessions
-        println!("Authenticated as {}", user);
+        println!("Аутентификация как {}", user);
         let token = "X-Auth-Token-abc123".to_string();
         Ok((
             RedfishSession {
@@ -160,11 +155,11 @@ impl RedfishSession<Connected> {
 }
 
 impl RedfishSession<Authenticated> {
-    /// Only available on Authenticated sessions.
+    /// Доступен только у аутентифицированных сессий.
     fn http_get(&self, path: &str) -> Result<serde_json::Value, RedfishError> {
         let _url = format!("{}{}", self.base_url, path);
-        // ... HTTP GET with auth_token header ...
-        Ok(serde_json::json!({})) // stub
+        // ... HTTP GET с заголовком auth_token ...
+        Ok(serde_json::json!({})) // заглушка
     }
 
     fn http_patch(
@@ -174,7 +169,7 @@ impl RedfishSession<Authenticated> {
     ) -> Result<serde_json::Value, RedfishError> {
         let _url = format!("{}{}", self.base_url, path);
         let _ = body;
-        Ok(serde_json::json!({})) // stub
+        Ok(serde_json::json!({})) // заглушка
     }
 
     fn http_post(
@@ -184,22 +179,22 @@ impl RedfishSession<Authenticated> {
     ) -> Result<serde_json::Value, RedfishError> {
         let _url = format!("{}{}", self.base_url, path);
         let _ = body;
-        Ok(serde_json::json!({})) // stub
+        Ok(serde_json::json!({})) // заглушка
     }
 
-    /// Transition: Authenticated → Closed (session consumed).
+    /// Переход: Authenticated → Closed (сессия потребляется).
     pub fn logout(self) {
         // DELETE /redfish/v1/SessionService/Sessions/{id}
-        println!("Session closed");
-        // self is consumed — can't use the session after logout
+        println!("Сессия закрыта");
+        // self потреблён: после logout сессию использовать нельзя
     }
 }
 
-// Attempting to call http_get on a non-Authenticated session:
+// Попытка вызвать http_get у неаутентифицированной сессии:
 //
 //   let session = RedfishSession::new("bmc01").connect()?;
 //   session.http_get("/redfish/v1/Systems");
-//   ❌ ERROR: method `http_get` not found for `RedfishSession<Connected>`
+//   ❌ ОШИБКА: метод `http_get` не найден для `RedfishSession<Connected>`
 
 #[derive(Debug)]
 pub enum RedfishError {
@@ -212,45 +207,42 @@ pub enum RedfishError {
 impl std::fmt::Display for RedfishError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::ConnectionFailed(msg) => write!(f, "connection failed: {msg}"),
-            Self::AuthenticationFailed(msg) => write!(f, "auth failed: {msg}"),
+            Self::ConnectionFailed(msg) => write!(f, "ошибка подключения: {msg}"),
+            Self::AuthenticationFailed(msg) => write!(f, "ошибка аутентификации: {msg}"),
             Self::HttpError { status, message } =>
                 write!(f, "HTTP {status}: {message}"),
-            Self::ValidationError(msg) => write!(f, "validation: {msg}"),
+            Self::ValidationError(msg) => write!(f, "валидация: {msg}"),
         }
     }
 }
 ```
 
-**Bug class eliminated:** sending requests on a disconnected or unauthenticated
-session. The method simply doesn't exist — no runtime check to forget.
+**Устранённый класс ошибок:** отправка запросов в отключённой или неаутентифицированной сессии. Метод просто не существует, и нечего забыть проверить во время выполнения.
 
 ---
 
-## Section 2 — Privilege Tokens (Capability Tokens, ch04)
+## Раздел 2 — Токены привилегий (capability-токены, гл. 04)
 
-Redfish defines four privilege levels: `Login`, `ConfigureComponents`,
-`ConfigureManager`, `ConfigureSelf`. Rather than checking permissions at
-runtime, encode them as zero-sized proof tokens.
+Redfish определяет четыре уровня привилегий: `Login`, `ConfigureComponents`, `ConfigureManager`, `ConfigureSelf`. Вместо проверки прав во время выполнения кодируем их как токены-доказательства нулевого размера.
 
 ```rust,ignore
-// ──── Privilege Tokens (zero-sized) ────
+// ──── Токены привилегий (нулевого размера) ────
 
-/// Proof the caller has Login privilege.
-/// Returned by successful login — the only way to obtain one.
+/// Доказательство, что у вызывающего есть привилегия Login.
+/// Возвращается при успешном входе: это единственный способ его получить.
 pub struct LoginToken { _private: () }
 
-/// Proof the caller has ConfigureComponents privilege.
-/// Only obtainable by admin-level authentication.
+/// Доказательство, что у вызывающего есть привилегия ConfigureComponents.
+/// Получить его может только аутентификация на уровне администратора.
 pub struct ConfigureComponentsToken { _private: () }
 
-/// Proof the caller has ConfigureManager privilege (firmware updates, etc.).
+/// Доказательство, что у вызывающего есть привилегия ConfigureManager (обновления прошивки и т. д.).
 pub struct ConfigureManagerToken { _private: () }
 
-// Extend login to return privilege tokens based on role:
+// Расширяем вход так, чтобы он возвращал токены привилегий в зависимости от роли:
 
 impl RedfishSession<Connected> {
-    /// Admin login — returns all privilege tokens.
+    /// Вход администратора: возвращает все токены привилегий.
     pub fn login_admin(
         self,
         user: &str,
@@ -270,7 +262,7 @@ impl RedfishSession<Connected> {
         ))
     }
 
-    /// Operator login — returns Login + ConfigureComponents only.
+    /// Вход оператора: возвращает только Login и ConfigureComponents.
     pub fn login_operator(
         self,
         user: &str,
@@ -288,7 +280,7 @@ impl RedfishSession<Connected> {
         ))
     }
 
-    /// Read-only login — returns Login token only.
+    /// Вход только для чтения: возвращает только токен Login.
     pub fn login_readonly(
         self,
         user: &str,
@@ -299,7 +291,7 @@ impl RedfishSession<Connected> {
 }
 ```
 
-Now privilege requirements are part of the function signature:
+Теперь требования к привилегиям — часть сигнатуры функции:
 
 ```rust,ignore
 # use std::marker::PhantomData;
@@ -310,16 +302,16 @@ Now privilege requirements are part of the function signature:
 # pub struct ConfigureManagerToken { _private: () }
 # #[derive(Debug)] pub enum RedfishError { HttpError { status: u16, message: String } }
 
-/// Anyone with Login can read thermal data.
+/// Любой с Login может читать данные о температуре.
 fn get_thermal(
     session: &RedfishSession<Authenticated>,
     _proof: &LoginToken,
 ) -> Result<serde_json::Value, RedfishError> {
     // GET /redfish/v1/Chassis/1/Thermal
-    Ok(serde_json::json!({})) // stub
+    Ok(serde_json::json!({})) // заглушка
 }
 
-/// Changing boot order requires ConfigureComponents.
+/// Изменение порядка загрузки требует ConfigureComponents.
 fn set_boot_order(
     session: &RedfishSession<Authenticated>,
     _proof: &ConfigureComponentsToken,
@@ -330,7 +322,7 @@ fn set_boot_order(
     Ok(())
 }
 
-/// Factory reset requires ConfigureManager.
+/// Сброс к заводским настройкам требует ConfigureManager.
 fn reset_to_defaults(
     session: &RedfishSession<Authenticated>,
     _proof: &ConfigureManagerToken,
@@ -339,44 +331,41 @@ fn reset_to_defaults(
     Ok(())
 }
 
-// Operator code calling reset_to_defaults:
+// Код оператора, вызывающий reset_to_defaults:
 //
 //   let (session, login, configure) = session.login_operator("op", "pass")?;
 //   reset_to_defaults(&session, &???);
-//   ❌ ERROR: no ConfigureManagerToken available — operator can't do this
+//   ❌ ОШИБКА: нет доступного ConfigureManagerToken, оператор не может этого сделать
 ```
 
-**Bug class eliminated:** privilege escalation. An operator-level login physically
-cannot produce a `ConfigureManagerToken` — the compiler won't let the code reference
-one. Zero runtime cost: for the compiled binary, these tokens don't exist.
+**Устранённый класс ошибок:** эскалация привилегий. Вход на уровне оператора физически не может выдать `ConfigureManagerToken`: компилятор не даст коду на него сослаться. Нулевые накладные расходы: в скомпилированном бинарнике этих токенов не существует.
 
 ---
 
-## Section 3 — Typed Resource Navigation (Phantom Types, ch09)
+## Раздел 3 — Типизированная навигация по ресурсам (phantom-типы, гл. 09)
 
-Redfish resources form a tree. Encoding the hierarchy as types prevents constructing
-illegal URIs:
+Ресурсы Redfish образуют дерево. Кодирование иерархии в типах не даёт построить недопустимые URI:
 
 ```mermaid
 graph TD
-    SR[ServiceRoot] --> Systems
-    SR --> Chassis
-    SR --> Managers
-    SR --> UpdateService
-    Systems --> CS[ComputerSystem]
-    CS --> Processors
-    CS --> Memory
-    CS --> Bios
-    Chassis --> Ch1[Chassis Instance]
-    Ch1 --> Thermal
-    Ch1 --> Power
-    Managers --> Mgr[Manager Instance]
+    SR["Корень службы (ServiceRoot)"] --> Systems["Системы"]
+    SR --> Chassis["Шасси"]
+    SR --> Managers["Менеджеры"]
+    SR --> UpdateService["Служба обновления"]
+    Systems --> CS["ComputerSystem"]
+    CS --> Processors["Процессоры"]
+    CS --> Memory["Память"]
+    CS --> Bios["BIOS"]
+    Chassis --> Ch1["Экземпляр шасси"]
+    Ch1 --> Thermal["Термо (Thermal)"]
+    Ch1 --> Power["Питание (Power)"]
+    Managers --> Mgr["Экземпляр менеджера"]
 ```
 
 ```rust,ignore
 use std::marker::PhantomData;
 
-// ──── Resource Type Markers ────
+// ──── Маркеры типов ресурсов ────
 
 pub struct ServiceRoot;
 pub struct SystemsCollection;
@@ -390,7 +379,7 @@ pub struct ManagersCollection;
 pub struct ManagerInstance;
 pub struct UpdateServiceResource;
 
-// ──── Typed Resource Path ────
+// ──── Типизированный путь к ресурсу ────
 
 pub struct RedfishPath<R> {
     uri: String,
@@ -492,44 +481,41 @@ impl<R> RedfishPath<R> {
     }
 }
 
-// ── Usage ──
+// ── Использование ──
 
 fn build_paths() {
     let root = RedfishPath::root();
 
-    // ✅ Valid navigation
+    // ✅ Корректная навигация
     let thermal = root.chassis().instance("1").thermal();
     assert_eq!(thermal.uri(), "/redfish/v1/Chassis/1/Thermal");
 
     let bios = root.systems().system("1").bios();
     assert_eq!(bios.uri(), "/redfish/v1/Systems/1/Bios");
 
-    // ❌ Compile error: ServiceRoot has no .thermal() method
+    // ❌ Ошибка компиляции: у ServiceRoot нет метода .thermal()
     // root.thermal();
 
-    // ❌ Compile error: SystemsCollection has no .bios() method
+    // ❌ Ошибка компиляции: у SystemsCollection нет метода .bios()
     // root.systems().bios();
 
-    // ❌ Compile error: ChassisInstance has no .bios() method
+    // ❌ Ошибка компиляции: у ChassisInstance нет метода .bios()
     // root.chassis().instance("1").bios();
 }
 ```
 
-**Bug class eliminated:** malformed URIs, navigating to a child resource that
-doesn't exist under the given parent. The hierarchy is enforced structurally —
-you can only reach `Thermal` through `Chassis → Instance → Thermal`.
+**Устранённый класс ошибок:** некорректные URI, переход к дочернему ресурсу, которого нет под данным родителем. Иерархия обеспечивается структурно: до `Thermal` можно добраться только через `Chassis → Instance → Thermal`.
 
 ---
 
-## Section 4 — Typed Telemetry Reads (Typed Commands + Dimensional Analysis, ch02 + ch06)
+## Раздел 4 — Типизированное чтение телеметрии (типизированные команды + анализ размерностей, гл. 02 + гл. 06)
 
-Combine typed resource paths with dimensional return types so the compiler knows
-what unit every reading carries:
+Соединяем типизированные пути к ресурсам с размерными типами возвращаемых значений, чтобы компилятор знал, какую единицу несёт каждое показание:
 
 ```rust,ignore
 use std::marker::PhantomData;
 
-// ──── Dimensional Types (ch06) ────
+// ──── Размерные типы (гл. 06) ────
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub struct Celsius(pub f64);
@@ -543,15 +529,15 @@ pub struct Watts(pub f64);
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub struct Volts(pub f64);
 
-// ──── Typed Redfish GET (ch02 pattern applied to REST) ────
+// ──── Типизированный GET Redfish (паттерн гл. 02, применённый к REST) ────
 
-/// A Redfish resource type determines its parsed response.
+/// Тип ресурса Redfish определяет его разобранный ответ.
 pub trait RedfishResource {
     type Response;
     fn parse(json: &serde_json::Value) -> Result<Self::Response, RedfishError>;
 }
 
-// ──── Validated Thermal Response (ch07) ────
+// ──── Проверенный ответ Thermal (гл. 07) ────
 
 #[derive(Debug)]
 pub struct ValidThermalResponse {
@@ -562,7 +548,7 @@ pub struct ValidThermalResponse {
 #[derive(Debug)]
 pub struct TemperatureReading {
     pub name: String,
-    pub reading: Celsius,           // ← dimensional type, not f64
+    pub reading: Celsius,           // ← размерный тип, а не f64
     pub upper_critical: Celsius,
     pub status: HealthStatus,
 }
@@ -570,7 +556,7 @@ pub struct TemperatureReading {
 #[derive(Debug)]
 pub struct FanReading {
     pub name: String,
-    pub reading: Rpm,               // ← dimensional type, not u32
+    pub reading: Rpm,               // ← размерный тип, а не u32
     pub status: HealthStatus,
 }
 
@@ -581,11 +567,11 @@ impl RedfishResource for ThermalResource {
     type Response = ValidThermalResponse;
 
     fn parse(json: &serde_json::Value) -> Result<ValidThermalResponse, RedfishError> {
-        // Parse and validate in one pass — boundary validation (ch07)
+        // Разбор и валидация за один проход: валидация на границе (гл. 07)
         let temps = json["Temperatures"]
             .as_array()
             .ok_or_else(|| RedfishError::ValidationError(
-                "missing Temperatures array".into(),
+                "отсутствует массив Temperatures".into(),
             ))?
             .iter()
             .map(|t| {
@@ -593,20 +579,20 @@ impl RedfishResource for ThermalResource {
                     name: t["Name"]
                         .as_str()
                         .ok_or_else(|| RedfishError::ValidationError(
-                            "missing Name".into(),
+                            "отсутствует Name".into(),
                         ))?
                         .to_string(),
                     reading: Celsius(
                         t["ReadingCelsius"]
                             .as_f64()
                             .ok_or_else(|| RedfishError::ValidationError(
-                                "missing ReadingCelsius".into(),
+                                "отсутствует ReadingCelsius".into(),
                             ))?,
                     ),
                     upper_critical: Celsius(
                         t["UpperThresholdCritical"]
                             .as_f64()
-                            .unwrap_or(105.0), // safe default for missing threshold
+                            .unwrap_or(105.0), // безопасное значение по умолчанию для отсутствующего порога
                     ),
                     status: parse_health(
                         t["Status"]["Health"]
@@ -620,7 +606,7 @@ impl RedfishResource for ThermalResource {
         let fans = json["Fans"]
             .as_array()
             .ok_or_else(|| RedfishError::ValidationError(
-                "missing Fans array".into(),
+                "отсутствует массив Fans".into(),
             ))?
             .iter()
             .map(|f| {
@@ -628,14 +614,14 @@ impl RedfishResource for ThermalResource {
                     name: f["Name"]
                         .as_str()
                         .ok_or_else(|| RedfishError::ValidationError(
-                            "missing Name".into(),
+                            "отсутствует Name".into(),
                         ))?
                         .to_string(),
                     reading: Rpm(
                         f["Reading"]
                             .as_u64()
                             .ok_or_else(|| RedfishError::ValidationError(
-                                "missing Reading".into(),
+                                "отсутствует Reading".into(),
                             ))? as u32,
                     ),
                     status: parse_health(
@@ -659,7 +645,7 @@ fn parse_health(s: &str) -> HealthStatus {
     }
 }
 
-// ──── Typed GET on Authenticated Session ────
+// ──── Типизированный GET в аутентифицированной сессии ────
 
 impl RedfishSession<Authenticated> {
     pub fn get_resource<R: RedfishResource>(
@@ -671,7 +657,7 @@ impl RedfishSession<Authenticated> {
     }
 }
 
-// ── Usage ──
+// ── Использование ──
 
 fn read_thermal(
     session: &RedfishSession<Authenticated>,
@@ -679,19 +665,19 @@ fn read_thermal(
 ) -> Result<(), RedfishError> {
     let path = RedfishPath::root().chassis().instance("1").thermal();
 
-    // Response type is inferred: ValidThermalResponse
+    // Тип ответа выводится: ValidThermalResponse
     let thermal = session.get_resource(&path)?;
 
     for t in &thermal.temperatures {
-        // t.reading is Celsius — can only compare with Celsius
+        // t.reading — Celsius: сравнивать можно только с Celsius
         if t.reading > t.upper_critical {
-            println!("CRITICAL: {} at {:?}", t.name, t.reading);
+            println!("КРИТИЧНО: {} при {:?}", t.name, t.reading);
         }
 
-        // ❌ Compile error: cannot compare Celsius with Rpm
+        // ❌ Ошибка компиляции: нельзя сравнить Celsius с Rpm
         // if t.reading > thermal.fans[0].reading { }
 
-        // ❌ Compile error: cannot compare Celsius with Watts
+        // ❌ Ошибка компиляции: нельзя сравнить Celsius с Watts
         // if t.reading > Watts(350.0) { }
     }
 
@@ -699,29 +685,26 @@ fn read_thermal(
 }
 ```
 
-**Bug classes eliminated:**
-- **Unit confusion:** `Celsius` ≠ `Rpm` ≠ `Watts` — the compiler rejects comparisons.
-- **Missing field panics:** `parse()` validates at the boundary; `ValidThermalResponse`
-  guarantees all fields are present.
-- **Wrong response type:** `get_resource(&thermal_path)` returns `ValidThermalResponse`,
-  not raw JSON. The resource type determines the response type at compile time.
+**Устранённые классы ошибок:**
+- **Путаница единиц:** `Celsius` ≠ `Rpm` ≠ `Watts`, компилятор отвергает сравнения.
+- **Паника из-за отсутствующего поля:** `parse()` валидирует на границе; `ValidThermalResponse` гарантирует наличие всех полей.
+- **Неверный тип ответа:** `get_resource(&thermal_path)` возвращает `ValidThermalResponse`, а не сырой JSON. Тип ресурса определяет тип ответа на этапе компиляции.
 
 ---
 
-## Section 5 — PATCH with Builder Type-State (ch11, Trick 4)
+## Раздел 5 — PATCH с билдером typestate (гл. 11, приём 4)
 
-Redfish PATCH payloads must contain specific fields. A builder that gates
-`.apply()` on required fields being set prevents incomplete or empty patches:
+Полезные нагрузки PATCH в Redfish должны содержать определённые поля. Билдер, который открывает `.apply()` только при установке обязательных полей, не даёт отправить неполные или пустые патчи:
 
 ```rust,ignore
 use std::marker::PhantomData;
 
-// ──── Type-level booleans for required fields ────
+// ──── Типовые булевы значения для обязательных полей ────
 
 pub struct FieldUnset;
 pub struct FieldSet;
 
-// ──── BIOS Settings PATCH Builder ────
+// ──── Билдер PATCH для настроек BIOS ────
 
 pub struct BiosPatchBuilder<BootOrder, TpmState> {
     boot_order: Option<Vec<String>>,
@@ -740,7 +723,7 @@ impl BiosPatchBuilder<FieldUnset, FieldUnset> {
 }
 
 impl<T> BiosPatchBuilder<FieldUnset, T> {
-    /// Set boot order — transitions the BootOrder marker to FieldSet.
+    /// Задаёт порядок загрузки: переводит маркер BootOrder в FieldSet.
     pub fn boot_order(self, order: Vec<String>) -> BiosPatchBuilder<FieldSet, T> {
         BiosPatchBuilder {
             boot_order: Some(order),
@@ -751,7 +734,7 @@ impl<T> BiosPatchBuilder<FieldUnset, T> {
 }
 
 impl<B> BiosPatchBuilder<B, FieldUnset> {
-    /// Set TPM state — transitions the TpmState marker to FieldSet.
+    /// Задаёт состояние TPM: переводит маркер TpmState в FieldSet.
     pub fn tpm_enabled(self, enabled: bool) -> BiosPatchBuilder<B, FieldSet> {
         BiosPatchBuilder {
             boot_order: self.boot_order,
@@ -762,7 +745,7 @@ impl<B> BiosPatchBuilder<B, FieldUnset> {
 }
 
 impl BiosPatchBuilder<FieldSet, FieldSet> {
-    /// .apply() only exists when ALL required fields are set.
+    /// .apply() существует только тогда, когда ВСЕ обязательные поля заданы.
     pub fn apply(
         self,
         session: &RedfishSession<Authenticated>,
@@ -785,7 +768,7 @@ impl BiosPatchBuilder<FieldSet, FieldSet> {
     }
 }
 
-// ── Usage ──
+// ── Использование ──
 
 fn configure_bios(
     session: &RedfishSession<Authenticated>,
@@ -793,18 +776,18 @@ fn configure_bios(
 ) -> Result<(), RedfishError> {
     let system = RedfishPath::root().systems().system("1");
 
-    // ✅ Both required fields set — .apply() is available
+    // ✅ Оба обязательных поля заданы: .apply() доступен
     BiosPatchBuilder::new()
         .boot_order(vec!["Pxe".into(), "Hdd".into()])
         .tpm_enabled(true)
         .apply(session, configure, &system)?;
 
-    // ❌ Compile error: .apply() not found on BiosPatchBuilder<FieldSet, FieldUnset>
+    // ❌ Ошибка компиляции: .apply() не найден у BiosPatchBuilder<FieldSet, FieldUnset>
     // BiosPatchBuilder::new()
     //     .boot_order(vec!["Pxe".into()])
     //     .apply(session, configure, &system)?;
 
-    // ❌ Compile error: .apply() not found on BiosPatchBuilder<FieldUnset, FieldUnset>
+    // ❌ Ошибка компиляции: .apply() не найден у BiosPatchBuilder<FieldUnset, FieldUnset>
     // BiosPatchBuilder::new()
     //     .apply(session, configure, &system)?;
 
@@ -812,38 +795,37 @@ fn configure_bios(
 }
 ```
 
-**Bug classes eliminated:**
-- **Empty PATCH:** Can't call `.apply()` without setting every required field.
-- **Missing privilege:** `.apply()` requires `&ConfigureComponentsToken`.
-- **Wrong resource:** Takes a `&RedfishPath<ComputerSystem>`, not a raw string.
+**Устранённые классы ошибок:**
+- **Пустой PATCH:** нельзя вызвать `.apply()`, не задав каждое обязательное поле.
+- **Отсутствие привилегии:** `.apply()` требует `&ConfigureComponentsToken`.
+- **Неверный ресурс:** принимает `&RedfishPath<ComputerSystem>`, а не строку.
 
 ---
 
-## Section 6 — Firmware Update Lifecycle (Single-Use + Type-State, ch03 + ch05)
+## Раздел 6 — Жизненный цикл обновления прошивки (одноразовые типы + typestate, гл. 03 + гл. 05)
 
-The Redfish `UpdateService` has a strict sequence: push image → verify →
-apply → reboot. Each phase must happen exactly once, in order.
+У `UpdateService` в Redfish строгая последовательность: загрузить образ → проверить → применить → перезагрузить. Каждая фаза должна произойти ровно один раз и в порядке очерёдности.
 
 ```mermaid
 stateDiagram-v2
     [*] --> Idle
     Idle --> Uploading : push_image()
-    Uploading --> Uploaded : upload completes
+    Uploading --> Uploaded : загрузка завершена
     Uploaded --> Verified : verify() ✓
     Uploaded --> Failed : verify() ✗
-    Verified --> Applying : apply() — consumes Verified
-    Applying --> NeedsReboot : apply completes
+    Verified --> Applying : apply() — потребляет Verified
+    Applying --> NeedsReboot : применение завершено
     NeedsReboot --> [*] : reboot()
     Failed --> [*]
 
-    note right of Verified : apply() consumes this state —
-    note right of Verified : can't apply twice
+    note right of Verified : apply() потребляет это состояние —
+    note right of Verified : применить дважды нельзя
 ```
 
 ```rust,ignore
 use std::marker::PhantomData;
 
-// ──── Firmware Update States ────
+// ──── Состояния обновления прошивки ────
 
 pub struct FwIdle;
 pub struct FwUploaded;
@@ -864,9 +846,9 @@ impl FirmwareUpdate<FwIdle> {
         image: &[u8],
     ) -> Result<FirmwareUpdate<FwUploaded>, RedfishError> {
         // POST /redfish/v1/UpdateService/Actions/UpdateService.SimpleUpdate
-        // or multipart push to /redfish/v1/UpdateService/upload
+        // или multipart-загрузка в /redfish/v1/UpdateService/upload
         let _ = image;
-        println!("Image uploaded ({} bytes)", image.len());
+        println!("Образ загружен ({} байт)", image.len());
         Ok(FirmwareUpdate {
             task_uri: "/redfish/v1/TaskService/Tasks/1".to_string(),
             image_hash: "sha256:abc123".to_string(),
@@ -876,10 +858,10 @@ impl FirmwareUpdate<FwIdle> {
 }
 
 impl FirmwareUpdate<FwUploaded> {
-    /// Verify image integrity. Returns FwVerified on success.
+    /// Проверяет целостность образа. При успехе возвращает FwVerified.
     pub fn verify(self) -> Result<FirmwareUpdate<FwVerified>, RedfishError> {
-        // Poll task until verification complete
-        println!("Image verified: {}", self.image_hash);
+        // Опрашиваем задачу до завершения проверки
+        println!("Образ проверен: {}", self.image_hash);
         Ok(FirmwareUpdate {
             task_uri: self.task_uri,
             image_hash: self.image_hash,
@@ -889,12 +871,12 @@ impl FirmwareUpdate<FwUploaded> {
 }
 
 impl FirmwareUpdate<FwVerified> {
-    /// Apply the update. Consumes self — can't apply twice.
-    /// This is the single-use pattern from ch03.
+    /// Применяет обновление. Потребляет self: применить дважды нельзя.
+    /// Это одноразовый паттерн из гл. 03.
     pub fn apply(self) -> Result<FirmwareUpdate<FwNeedsReboot>, RedfishError> {
-        // PATCH /redfish/v1/UpdateService — set ApplyTime
-        println!("Firmware applied from {}", self.task_uri);
-        // self is moved — calling apply() again is a compile error
+        // PATCH /redfish/v1/UpdateService: задаём ApplyTime
+        println!("Прошивка применена из {}", self.task_uri);
+        // self перемещён: повторный вызов apply() — ошибка компиляции
         Ok(FirmwareUpdate {
             task_uri: self.task_uri,
             image_hash: self.image_hash,
@@ -904,7 +886,7 @@ impl FirmwareUpdate<FwVerified> {
 }
 
 impl FirmwareUpdate<FwNeedsReboot> {
-    /// Reboot to activate the new firmware.
+    /// Перезагрузка, чтобы активировать новую прошивку.
     pub fn reboot(
         self,
         session: &RedfishSession<Authenticated>,
@@ -912,84 +894,83 @@ impl FirmwareUpdate<FwNeedsReboot> {
     ) -> Result<(), RedfishError> {
         // POST .../Actions/Manager.Reset {"ResetType": "GracefulRestart"}
         let _ = session;
-        println!("BMC rebooting to activate firmware");
+        println!("BMC перезагружается для активации прошивки");
         Ok(())
     }
 }
 
-// ── Usage ──
+// ── Использование ──
 
 fn update_bmc_firmware(
     session: &RedfishSession<Authenticated>,
     manager_proof: &ConfigureManagerToken,
     image: &[u8],
 ) -> Result<(), RedfishError> {
-    // Each step returns the next state — the old state is consumed
+    // Каждый шаг возвращает следующее состояние, предыдущее потребляется
     let uploaded = FirmwareUpdate::push_image(session, manager_proof, image)?;
     let verified = uploaded.verify()?;
     let needs_reboot = verified.apply()?;
     needs_reboot.reboot(session, manager_proof)?;
 
-    // ❌ Compile error: use of moved value `verified`
+    // ❌ Ошибка компиляции: использование перемещённого значения `verified`
     // verified.apply()?;
 
-    // ❌ Compile error: FirmwareUpdate<FwUploaded> has no .apply() method
-    // uploaded.apply()?;      // must verify first!
+    // ❌ Ошибка компиляции: у FirmwareUpdate<FwUploaded> нет метода .apply()
+    // uploaded.apply()?;      // сначала нужно проверить!
 
-    // ❌ Compile error: push_image requires &ConfigureManagerToken
+    // ❌ Ошибка компиляции: push_image требует &ConfigureManagerToken
     // FirmwareUpdate::push_image(session, &login_token, image)?;
 
     Ok(())
 }
 ```
 
-**Bug classes eliminated:**
-- **Applying unverified firmware:** `.apply()` only exists on `FwVerified`.
-- **Double apply:** `apply()` consumes `self` — moved value can't be reused.
-- **Skipping reboot:** `FwNeedsReboot` is a distinct type; you can't accidentally
-  continue normal operations while firmware is staged.
-- **Unauthorized update:** `push_image()` requires `&ConfigureManagerToken`.
+**Устранённые классы ошибок:**
+- **Применение непроверенной прошивки:** `.apply()` существует только у `FwVerified`.
+- **Двойное применение:** `apply()` потребляет `self`, перемещённое значение нельзя использовать повторно.
+- **Пропуск перезагрузки:** `FwNeedsReboot` — отдельный тип; нельзя по ошибке продолжить обычную работу, пока прошивка подготовлена.
+- **Несанкционированное обновление:** `push_image()` требует `&ConfigureManagerToken`.
 
 ---
 
-## Section 7 — Putting It All Together
+## Раздел 7 — Собираем всё вместе
 
-Here's the full diagnostic workflow composing all six sections:
+Вот полный диагностический сценарий, который объединяет все шесть разделов:
 
 ```rust,ignore
 fn full_redfish_diagnostic() -> Result<(), RedfishError> {
-    // ── 1. Session lifecycle (Section 1) ──
+    // ── 1. Жизненный цикл сессии (раздел 1) ──
     let session = RedfishSession::new("bmc01.lab.local");
     let session = session.connect()?;
 
-    // ── 2. Privilege tokens (Section 2) ──
-    // Admin login — receives all capability tokens
+    // ── 2. Токены привилегий (раздел 2) ──
+    // Вход администратора: получаем все токены возможностей
     let (session, _login, configure, manager) =
         session.login_admin("admin", "p@ssw0rd")?;
 
-    // ── 3. Typed navigation (Section 3) ──
+    // ── 3. Типизированная навигация (раздел 3) ──
     let thermal_path = RedfishPath::root()
         .chassis()
         .instance("1")
         .thermal();
 
-    // ── 4. Typed telemetry read (Section 4) ──
+    // ── 4. Типизированное чтение телеметрии (раздел 4) ──
     let thermal: ValidThermalResponse = session.get_resource(&thermal_path)?;
 
     for t in &thermal.temperatures {
-        // Celsius can only compare with Celsius — dimensional safety
+        // Celsius сравнивается только с Celsius: размерная безопасность
         if t.reading > t.upper_critical {
-            println!("🔥 {} is critical: {:?}", t.name, t.reading);
+            println!("🔥 {} в критическом состоянии: {:?}", t.name, t.reading);
         }
     }
 
     for f in &thermal.fans {
         if f.reading < Rpm(1000) {
-            println!("⚠ {} below threshold: {:?}", f.name, f.reading);
+            println!("⚠ {} ниже порога: {:?}", f.name, f.reading);
         }
     }
 
-    // ── 5. Type-safe PATCH (Section 5) ──
+    // ── 5. Типобезопасный PATCH (раздел 5) ──
     let system_path = RedfishPath::root().systems().system("1");
 
     BiosPatchBuilder::new()
@@ -997,13 +978,13 @@ fn full_redfish_diagnostic() -> Result<(), RedfishError> {
         .tpm_enabled(true)
         .apply(&session, &configure, &system_path)?;
 
-    // ── 6. Firmware update lifecycle (Section 6) ──
+    // ── 6. Жизненный цикл обновления прошивки (раздел 6) ──
     let firmware_image = include_bytes!("bmc_firmware.bin");
     let uploaded = FirmwareUpdate::push_image(&session, &manager, firmware_image)?;
     let verified = uploaded.verify()?;
     let needs_reboot = verified.apply()?;
 
-    // ── 7. Clean shutdown ──
+    // ── 7. Чистое завершение ──
     needs_reboot.reboot(&session, &manager)?;
     session.logout();
 
@@ -1011,60 +992,50 @@ fn full_redfish_diagnostic() -> Result<(), RedfishError> {
 }
 ```
 
-### What the Compiler Proves
+### Что доказывает компилятор
 
-| # | Bug class | How it's prevented | Pattern (Section) |
-|---|-----------|-------------------|-------------------|
-| 1 | Request on unauthenticated session | `http_get()` only exists on `Session<Authenticated>` | Type-state (§1) |
-| 2 | Privilege escalation | `ConfigureManagerToken` not returned by operator login | Capability tokens (§2) |
-| 3 | Malformed Redfish URI | Navigation methods enforce parent→child hierarchy | Phantom types (§3) |
-| 4 | Unit confusion (°C vs RPM vs W) | `Celsius`, `Rpm`, `Watts` are distinct types | Dimensional analysis (§4) |
-| 5 | Missing JSON field → panic | `ValidThermalResponse` validates at parse boundary | Validated boundaries (§4) |
-| 6 | Wrong response type | `RedfishResource::Response` is fixed per resource | Typed commands (§4) |
-| 7 | Incomplete PATCH payload | `.apply()` only exists when all fields are `FieldSet` | Builder type-state (§5) |
-| 8 | Missing privilege for PATCH | `.apply()` requires `&ConfigureComponentsToken` | Capability tokens (§5) |
-| 9 | Applying unverified firmware | `.apply()` only exists on `FwVerified` | Type-state (§6) |
-| 10 | Double firmware apply | `apply()` consumes `self` — value is moved | Single-use types (§6) |
-| 11 | Firmware update without authority | `push_image()` requires `&ConfigureManagerToken` | Capability tokens (§6) |
-| 12 | Use-after-logout | `logout()` consumes the session | Ownership (§1) |
+| № | Класс ошибки | Как это предотвращается | Паттерн (раздел) |
+|---|--------------|-------------------------|------------------|
+| 1 | Запрос в неаутентифицированной сессии | `http_get()` существует только у `Session<Authenticated>` | Typestate (§1) |
+| 2 | Эскалация привилегий | `ConfigureManagerToken` не выдаётся при входе оператора | Capability-токены (§2) |
+| 3 | Некорректный URI Redfish | Методы навигации обеспечивают иерархию родитель → потомок | Phantom-типы (§3) |
+| 4 | Путаница единиц (°C, об/мин, Вт) | `Celsius`, `Rpm`, `Watts` — разные типы | Анализ размерностей (§4) |
+| 5 | Отсутствующее поле JSON → паника | `ValidThermalResponse` валидирует на границе разбора | Проверенные границы (§4) |
+| 6 | Неверный тип ответа | `RedfishResource::Response` фиксирован для каждого ресурса | Типизированные команды (§4) |
+| 7 | Неполная нагрузка PATCH | `.apply()` существует только при `FieldSet` у всех полей | Typestate билдера (§5) |
+| 8 | Отсутствие привилегии для PATCH | `.apply()` требует `&ConfigureComponentsToken` | Capability-токены (§5) |
+| 9 | Применение непроверенной прошивки | `.apply()` существует только у `FwVerified` | Typestate (§6) |
+| 10 | Двойное применение прошивки | `apply()` потребляет `self`: значение перемещается | Одноразовые типы (§6) |
+| 11 | Обновление прошивки без полномочий | `push_image()` требует `&ConfigureManagerToken` | Capability-токены (§6) |
+| 12 | Использование после выхода | `logout()` потребляет сессию | Владение (§1) |
 
-**Total runtime overhead of ALL twelve guarantees: zero.**
+**Суммарные накладные расходы во время выполнения от ВСЕХ двенадцати гарантий: ноль.**
 
-The generated binary makes the same HTTP calls as the untyped version — but the
-untyped version can have 12 classes of bugs. This version can't.
+Скомпилированный бинарник делает те же HTTP-вызовы, что и нетипизированная версия, но нетипизированная версия может содержать 12 классов ошибок. Эта версия не может.
 
 ---
 
-## Comparison: IPMI Integration (ch10) vs. Redfish Integration
+## Сравнение: интеграция с IPMI (гл. 10) и с Redfish
 
-| Dimension | ch10 (IPMI) | This chapter (Redfish) |
-|-----------|-------------|----------------------|
-| Transport | Raw bytes over KCS/LAN | JSON over HTTPS |
-| Navigation | Flat command codes (NetFn/Cmd) | Hierarchical URI tree |
-| Response binding | `IpmiCmd::Response` | `RedfishResource::Response` |
-| Privilege model | Single `AdminToken` | Role-based multi-token |
-| Payload construction | Byte arrays | Builder type-state for JSON |
-| Update lifecycle | Not covered | Full type-state chain |
-| Patterns exercised | 7 | 8 (adds builder type-state) |
+| Аспект | гл. 10 (IPMI) | Эта глава (Redfish) |
+|--------|---------------|---------------------|
+| Транспорт | Сырые байты через KCS/LAN | JSON через HTTPS |
+| Навигация | Плоские коды команд (NetFn/Cmd) | Иерархическое дерево URI |
+| Привязка ответа | `IpmiCmd::Response` | `RedfishResource::Response` |
+| Модель привилегий | Один `AdminToken` | Многотокенная модель на основе ролей |
+| Построение полезной нагрузки | Массивы байтов | Билдер с typestate для JSON |
+| Жизненный цикл обновления | Не рассматривается | Полная цепочка typestate |
+| Задействованные паттерны | 7 | 8 (добавляется typestate билдера) |
 
-The two chapters are complementary: ch10 shows the patterns work at the byte level,
-this chapter shows they work identically at the REST/JSON level. The type system
-doesn't care about the transport — it proves correctness either way.
+Две главы дополняют друг друга: гл. 10 показывает, что паттерны работают на уровне байтов, а эта глава показывает, что они работают одинаково на уровне REST/JSON. Система типов не зависит от транспорта и доказывает корректность в обоих случаях.
 
-## Key Takeaways
+## Ключевые выводы
 
-1. **Eight patterns compose into one Redfish client** — session type-state, capability
-   tokens, phantom-typed URIs, typed commands, dimensional analysis, validated
-   boundaries, builder type-state, and single-use firmware apply.
-2. **Twelve bug classes become compile errors** — see the table above.
-3. **Zero runtime overhead** — every proof token, phantom type, and type-state
-   marker compiles away. The binary is identical to hand-rolled untyped code.
-4. **REST APIs benefit as much as byte protocols** — the patterns from ch02–ch09
-   apply equally to JSON-over-HTTPS (Redfish) and bytes-over-KCS (IPMI).
-5. **Privilege enforcement is structural, not procedural** — the function signature
-   declares what's required; the compiler enforces it.
-6. **This is a design template** — adapt the resource type markers, capability
-   tokens, and builder for your specific Redfish schema and organizational
-   role hierarchy.
+1. **Восемь паттернов складываются в один клиент Redfish**: typestate сессии, capability-токены, URI с phantom-типами, типизированные команды, анализ размерностей, проверенные границы, typestate билдера и одноразовое применение прошивки.
+2. **Двенадцать классов ошибок становятся ошибками компиляции**: см. таблицу выше.
+3. **Нулевые накладные расходы во время выполнения**: каждый токен-доказательство, phantom-тип и маркер typestate исчезает при компиляции. Бинарный файл идентичен написанному вручную нетипизированному коду.
+4. **REST API выигрывают не меньше, чем протоколы на уровне байтов**: паттерны из гл. 02–09 одинаково применимы к JSON-over-HTTPS (Redfish) и байтам-over-KCS (IPMI).
+5. **Соблюдение привилегий структурно, а не процедурно**: сигнатура функции объявляет требования, а компилятор их обеспечивает.
+6. **Это шаблон проектирования**: адаптируйте маркеры типов ресурсов, capability-токены и билдер под вашу конкретную схему Redfish и иерархию ролей в организации.
 
 ---

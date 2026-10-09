@@ -1,60 +1,60 @@
-# The Philosophy — Why Types Beat Tests 🟢
+# Философия: почему типы лучше тестов 🟢
 
-> **What you'll learn:** The three levels of compile-time correctness (value, state, protocol), the Curry-Howard intuition behind type-level proofs, and when correct-by-construction patterns are — and aren't — worth the investment.
+> **Что вы узнаете:** три уровня корректности на этапе компиляции (значения, состояния, протоколы), интуицию соответствия Карри — Говарда, лежащую в основе доказательств на уровне типов, и то, когда паттерны корректности по построению оправданы, а когда — нет.
 >
-> **Cross-references:** [ch02](ch02-typed-command-interfaces-request-determi.md) (typed commands), [ch05](ch05-protocol-state-machines-type-state-for-r.md) (type-state), [ch13](ch13-reference-card.md) (reference card)
+> **Перекрёстные ссылки:** [гл. 02](ch02-typed-command-interfaces-request-determi.md) (типизированные команды), [гл. 05](ch05-protocol-state-machines-type-state-for-r.md) (typestate), [гл. 13](ch13-reference-card.md) (шпаргалка)
 
-## The Cost of Runtime Checking
+## Цена проверок во время выполнения
 
-Consider a typical runtime guard in a diagnostics codebase:
+Рассмотрим типичную проверку во время выполнения в кодовой базе диагностики:
 
 ```rust,ignore
 fn read_sensor(sensor_type: &str, raw: &[u8]) -> f64 {
     match sensor_type {
-        "temperature" => raw[0] as i8 as f64,          // signed byte
+        "temperature" => raw[0] as i8 as f64,          // знаковый байт
         "fan_speed"   => u16::from_le_bytes([raw[0], raw[1]]) as f64,
         "voltage"     => u16::from_le_bytes([raw[0], raw[1]]) as f64 / 1000.0,
-        _             => panic!("unknown sensor type: {sensor_type}"),
+        _             => panic!("неизвестный тип датчика: {sensor_type}"),
     }
 }
 ```
 
-This function has **four failure modes** the compiler cannot catch:
+У этой функции есть **четыре режима отказа**, которые компилятор не может поймать:
 
-1. Typo: `"temperture"` → panic at runtime
-2. Wrong `raw` length: `fan_speed` with 1 byte → panic at runtime
-3. Caller uses the returned `f64` as RPM when it's actually °C → logic bug, silent
-4. New sensor type added but this `match` not updated → panic at runtime
+1. Опечатка: `"temperture"` → panic во время выполнения
+2. Неверная длина `raw`: `fan_speed` с одним байтом → panic во время выполнения
+3. Вызывающий код использует возвращённое `f64` как обороты (RPM), хотя это градусы Цельсия → логическая ошибка, которая никак не проявляется
+4. Добавлен новый тип датчика, но этот `match` не обновлён → panic во время выполнения
 
-Every failure mode is discovered **after deployment**. Tests help, but they only cover the cases someone thought to write. The type system covers **all** cases, including ones nobody imagined.
+Каждый из этих режимов обнаруживается **уже после развёртывания**. Тесты помогают, но они покрывают только те случаи, о которых кто-то подумал. Система типов охватывает **все** случаи, включая те, о которых никто не подумал.
 
-## Three Levels of Correctness
+## Три уровня корректности
 
-### Level 1 — Value Correctness
-**Make invalid values unrepresentable.**
+### Уровень 1 — Корректность значений
+**Сделайте недопустимые значения непредставимыми.**
 
 ```rust,ignore
-// ❌ Any u16 can be a "port" — 0 is invalid but compiles
+// ❌ Любой u16 может быть «портом» — 0 недопустим, но код компилируется
 fn connect(port: u16) { /* ... */ }
 
-// ✅ Only validated ports can exist
-pub struct Port(u16);  // private field
+// ✅ Существуют только проверенные порты
+pub struct Port(u16);  // приватное поле
 
 impl TryFrom<u16> for Port {
     type Error = &'static str;
     fn try_from(v: u16) -> Result<Self, Self::Error> {
-        if v > 0 { Ok(Port(v)) } else { Err("port must be > 0") }
+        if v > 0 { Ok(Port(v)) } else { Err("порт должен быть больше 0") }
     }
 }
 
 fn connect(port: Port) { /* ... */ }
-// Port(0) can never be constructed — invariant holds everywhere
+// Port(0) никогда не может быть создан — инвариант выполняется везде
 ```
 
-**Hardware example:** `SensorId(u8)` — wraps a raw sensor number with validation that it's in the SDR range.
+**Пример из аппаратного обеспечения:** `SensorId(u8)` — оборачивает номер датчика сырым значением и проверяет, что он находится в диапазоне SDR.
 
-### Level 2 — State Correctness
-**Make invalid transitions unrepresentable.**
+### Уровень 2 — Корректность состояний
+**Сделайте недопустимые переходы непредставимыми.**
 
 ```rust,ignore
 use std::marker::PhantomData;
@@ -69,7 +69,7 @@ struct Socket<State> {
 
 impl Socket<Disconnected> {
     fn connect(self, addr: &str) -> Socket<Connected> {
-        // ... connect logic ...
+        // ... логика подключения ...
         Socket { fd: self.fd, _state: PhantomData }
     }
 }
@@ -81,13 +81,13 @@ impl Socket<Connected> {
     }
 }
 
-// Socket<Disconnected> has no send() method — compile error if you try
+// У Socket<Disconnected> нет метода send() — если его вызвать, будет ошибка компиляции
 ```
 
-**Hardware example:** GPIO pin modes — `Pin<Input>` has `read()` but not `write()`.
+**Пример из аппаратного обеспечения:** режимы пинов GPIO — у `Pin<Input>` есть `read()`, но нет `write()`.
 
-### Level 3 — Protocol Correctness
-**Make invalid interactions unrepresentable.**
+### Уровень 3 — Корректность протоколов
+**Сделайте недопустимые взаимодействия непредставимыми.**
 
 ```rust,ignore
 use std::io;
@@ -97,8 +97,8 @@ trait IpmiCmd {
     fn parse_response(&self, raw: &[u8]) -> io::Result<Self::Response>;
 }
 
-// Simplified for illustration — see ch02 for the full trait with
-// net_fn(), cmd_byte(), payload(), and parse_response().
+// Упрощено для наглядности — полный трейт с net_fn(), cmd_byte(), payload() и
+// parse_response() см. в гл. 02.
 
 struct ReadTemp { sensor_id: u8 }
 impl IpmiCmd for ReadTemp {
@@ -113,49 +113,48 @@ impl IpmiCmd for ReadTemp {
 fn execute<C: IpmiCmd>(cmd: &C, raw: &[u8]) -> io::Result<C::Response> {
     cmd.parse_response(raw)
 }
-// ReadTemp always returns Celsius — can't accidentally get Rpm
+// ReadTemp всегда возвращает Celsius — нельзя случайно получить Rpm
 ```
 
-**Hardware example:** IPMI, Redfish, NVMe Admin commands — the request type determines the response type.
+**Пример из аппаратного обеспечения:** IPMI, Redfish, административные команды NVMe — тип запроса определяет тип ответа.
 
-## The Curry-Howard Connection (Simplified)
+## Связь с соответствием Карри — Говарда (упрощённо)
 
-In programming language theory, the **Curry-Howard correspondence** states that types are propositions and programs are proofs. When you write:
+В теории языков программирования **соответствие Карри — Говарда** утверждает, что типы — это высказывания, а программы — их доказательства. Когда вы пишете:
 
 ```rust,ignore
 fn execute<C: IpmiCmd>(cmd: &C) -> io::Result<C::Response>
 ```
 
-You're not just writing a function — you're stating a **theorem**: "for any command type `C` that implements `IpmiCmd`, executing it produces exactly `C::Response`." The compiler **proves** this theorem every time it compiles your code. If the proof fails, the program can't exist.
+вы не просто пишете функцию, а формулируете **теорему**: «для любого типа команды `C`, реализующего `IpmiCmd`, выполнение даёт ровно `C::Response`». Компилятор **доказывает** эту теорему при каждой сборке вашего кода. Если доказательство не сходится, такой программы просто не может существовать.
 
-You don't need to understand the theory to use the patterns. But it explains *why* Rust's type system is so powerful — it's not just catching mistakes, it's **proving correctness**.
+Чтобы пользоваться паттернами, теорию знать не обязательно. Но она объясняет, *почему* система типов Rust так мощна: она не просто ловит ошибки, а **доказывает корректность**.
 
-## When NOT to Use These Patterns
+## Когда НЕ стоит использовать эти паттерны
 
-Correct-by-construction is not always the right choice:
+Корректность по построению не всегда оправдана:
 
-| Situation | Recommendation |
-|-----------|---------------|
-| Safety-critical boundary (power sequencing, crypto) | ✅ Always — a bug here melts hardware or leaks secrets |
-| Cross-module public API | ✅ Usually — misuse should be a compile error |
-| State machine with 3+ states | ✅ Usually — type-state prevents wrong transitions |
-| Internal helper within one 50-line function | ❌ Overkill — a simple `assert!` suffices |
-| Prototyping / exploring unknown hardware | ❌ Raw types first — refine after behaviour is understood |
-| User-facing CLI parsing | ⚠️ `clap` + `TryFrom` at the boundary, raw types inside is fine |
+| Ситуация | Рекомендация |
+|----------|--------------|
+| Критичная к безопасности граница (управление питанием, криптография) | ✅ Всегда: ошибка здесь может расплавить железо или утечь секреты |
+| Публичный API между модулями | ✅ Обычно: неправильное использование должно приводить к ошибке компиляции |
+| Автомат состояний с тремя и более состояниями | ✅ Обычно: typestate предотвращает неверные переходы |
+| Внутренний помощник в одной функции на 50 строк | ❌ Избыточно: достаточно простого `assert!` |
+| Прототипирование и изучение неизвестного оборудования | ❌ Сначала сырые типы; уточняйте их, когда поведение станет понятно |
+| Разбор пользовательского CLI | ⚠️ `clap` + `TryFrom` на границе, внутри допустимы сырые типы |
 
-The key question: **"If this bug happens in production, how bad is it?"**
+Ключевой вопрос: **«Если эта ошибка случится в продакшене, насколько она опасна?»**
 
-- Fan stops → GPU melts → **use types**
-- Wrong DER record → customer gets bad data → **use types**
-- Debug log message slightly wrong → **use `assert!`**
+- Вентилятор остановился → GPU выходит из строя → **используйте типы**
+- Неверная запись DER → клиент получает некорректные данные → **используйте типы**
+- Немного неверное debug-сообщение в логе → **используйте `assert!`**
 
-## Key Takeaways
+## Ключевые выводы
 
-1. **Three levels of correctness** — value (newtypes), state (type-state), protocol (associated types) — each eliminates a broader class of bugs.
-2. **Curry-Howard in practice** — every generic function signature is a theorem the compiler proves on each build.
-3. **The cost question** — "if this bug ships, how bad is it?" determines whether types or tests are the right tool.
-4. **Types complement tests** — they eliminate entire *categories*; tests cover specific *values* and edge cases.
-5. **Know when to stop** — internal helpers and throwaway prototypes rarely need type-level enforcement.
+1. **Три уровня корректности** — значения (newtype), состояния (typestate), протоколы (ассоциированные типы) — каждый уровень устраняет более широкий класс ошибок.
+2. **Соответствие Карри — Говарда на практике** — каждая сигнатура обобщённой функции — это теорема, которую компилятор доказывает при каждой сборке.
+3. **Вопрос о цене** — «если эта ошибка уйдёт в продакшен, насколько она опасна?» — определяет, что уместнее: типы или тесты.
+4. **Типы дополняют тесты** — типы устраняют целые *категории* ошибок, а тесты проверяют конкретные *значения* и граничные случаи.
+5. **Знайте, когда остановиться** — внутренние помощники и одноразовые прототипы редко нуждаются в принудительной проверке на уровне типов.
 
 ---
-

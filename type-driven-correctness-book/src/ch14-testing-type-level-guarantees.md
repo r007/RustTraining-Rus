@@ -1,24 +1,18 @@
-# Testing Type-Level Guarantees 🟡
+# Тестирование гарантий на уровне типов 🟡
 
-> **What you'll learn:** How to test that invalid code *fails to compile* (trybuild), fuzz validated boundaries (proptest), verify RAII invariants, and prove zero-cost abstraction via `cargo-show-asm`.
+> **Что вы узнаете:** как проверить, что некорректный код *не компилируется* (trybuild), как подвергнуть фаззингу проверенные границы (proptest), как проверить инварианты RAII и как доказать бесплатность абстракций с помощью `cargo-show-asm`.
 >
-> **Cross-references:** [ch03](ch03-single-use-types-cryptographic-guarantee.md) (compile-fail for nonces), [ch07](ch07-validated-boundaries-parse-dont-validate.md) (proptest for boundaries), [ch05](ch05-protocol-state-machines-type-state-for-r.md) (RAII for sessions)
+> **Перекрёстные ссылки:** [гл. 03](ch03-single-use-types-cryptographic-guarantee.md) (compile-fail для nonce), [гл. 07](ch07-validated-boundaries-parse-dont-validate.md) (proptest для границ), [гл. 05](ch05-protocol-state-machines-type-state-for-r.md) (RAII для сессий)
 
-## Testing Type-Level Guarantees
+## Тестирование гарантий на уровне типов
 
-Correct-by-construction patterns shift bugs from runtime to compile time. But
-how do you **test** that invalid code actually fails to compile? And how do you
-ensure validated boundaries hold under fuzzing? This chapter covers the testing
-tools that complement type-level correctness.
+Паттерны корректности по построению переносят ошибки из времени выполнения на этап компиляции. Но как **проверить**, что некорректный код действительно не компилируется? И как убедиться, что проверенные границы выдерживают фаззинг? В этой главе рассматриваются инструменты тестирования, которые дополняют корректность на уровне типов.
 
-### Compile-Fail Tests with `trybuild`
+### Compile-fail тесты с `trybuild`
 
-The [`trybuild`](https://crates.io/crates/trybuild) crate lets you assert that
-certain code **should not compile**. This is essential for maintaining type-level
-invariants across refactors — if someone accidentally adds `Clone` to your
-single-use `Nonce`, the compile-fail test catches it.
+Крейт [`trybuild`](https://crates.io/crates/trybuild) позволяет утверждать, что определённый код **не должен компилироваться**. Это важно для сохранения инвариантов уровня типов при рефакторинге: если кто-то случайно добавит `Clone` к вашему одноразовому `Nonce`, compile-fail тест это поймает.
 
-**Setup:**
+**Настройка:**
 
 ```toml
 # Cargo.toml
@@ -26,7 +20,7 @@ single-use `Nonce`, the compile-fail test catches it.
 trybuild = "1"
 ```
 
-**Test file (`tests/compile_fail.rs`):**
+**Файл теста (`tests/compile_fail.rs`):**
 
 ```rust,ignore
 #[test]
@@ -36,7 +30,7 @@ fn type_safety_tests() {
 }
 ```
 
-**Test case: Nonce reuse must not compile (`tests/ui/nonce_reuse.rs`):**
+**Тест: повторное использование nonce не должно компилироваться (`tests/ui/nonce_reuse.rs`):**
 
 ```rust,ignore
 // tests/ui/nonce_reuse.rs
@@ -45,13 +39,13 @@ use my_crate::Nonce;
 fn main() {
     let nonce = Nonce::new();
     encrypt(nonce);
-    encrypt(nonce); // should fail: use of moved value
+    encrypt(nonce); // должно быть ошибкой: использование перемещённого значения
 }
 
 fn encrypt(_n: Nonce) {}
 ```
 
-**Expected error (`tests/ui/nonce_reuse.stderr`):**
+**Ожидаемая ошибка (`tests/ui/nonce_reuse.stderr`):**
 
 ```text
 error[E0382]: use of moved value: `nonce`
@@ -61,35 +55,32 @@ error[E0382]: use of moved value: `nonce`
   |         ----- move occurs because `nonce` has type `Nonce`, which does not implement the `Copy` trait
 5 |     encrypt(nonce);
   |             ----- value moved here
-6 |     encrypt(nonce); // should fail: use of moved value
+6 |     encrypt(nonce); // должно быть ошибкой: использование перемещённого значения
   |             ^^^^^ value used here after move
 ```
 
-**More compile-fail test cases per chapter:**
+**Другие compile-fail тесты по главам:**
 
-| Pattern (Chapter) | Test assertion | File |
-|-------------------|---------------|------|
-| Single-Use Nonce (ch03) | Can't use nonce twice | `nonce_reuse.rs` |
-| Capability Token (ch04) | Can't call `admin_op()` without token | `missing_token.rs` |
-| Type-State (ch05) | Can't `send_command()` on `Session<Idle>` | `wrong_state.rs` |
-| Dimensional (ch06) | Can't add `Celsius + Rpm` | `unit_mismatch.rs` |
-| Sealed Trait (Trick 2) | External crate can't impl sealed trait | `unseal_attempt.rs` |
-| Non-Exhaustive (Trick 3) | External match without wildcard fails | `missing_wildcard.rs` |
+| Паттерн (глава) | Проверяемое утверждение | Файл |
+|-----------------|-------------------------|------|
+| Одноразовый nonce (гл. 03) | Нельзя использовать nonce дважды | `nonce_reuse.rs` |
+| Capability-токен (гл. 04) | Нельзя вызвать `admin_op()` без токена | `missing_token.rs` |
+| Typestate (гл. 05) | Нельзя вызвать `send_command()` у `Session<Idle>` | `wrong_state.rs` |
+| Размерные типы (гл. 06) | Нельзя сложить `Celsius + Rpm` | `unit_mismatch.rs` |
+| Sealed-трейт (приём 2) | Внешний крейт не может реализовать sealed-трейт | `unseal_attempt.rs` |
+| Non-exhaustive (приём 3) | Внешний match без подстановки не компилируется | `missing_wildcard.rs` |
 
-**CI integration:**
+**Интеграция с CI:**
 
 ```yaml
 # .github/workflows/ci.yml
-- name: Run compile-fail tests
+- name: Запуск compile-fail тестов
   run: cargo test --test compile_fail
 ```
 
-### Property-Based Testing of Validated Boundaries
+### Property-based тестирование проверенных границ
 
-Validated boundaries (ch07) parse data once and reject invalid input. But
-how do you know your validation catches **all** invalid inputs? Property-based
-testing with [`proptest`](https://crates.io/crates/proptest) generates
-thousands of random inputs to stress the boundary:
+Проверенные границы (гл. 07) разбирают данные один раз и отвергают некорректный ввод. Но откуда знать, что проверка ловит **все** некорректные входные данные? Property-based тестирование с [`proptest`](https://crates.io/crates/proptest) генерирует тысячи случайных входных данных, чтобы нагрузить границу:
 
 ```toml
 # Cargo.toml
@@ -100,42 +91,42 @@ proptest = "1"
 ```rust,ignore
 use proptest::prelude::*;
 
-/// From ch07: ValidFru wraps a spec-compliant FRU payload.
-/// These tests use the full ch07 ValidFru with board_area(),
-/// product_area(), and format_version() methods.
-/// Note: ch07 defines TryFrom<RawFruData>, so we wrap raw bytes first.
+/// Из гл. 07: ValidFru оборачивает полезную нагрузку FRU, соответствующую спецификации.
+/// В этих тестах используется полный ValidFru из гл. 07 с методами board_area(),
+/// product_area() и format_version().
+/// Примечание: в гл. 07 определён TryFrom<RawFruData>, поэтому сначала оборачиваем сырые байты.
 
 proptest! {
-    /// Any byte sequence that passes validation must be usable without panic.
+    /// Любая последовательность байтов, прошедшая проверку, должна использоваться без паники.
     #[test]
     fn valid_fru_never_panics(data in proptest::collection::vec(any::<u8>(), 0..1024)) {
         if let Ok(fru) = ValidFru::try_from(RawFruData(data)) {
-            // These must never panic on a validated FRU
-            // (methods from ch07's ValidFru impl):
+            // Эти методы не должны паниковать для проверенного FRU
+            // (методы из реализации ValidFru в гл. 07):
             let _ = fru.format_version();
             let _ = fru.board_area();
             let _ = fru.product_area();
         }
     }
 
-    /// Round-trip: format_version is preserved through reparsing.
+    /// Круговой тест: format_version сохраняется при повторном разборе.
     #[test]
     fn fru_round_trip(data in valid_fru_strategy()) {
         let raw = RawFruData(data.clone());
         let fru = ValidFru::try_from(raw).unwrap();
         let version = fru.format_version();
-        // Re-parse the same bytes — version must be identical
+        // Повторно разбираем те же байты: версия должна совпасть
         let reparsed = ValidFru::try_from(RawFruData(data)).unwrap();
         prop_assert_eq!(version, reparsed.format_version());
     }
 }
 
-/// Custom strategy: generates byte vectors that satisfy the FRU spec header.
-/// The header format matches ch07's `TryFrom<RawFruData>` validation:
-///   - Byte 0: version = 0x01
-///   - Bytes 1-6: area offsets (×8 = actual byte offset)
-///   - Byte 7: checksum (sum of bytes 0-7 = 0 mod 256)
-/// The body is random but large enough for the offsets to be in-bounds.
+/// Произвольная стратегия: генерирует векторы байтов, удовлетворяющие заголовку FRU.
+/// Формат заголовка соответствует проверке `TryFrom<RawFruData>` из гл. 07:
+///   - Байт 0: версия = 0x01
+///   - Байты 1–6: смещения областей (×8 = фактическое смещение в байтах)
+///   - Байт 7: контрольная сумма (сумма байтов 0–7 = 0 по модулю 256)
+/// Тело случайное, но достаточно большое, чтобы смещения оставались в пределах.
 fn valid_fru_strategy() -> impl Strategy<Value = Vec<u8>> {
     let header = vec![0x01, 0x00, 0x01, 0x02, 0x00, 0x00, 0x00];
     proptest::collection::vec(any::<u8>(), 64..256)
@@ -149,32 +140,31 @@ fn valid_fru_strategy() -> impl Strategy<Value = Vec<u8>> {
 }
 ```
 
-**The testing pyramid for correct-by-construction code:**
+**Пирамида тестирования для кода с корректностью по построению:**
 
 ```text
 ┌───────────────────────────────────┐
-│    Compile-Fail Tests (trybuild)  │ ← "Invalid code must not compile"
+│    Compile-fail тесты (trybuild)  │ ← «Некорректный код не должен компилироваться»
 ├───────────────────────────────────┤
-│  Property Tests (proptest/quickcheck) │ ← "Valid inputs never panic"
+│  Property-тесты (proptest/quickcheck) │ ← «Корректные входные данные никогда не вызывают панику»
 ├───────────────────────────────────┤
-│    Unit Tests (#[test])           │ ← "Specific inputs produce expected outputs"
+│    Модульные тесты (#[test])       │ ← «Конкретные входные данные дают ожидаемый результат»
 ├───────────────────────────────────┤
-│    Type System (patterns ch02–13) │ ← "Entire classes of bugs can't exist"
+│    Система типов (гл. 02–13)      │ ← «Целые классы ошибок не могут существовать»
 └───────────────────────────────────┘
 ```
 
-### RAII Verification
+### Проверка RAII
 
-RAII (Trick 12) guarantees cleanup. To test this, verify that the `Drop` impl
-actually fires:
+RAII (приём 12) гарантирует очистку. Чтобы это проверить, убедимся, что реализация `Drop` действительно срабатывает:
 
 ```rust,ignore
 use std::sync::atomic::{AtomicBool, Ordering};
 
-// NOTE: These tests use a global AtomicBool, so they must not run in
-// parallel with each other. Use `#[serial_test::serial]` or run with
-// `cargo test -- --test-threads=1`. Alternatively, use a per-test
-// `Arc<AtomicBool>` passed via closure to avoid the global entirely.
+// ПРИМЕЧАНИЕ: эти тесты используют глобальный AtomicBool, поэтому их нельзя запускать
+// параллельно друг с другом. Используйте `#[serial_test::serial]` или запускайте с
+// `cargo test -- --test-threads=1`. Либо используйте `Arc<AtomicBool>` для каждого теста,
+// передаваемый через замыкание, чтобы полностью обойтись без глобального состояния.
 static DROPPED: AtomicBool = AtomicBool::new(false);
 
 struct TestSession;
@@ -189,11 +179,11 @@ fn session_drops_on_early_return() {
     DROPPED.store(false, Ordering::SeqCst);
     let result: Result<(), &str> = (|| {
         let _session = TestSession;
-        Err("simulated failure")?;
+        Err("имитация сбоя")?;
         Ok(())
     })();
     assert!(result.is_err());
-    assert!(DROPPED.load(Ordering::SeqCst), "Drop must fire on early return");
+    assert!(DROPPED.load(Ordering::SeqCst), "Drop должен сработать при раннем возврате");
 }
 
 #[test]
@@ -201,42 +191,39 @@ fn session_drops_on_panic() {
     DROPPED.store(false, Ordering::SeqCst);
     let result = std::panic::catch_unwind(|| {
         let _session = TestSession;
-        panic!("simulated panic");
+        panic!("имитация паники");
     });
     assert!(result.is_err());
-    assert!(DROPPED.load(Ordering::SeqCst), "Drop must fire on panic");
+    assert!(DROPPED.load(Ordering::SeqCst), "Drop должен сработать при панике");
 }
 ```
 
-### Applying to Your Codebase
+### Применение к вашей кодовой базе
 
-Here's a prioritized plan for adding type-level tests to the
-workspace:
+Вот приоритизированный план добавления тестов на уровне типов в рабочую область:
 
-| Crate | Test type | What to test |
-|-------|-----------|-------------|
-| `protocol_lib` | Compile-fail | `Session<Idle>` can't `send_command()` |
-| `protocol_lib` | Property | Any byte seq → `TryFrom` either succeeds or returns Err (no panic) |
-| `thermal_diag` | Compile-fail | Can't construct `FanReading` without `HasSpi` mixin |
-| `accel_diag` | Property | GPU sensor parsing: random bytes → validated-or-rejected |
-| `config_loader` | Property | Random strings → `FromStr` for `DiagLevel` never panics |
-| `pci_topology` | Compile-fail | `Register<Width16>` can't be passed where `Width32` expected |
-| `event_handler` | Compile-fail | Audit token can't be cloned |
-| `diag_framework` | Compile-fail | `DerBuilder<Missing, _>` can't call `finish()` |
+| Крейт | Тип теста | Что тестировать |
+|-------|-----------|-----------------|
+| `protocol_lib` | Compile-fail | `Session<Idle>` не может вызвать `send_command()` |
+| `protocol_lib` | Property | Любая последовательность байтов → `TryFrom` либо успешно завершается, либо возвращает Err (без паники) |
+| `thermal_diag` | Compile-fail | Нельзя создать `FanReading` без миксина `HasSpi` |
+| `accel_diag` | Property | Разбор показаний GPU: случайные байты → либо проверены, либо отвергнуты |
+| `config_loader` | Property | Случайные строки → `FromStr` для `DiagLevel` никогда не паникует |
+| `pci_topology` | Compile-fail | `Register<Width16>` нельзя передать туда, где ожидается `Width32` |
+| `event_handler` | Compile-fail | Токен аудита нельзя клонировать |
+| `diag_framework` | Compile-fail | `DerBuilder<Missing, _>` не может вызвать `finish()` |
 
-### Zero-Cost Abstraction: Proof by Assembly
+### Бесплатные абстракции: доказательство через ассемблер
 
-A common concern: "Do newtypes and phantom types add runtime overhead?"
-The answer is **no** — they compile to identical assembly as raw primitives.
-Here's how to verify:
+Распространённый вопрос: «Добавляют ли newtype и phantom-типы накладные расходы во время выполнения?» Ответ: **нет**. Они компилируются в такой же ассемблер, как и голые примитивы. Вот как это проверить.
 
-**Setup:**
+**Настройка:**
 
 ```bash
 cargo install cargo-show-asm
 ```
 
-**Example: Newtype vs raw u32:**
+**Пример: newtype против голого u32:**
 
 ```rust,ignore
 // src/lib.rs
@@ -246,62 +233,57 @@ pub struct Rpm(pub u32);
 #[derive(Clone, Copy)]
 pub struct Celsius(pub f64);
 
-// Newtype arithmetic
+// Арифметика через newtype
 #[inline(never)]
 pub fn add_rpm(a: Rpm, b: Rpm) -> Rpm {
     Rpm(a.0 + b.0)
 }
 
-// Raw arithmetic (for comparison)
+// Голая арифметика (для сравнения)
 #[inline(never)]
 pub fn add_raw(a: u32, b: u32) -> u32 {
     a + b
 }
 ```
 
-**Run:**
+**Запуск:**
 
 ```bash
 cargo asm my_crate::add_rpm
 cargo asm my_crate::add_raw
 ```
 
-**Result — identical assembly:**
+**Результат: одинаковый ассемблер:**
 
 ```asm
-; add_rpm (newtype)           ; add_raw (raw u32)
+; add_rpm (newtype)           ; add_raw (голый u32)
 my_crate::add_rpm:            my_crate::add_raw:
   lea eax, [rdi + rsi]         lea eax, [rdi + rsi]
   ret                          ret
 ```
 
-The `Rpm` wrapper is completely erased at compile time. The same holds for
-`PhantomData<S>` (zero bytes), `ZST` tokens (zero bytes), and all other
-type-level markers used throughout this guide.
+Обёртка `Rpm` полностью стирается на этапе компиляции. То же верно для `PhantomData<S>` (ноль байт), токенов `ZST` (ноль байт) и всех остальных маркеров уровня типов, которые используются в этом руководстве.
 
-**Verify for your own types:**
+**Проверка своих типов:**
 
 ```bash
-# Show assembly for a specific function
+# Показать ассемблер для конкретной функции
 cargo asm --lib ipmi_lib::session::execute
 
-# Show that PhantomData adds zero bytes
+# Показать, что PhantomData не добавляет байтов
 cargo asm --lib --rust ipmi_lib::session::IpmiSession
 ```
 
-> **Key takeaway:** Every pattern in this guide has **zero runtime cost**.
-> The type system does all the work and is erased completely during compilation.
-> You get the safety of Haskell with the performance of C.
+> **Ключевой вывод:** каждый паттерн в этом руководстве имеет **нулевую стоимость во время выполнения**. Система типов делает всю работу и полностью стирается при компиляции. Вы получаете безопасность Haskell с производительностью C.
 
-## Key Takeaways
+## Ключевые выводы
 
-1. **trybuild tests that invalid code won't compile** — essential for maintaining type-level invariants across refactors.
-2. **proptest fuzzes validation boundaries** — generates thousands of random inputs to stress `TryFrom` implementations.
-3. **RAII verification tests that Drop runs** — Arc counters or mock flags prove cleanup happened.
-4. **cargo-show-asm proves zero-cost** — phantom types, ZSTs, and newtypes produce the same assembly as raw C.
-5. **Add compile-fail tests for every "impossible" state** — if someone accidentally derives `Clone` on a single-use type, the test catches it.
+1. **trybuild проверяет, что некорректный код не компилируется**: это важно для сохранения инвариантов уровня типов при рефакторинге.
+2. **proptest подвергает фаззингу границы валидации**: генерирует тысячи случайных входных данных, чтобы нагрузить реализации `TryFrom`.
+3. **Проверка RAII подтверждает, что Drop выполняется**: счётчики Arc или флаги-заглушки доказывают, что очистка произошла.
+4. **cargo-show-asm доказывает нулевую стоимость**: phantom-типы, ZST и newtype дают тот же ассемблер, что и голый C.
+5. **Добавляйте compile-fail тесты для каждого «невозможного» состояния**: если кто-то случайно выведет `Clone` для одноразового типа, тест это поймает.
 
 ---
 
-*End of Type-Driven Correctness in Rust*
-
+*Конец книги «Корректность на уровне типов в Rust»*
