@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" role="img" aria-labelledby="t-type-driven-correctness-book">
+  <title id="t-type-driven-correctness-book">Корректность на уровне типов</title>
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7e22ce"/><stop offset="1" stop-color="#2e1065"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="450" fill="url(#g)"/>
+  <circle cx="700" cy="80" r="160" fill="#ffffff" fill-opacity=".06"/>
+  <circle cx="90" cy="420" r="120" fill="#ffffff" fill-opacity=".05"/>
+  <text x="60" y="120" font-size="20" letter-spacing="3" fill="#ffffff" fill-opacity=".85" font-family="DejaVu Sans, Arial, sans-serif" font-weight="700">ЭКСПЕРТНЫЙ УРОВЕНЬ</text>
+  <text x="60" y="210" font-size="44" font-weight="700" fill="#ffffff" font-family="DejaVu Sans, Arial, sans-serif">Корректность</text>
+  <text x="60" y="268" font-size="44" font-weight="700" fill="#ffffff" font-family="DejaVu Sans, Arial, sans-serif">на уровне типов</text>
+  <path d="M650 135 L718 157 L718 221 C718 270 690 297 650 315 C610 297 582 270 582 221 L582 157 Z" fill="#ffffff" fill-opacity=".92"/>
+  <polyline points="616,225 642,251 688,199" fill="none" stroke="#7e22ce" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

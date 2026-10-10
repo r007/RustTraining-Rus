@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" role="img" aria-labelledby="t-c-cpp-book">
+  <title id="t-c-cpp-book">Курс Rust для программистов на C/C++</title>
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#15803d"/><stop offset="1" stop-color="#052e16"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="450" fill="url(#g)"/>
+  <circle cx="700" cy="80" r="160" fill="#ffffff" fill-opacity=".06"/>
+  <circle cx="90" cy="420" r="120" fill="#ffffff" fill-opacity=".05"/>
+  <text x="60" y="120" font-size="20" letter-spacing="3" fill="#ffffff" fill-opacity=".85" font-family="DejaVu Sans, Arial, sans-serif" font-weight="700">ИЗ C / C++ В RUST</text>
+  <text x="60" y="200" font-size="46" font-weight="700" fill="#ffffff" font-family="DejaVu Sans, Arial, sans-serif">Rust для</text>
+  <text x="60" y="258" font-size="46" font-weight="700" fill="#ffffff" font-family="DejaVu Sans, Arial, sans-serif">программистов</text>
+  <text x="60" y="316" font-size="46" font-weight="700" fill="#ffffff" font-family="DejaVu Sans, Arial, sans-serif">на C/C++</text>
+  <rect x="496" y="177" width="96" height="96" rx="10" fill="none" stroke="#ffffff" stroke-opacity=".6" stroke-width="4" stroke-dasharray="8 6"/>
+  <path d="M610 225 H656" stroke="#fbbf24" stroke-width="8" stroke-linecap="round"/>
+  <path d="M646 213 L660 225 L646 237" fill="none" stroke="#fbbf24" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="676" y="177" width="96" height="96" rx="10" fill="#ffffff" fill-opacity=".92"/>
+  <g stroke="#15803d" stroke-width="6" stroke-linecap="round">
+    <line x1="692" y1="202" x2="756" y2="202"/>
+    <line x1="692" y1="225" x2="744" y2="225"/>
+    <line x1="692" y1="248" x2="752" y2="248"/>
+  </g>
+</svg>

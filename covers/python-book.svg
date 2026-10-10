@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" role="img" aria-labelledby="t-python-book">
+  <title id="t-python-book">Rust для программистов на Python</title>
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#15803d"/><stop offset="1" stop-color="#052e16"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="450" fill="url(#g)"/>
+  <circle cx="700" cy="80" r="160" fill="#ffffff" fill-opacity=".06"/>
+  <circle cx="90" cy="420" r="120" fill="#ffffff" fill-opacity=".05"/>
+  <text x="60" y="120" font-size="20" letter-spacing="3" fill="#ffffff" fill-opacity=".85" font-family="DejaVu Sans, Arial, sans-serif" font-weight="700">ИЗ PYTHON В RUST</text>
+  <text x="60" y="200" font-size="46" font-weight="700" fill="#ffffff" font-family="DejaVu Sans, Arial, sans-serif">Rust для</text>
+  <text x="60" y="258" font-size="46" font-weight="700" fill="#ffffff" font-family="DejaVu Sans, Arial, sans-serif">программистов</text>
+  <text x="60" y="316" font-size="46" font-weight="700" fill="#ffffff" font-family="DejaVu Sans, Arial, sans-serif">на Python</text>
+  <path d="M500 225 C520 185 540 185 560 225 S600 265 620 225 S660 185 680 225 L760 225" fill="none" stroke="#ffffff" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="680" cy="225" r="11" fill="#fbbf24"/>
+</svg>
