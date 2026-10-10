@@ -8,6 +8,12 @@ use std::process::Command;
 /// Книги сборника: (каталог, название, описание, категория).
 const BOOKS: &[(&str, &str, &str, &str)] = &[
     (
+        "training-book",
+        "Практический курс Rust",
+        "Основы языка, многозадачность, веб, FFI, Python и встраиваемые системы",
+        "bridge",
+    ),
+    (
         "c-cpp-book",
         "Курс Rust для программистов на C/C++",
         "Семантика перемещения, RAII, FFI, embedded, no_std",
