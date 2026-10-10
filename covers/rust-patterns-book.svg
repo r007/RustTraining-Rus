@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" role="img" aria-labelledby="t-rust-patterns-book">
+  <title id="t-rust-patterns-book">Паттерны Rust</title>
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#b45309"/><stop offset="1" stop-color="#451a03"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="450" fill="url(#g)"/>
+  <circle cx="700" cy="80" r="160" fill="#ffffff" fill-opacity=".06"/>
+  <circle cx="90" cy="420" r="120" fill="#ffffff" fill-opacity=".05"/>
+  <text x="60" y="120" font-size="20" letter-spacing="3" fill="#ffffff" fill-opacity=".85" font-family="DejaVu Sans, Arial, sans-serif" font-weight="700">ПРОДВИНУТЫЙ УРОВЕНЬ</text>
+  <text x="60" y="210" font-size="56" font-weight="700" fill="#ffffff" font-family="DejaVu Sans, Arial, sans-serif">Паттерны</text>
+  <text x="60" y="270" font-size="56" font-weight="700" fill="#ffffff" font-family="DejaVu Sans, Arial, sans-serif">Rust</text>
+  <g fill="#ffffff">
+    <rect x="520" y="123" width="60" height="60" rx="10"/>
+    <rect x="592" y="123" width="60" height="60" rx="10" fill-opacity=".35"/>
+    <rect x="664" y="123" width="60" height="60" rx="10" fill-opacity=".6"/>
+    <rect x="520" y="195" width="60" height="60" rx="10" fill-opacity=".35"/>
+    <rect x="592" y="195" width="60" height="60" rx="10" fill="#fbbf24"/>
+    <rect x="664" y="195" width="60" height="60" rx="10" fill-opacity=".35"/>
+    <rect x="520" y="267" width="60" height="60" rx="10" fill-opacity=".6"/>
+    <rect x="592" y="267" width="60" height="60" rx="10" fill-opacity=".35"/>
+    <rect x="664" y="267" width="60" height="60" rx="10"/>
+  </g>
+</svg>

@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" role="img" aria-labelledby="t-training-book">
+  <title id="t-training-book">Практический курс Rust</title>
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#15803d"/><stop offset="1" stop-color="#052e16"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="450" fill="url(#g)"/>
+  <circle cx="700" cy="80" r="160" fill="#ffffff" fill-opacity=".06"/>
+  <circle cx="90" cy="420" r="120" fill="#ffffff" fill-opacity=".05"/>
+  <text x="60" y="120" font-size="20" letter-spacing="3" fill="#ffffff" fill-opacity=".85" font-family="DejaVu Sans, Arial, sans-serif" font-weight="700">КУРС RUST</text>
+  <text x="60" y="210" font-size="50" font-weight="700" fill="#ffffff" font-family="DejaVu Sans, Arial, sans-serif">Практический</text>
+  <text x="60" y="268" font-size="50" font-weight="700" fill="#ffffff" font-family="DejaVu Sans, Arial, sans-serif">курс Rust</text>
+  <path d="M540 175 Q585 165 618 185 L618 300 Q585 285 540 292 Z" fill="#ffffff" fill-opacity=".92"/>
+  <path d="M622 185 Q655 165 700 175 L700 292 Q655 285 622 300 Z" fill="#ffffff" fill-opacity=".92"/>
+  <g stroke="#15803d" stroke-width="5" stroke-linecap="round">
+    <line x1="556" y1="210" x2="602" y2="210"/>
+    <line x1="556" y1="230" x2="590" y2="230"/>
+    <line x1="556" y1="250" x2="598" y2="250"/>
+    <line x1="640" y1="210" x2="684" y2="210"/>
+    <line x1="640" y1="230" x2="672" y2="230"/>
+    <line x1="640" y1="250" x2="680" y2="250"/>
+  </g>
+  <line x1="620" y1="185" x2="620" y2="300" stroke="#052e16" stroke-opacity=".35" stroke-width="3"/>
+</svg>

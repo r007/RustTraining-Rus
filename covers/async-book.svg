@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" role="img" aria-labelledby="t-async-book">
+  <title id="t-async-book">Async Rust: от Future до продакшена</title>
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0e7490"/><stop offset="1" stop-color="#083344"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="450" fill="url(#g)"/>
+  <circle cx="700" cy="80" r="160" fill="#ffffff" fill-opacity=".06"/>
+  <circle cx="90" cy="420" r="120" fill="#ffffff" fill-opacity=".05"/>
+  <text x="60" y="120" font-size="20" letter-spacing="3" fill="#ffffff" fill-opacity=".85" font-family="DejaVu Sans, Arial, sans-serif" font-weight="700">ПОГРУЖЕНИЕ В ASYNC</text>
+  <text x="60" y="200" font-size="46" font-weight="700" fill="#ffffff" font-family="DejaVu Sans, Arial, sans-serif">Async Rust:</text>
+  <text x="60" y="258" font-size="46" font-weight="700" fill="#ffffff" font-family="DejaVu Sans, Arial, sans-serif">от Future до</text>
+  <text x="60" y="316" font-size="46" font-weight="700" fill="#ffffff" font-family="DejaVu Sans, Arial, sans-serif">продакшена</text>
+  <line x1="600" y1="150" x2="600" y2="300" stroke="#fbbf24" stroke-width="3" stroke-dasharray="6 6"/>
+  <rect x="520" y="160" width="90" height="20" rx="10" fill="#ffffff" fill-opacity=".9"/>
+  <rect x="630" y="160" width="110" height="20" rx="10" fill="#ffffff" fill-opacity=".5"/>
+  <rect x="560" y="215" width="150" height="20" rx="10" fill="#ffffff" fill-opacity=".9"/>
+  <rect x="520" y="270" width="64" height="20" rx="10" fill="#ffffff" fill-opacity=".5"/>
+  <rect x="604" y="270" width="136" height="20" rx="10" fill="#ffffff" fill-opacity=".9"/>
+</svg>
